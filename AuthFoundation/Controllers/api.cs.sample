@@ -1,58 +1,58 @@
-using Microsoft.AspNetCore.Mvc;
+//using Microsoft.AspNetCore.Mvc;
 
-namespace AuthFoundation.Controllers
-{
-    [ApiController]
-    [Route("sample")]
-    public class SampleController : ControllerBase
-    {
+//namespace AuthFoundation.Controllers
+//{
+//    [ApiController]
+//    [Route("sample")]
+//    public class SampleController : ControllerBase
+//    {
 
-        [HttpGet(Name = "GetSample")]
-        public async Task<IActionResult> Get()
-        {
-            HttpContext context = Request.HttpContext;
-            Input input = new Input(context);
-            return (IActionResult)Results.Ok(new Output());
-        }
-        /// <summary>
-        /// 入力値クラス
-        /// </summary>
-        public class Input
-        {
-            public string Value { get; set; }
+//        [HttpGet(Name = "GetSample")]
+//        public async Task<IActionResult> Get()
+//        {
+//            HttpContext context = Request.HttpContext;
+//            Input input = new Input(context);
+//            return (IActionResult)Results.Ok(new Output());
+//        }
+//        /// <summary>
+//        /// 入力値クラス
+//        /// </summary>
+//        public class Input
+//        {
+//            public string Value { get; set; }
 
-            public Input(HttpContext context)
-            {
-                Value = string.Empty;
-            }
-        }
-        /// <summary>
-        /// 返却値クラス
-        /// </summary>
-        private class Output
-        {
-            public string StatusCode { get; }
-            public string Message { get; }
+//            public Input(HttpContext context)
+//            {
+//                Value = string.Empty;
+//            }
+//        }
+//        /// <summary>
+//        /// 返却値クラス
+//        /// </summary>
+//        private class Output
+//        {
+//            public string StatusCode { get; }
+//            public string Message { get; }
 
-            /// <summary>
-            /// 例外
-            /// </summary>
-            /// <param name="ex">例外</param>
-            public Output(Common.ApiException ex)
-            {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
-            }
+//            /// <summary>
+//            /// 例外
+//            /// </summary>
+//            /// <param name="ex">例外</param>
+//            public Output(Common.ApiException ex)
+//            {
+//                StatusCode = ex.Code;
+//                Message = ex.ErrorMessage;
+//            }
 
-            /// <summary>
-            /// 正常
-            /// </summary>
-            public Output()
-            {
-                StatusCode = Common.Code.SUCCESS.Code;
-                Message = Common.Code.SUCCESS.ErrorMessage;
-            }
+//            /// <summary>
+//            /// 正常
+//            /// </summary>
+//            public Output()
+//            {
+//                StatusCode = Common.Code.SUCCESS.Code;
+//                Message = Common.Code.SUCCESS.ErrorMessage;
+//            }
 
-        }
-    }
-}
+//        }
+//    }
+//}
