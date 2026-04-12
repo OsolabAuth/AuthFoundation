@@ -12,6 +12,4 @@ public partial class data_key_master
     public DateTime create_datetime { get; set; }
 
     public DateTime update_datetime { get; set; }
-
-    public virtual ICollection<client_data_key> client_data_keys { get; set; } = new List<client_data_key>();
 }

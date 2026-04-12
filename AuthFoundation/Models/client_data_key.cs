@@ -17,7 +17,5 @@ public partial class client_data_key
 
     public DateTime update_datetime { get; set; }
 
-    public virtual client_master client { get; set; }
-
-    public virtual data_key_master data_keyNavigation { get; set; }
+    public byte status { get; set; }
 }

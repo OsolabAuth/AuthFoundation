@@ -94,6 +94,7 @@ BEGIN
     	[data_key] [varchar](64) NOT NULL,
     	[create_datetime] [datetime2](0) NOT NULL,
     	[update_datetime] [datetime2](0) NOT NULL,
+    	[status] [tinyint] NOT NULL,
      CONSTRAINT [PK_client_data_key] PRIMARY KEY CLUSTERED 
     (
     	[sequence_id] ASC

@@ -19,7 +19,5 @@ public partial class client_master
 
     public byte status { get; set; }
 
-    public virtual ICollection<client_data_key> client_data_keys { get; set; } = new List<client_data_key>();
-
     public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
 }

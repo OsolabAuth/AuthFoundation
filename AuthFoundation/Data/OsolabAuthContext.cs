@@ -42,16 +42,6 @@ public partial class OsolabAuthContext : DbContext
                 .HasMaxLength(64)
                 .IsUnicode(false);
             entity.Property(e => e.update_datetime).HasPrecision(0);
-
-            entity.HasOne(d => d.client).WithMany(p => p.client_data_keys)
-                .HasForeignKey(d => d.client_id)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_client_data_key_client_id");
-
-            entity.HasOne(d => d.data_keyNavigation).WithMany(p => p.client_data_keys)
-                .HasForeignKey(d => d.data_key)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_client_data_key_data_key");
         });
 
         modelBuilder.Entity<client_master>(entity =>
