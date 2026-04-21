@@ -9,7 +9,7 @@ namespace AuthFoundation.Controllers
         private const string version = "develop1.0.0";
 
         [HttpGet(Name = "GetVersion")]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> GetVersion()
         {
             HttpContext context = Request.HttpContext;
             Input input = new Input(context);

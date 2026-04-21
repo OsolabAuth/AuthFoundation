@@ -1,28 +1,35 @@
+using AuthFoundation.Common;
+using AuthFoundation.Data;
+using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+AppConfig.Initialize(builder.Configuration);
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
 
-builder.Services.AddSwaggerGen();
-builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddDbContext<OsolabAuthContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    ));
+
+var redisConnectionString =
+    builder.Configuration.GetConnectionString("Redis")
+    ?? throw new InvalidOperationException("Redis connection string is not configured.");
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+{
+    var options = ConfigurationOptions.Parse(redisConnectionString);
+    options.AbortOnConnectFail = false;
+    return ConnectionMultiplexer.Connect(options);
+});
+
+builder.Services.AddSingleton<IRedisClient, RedisClient>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

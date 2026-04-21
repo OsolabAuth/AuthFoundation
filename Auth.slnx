@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="AuthFoundation/AuthFoundation.csproj" />
+  <Project Path="AuthFoundationTest/AuthFoundationTest.csproj" Id="2d2f713d-e8d9-490a-8725-6f1c3d7e55ca" />
 </Solution>
