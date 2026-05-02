@@ -18,11 +18,19 @@ public partial class OsolabAuthContext : DbContext
 
     public virtual DbSet<client_master> client_masters { get; set; }
 
+    public virtual DbSet<client_scope> client_scopes { get; set; }
+
+    public virtual DbSet<client_term> client_terms { get; set; }
+
     public virtual DbSet<data_key_master> data_key_masters { get; set; }
 
     public virtual DbSet<osolab_user> osolab_users { get; set; }
 
+    public virtual DbSet<user_client_scope> user_client_scopes { get; set; }
+
     public virtual DbSet<user_info> user_infos { get; set; }
+
+    public virtual DbSet<user_term> user_terms { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +72,64 @@ public partial class OsolabAuthContext : DbContext
             entity.Property(e => e.update_datetime).HasPrecision(0);
         });
 
+        modelBuilder.Entity<client_scope>(entity =>
+        {
+            entity.HasKey(e => e.sequence_id);
+
+            entity.ToTable("client_scopes", "auth");
+
+            entity.HasIndex(e => new { e.client_id, e.scope }, "UX_client_scopes_client_scope").IsUnique();
+
+            entity.Property(e => e.client_id)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.required).HasDefaultValue(true, "DF_client_scopes_required");
+            entity.Property(e => e.scope)
+                .IsRequired()
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.client).WithMany(p => p.client_scopes)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_client_scopes_client_id");
+        });
+
+        modelBuilder.Entity<client_term>(entity =>
+        {
+            entity.HasKey(e => e.term_id);
+
+            entity.ToTable("client_terms", "auth");
+
+            entity.HasIndex(e => new { e.client_id, e.term_version }, "UX_client_terms_client_term_version").IsUnique();
+
+            entity.Property(e => e.client_id)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.required).HasDefaultValue(true, "DF_client_terms_required");
+            entity.Property(e => e.term_title)
+                .IsRequired()
+                .HasMaxLength(128);
+            entity.Property(e => e.term_url)
+                .IsRequired()
+                .HasMaxLength(1024);
+            entity.Property(e => e.term_version)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.client).WithMany(p => p.client_terms)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_client_terms_client_id");
+        });
+
         modelBuilder.Entity<data_key_master>(entity =>
         {
             entity.HasKey(e => e.data_key);
@@ -102,6 +168,40 @@ public partial class OsolabAuthContext : DbContext
             entity.Property(e => e.update_datetime).HasPrecision(0);
         });
 
+        modelBuilder.Entity<user_client_scope>(entity =>
+        {
+            entity.HasKey(e => e.sequence_id);
+
+            entity.ToTable("user_client_scopes", "auth");
+
+            entity.HasIndex(e => new { e.osolab_id, e.client_id, e.scope }, "UX_user_client_scopes_osolab_client_scope").IsUnique();
+
+            entity.Property(e => e.agreed_at).HasPrecision(0);
+            entity.Property(e => e.client_id)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.osolab_id)
+                .IsRequired()
+                .HasMaxLength(16);
+            entity.Property(e => e.scope)
+                .IsRequired()
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.client).WithMany(p => p.user_client_scopes)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_client_scopes_client_id");
+
+            entity.HasOne(d => d.osolab).WithMany(p => p.user_client_scopes)
+                .HasForeignKey(d => d.osolab_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_client_scopes_osolab_id");
+        });
+
         modelBuilder.Entity<user_info>(entity =>
         {
             entity.HasKey(e => new { e.osolab_id, e.client_id, e.data_key });
@@ -136,6 +236,45 @@ public partial class OsolabAuthContext : DbContext
                 .HasForeignKey(d => d.osolab_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_user_info_osolab_id");
+        });
+
+        modelBuilder.Entity<user_term>(entity =>
+        {
+            entity.HasKey(e => e.sequence_id);
+
+            entity.ToTable("user_terms", "auth");
+
+            entity.HasIndex(e => new { e.osolab_id, e.client_id, e.term_id, e.term_version }, "UX_user_terms_osolab_client_term").IsUnique();
+
+            entity.Property(e => e.agreed_at).HasPrecision(0);
+            entity.Property(e => e.client_id)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.osolab_id)
+                .IsRequired()
+                .HasMaxLength(16);
+            entity.Property(e => e.term_version)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.client).WithMany(p => p.user_terms)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_terms_client_id");
+
+            entity.HasOne(d => d.osolab).WithMany(p => p.user_terms)
+                .HasForeignKey(d => d.osolab_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_terms_osolab_id");
+
+            entity.HasOne(d => d.term).WithMany(p => p.user_terms)
+                .HasForeignKey(d => d.term_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_terms_term_id");
         });
 
         OnModelCreatingPartial(modelBuilder);

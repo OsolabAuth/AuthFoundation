@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AuthFoundation Login</title>
+</head>
+<body>
+  <h1>Login</h1>
+  <p>Authorization session: <code id="session">__SESSION_ID__</code></p>
+  <form id="loginForm">
+    <label>email <input type="email" id="email" required /></label><br />
+    <label>password(hash) <input type="text" id="password" required /></label><br />
+    <button type="submit">Login</button>
+  </form>
+  <p><button id="signupBtn" type="button">Signup</button></p>
+  <pre id="result"></pre>
+  <script>
+    const form = document.getElementById("loginForm");
+    document.getElementById("signupBtn").addEventListener("click", () => {
+      const sid = document.getElementById("session").textContent;
+      window.location.href = "/Signup/Account/view?session_id=" + encodeURIComponent(sid);
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": document.getElementById("session").textContent
+        },
+        body: JSON.stringify({
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value
+        })
+      });
+      const data = await res.json();
+      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+      if (res.ok && data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
+      if (res.ok && data.nextUrl) {
+        window.location.href = data.nextUrl;
+      }
+    });
+  </script>
+</body>
+</html>

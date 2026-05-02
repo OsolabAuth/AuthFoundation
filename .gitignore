@@ -365,3 +365,5 @@ FodyWeavers.xsd
 # Documentation (explicitly keep tracked)
 docs/
 docs/**/*.md
+# local docker env
+.env

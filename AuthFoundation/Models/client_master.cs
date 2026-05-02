@@ -19,5 +19,13 @@ public partial class client_master
 
     public byte status { get; set; }
 
+    public virtual ICollection<client_scope> client_scopes { get; set; } = new List<client_scope>();
+
+    public virtual ICollection<client_term> client_terms { get; set; } = new List<client_term>();
+
+    public virtual ICollection<user_client_scope> user_client_scopes { get; set; } = new List<user_client_scope>();
+
     public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
+
+    public virtual ICollection<user_term> user_terms { get; set; } = new List<user_term>();
 }

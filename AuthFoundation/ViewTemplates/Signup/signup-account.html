@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>Signup</title></head>
+<body>
+  <h1>Signup</h1>
+  <p>Authorization session: <code id="sid">__SID__</code></p>
+  <form id="f">
+    <input id="email" type="email" placeholder="email" required />
+    <input id="password" type="text" placeholder="password hash(64hex)" required />
+    <button type="submit">Create account</button>
+  </form>
+  <pre id="r"></pre>
+  <script>
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const res = await fetch("/Signup/Account", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","x-session-id":document.getElementById("sid").textContent},
+        body: JSON.stringify({email:document.getElementById("email").value,password:document.getElementById("password").value})
+      });
+      const data = await res.json();
+      document.getElementById("r").textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>

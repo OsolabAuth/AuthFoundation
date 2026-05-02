@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AuthFoundation Term Consent</title>
+</head>
+<body>
+  <h1>Consent</h1>
+  <p>Authorization session: <code id="session">__SESSION_ID__</code></p>
+  <p>Agree terms and scope to continue.</p>
+  <button id="agreeBtn">Agree</button>
+  <pre id="result"></pre>
+  <script>
+    document.getElementById("agreeBtn").addEventListener("click", async () => {
+      const res = await fetch("/term", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": document.getElementById("session").textContent
+        }
+      });
+      const data = await res.json();
+      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+      if (res.ok && data.redirectUri) {
+        window.location.href = data.redirectUri;
+      }
+    });
+  </script>
+</body>
+</html>

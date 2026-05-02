@@ -8,6 +8,7 @@ namespace AuthFoundation.Common
         public static readonly ApiException SUCCESS = new ApiException("00000", HttpStatusCode.OK, "OK" );
         public static readonly ApiException REQUEST_PARAMETER_ERROR = new ApiException("00001", HttpStatusCode.BadRequest, "リクエストの内容が異常です");
         public static readonly ApiException ILLEGAL_CLIENT = new ApiException("00002", HttpStatusCode.BadRequest, "不正なクライアント");
+        public static readonly ApiException AUTHENTICATION_FAILED = new ApiException("00003", HttpStatusCode.Unauthorized, "認証に失敗しました");
 
         public static readonly ApiException INTERNAL_SERVER_ERROR = new ApiException("90000", HttpStatusCode.InternalServerError, "ハンドルされていないエラーが発生しました");
         public static readonly ApiException ID_GENERATION_ERORR = new ApiException("90001", HttpStatusCode.InternalServerError, "ID生成に失敗しました");
@@ -25,16 +26,25 @@ namespace AuthFoundation.Common
         public static class HttpHeaders
         {
             public static readonly RequestValidation X_AUTH_CLIENT_ID = new RequestValidation("x-auth-clientid", @"^[0-9]{32}$");
+            public static readonly RequestValidation X_FLOW_TYPE = new RequestValidation("x-flow-type", @"^AuthorizationCode$");
+            public static readonly RequestValidation X_SESSION_ID = new RequestValidation("x-session-id", @"^[0-9a-zA-Z]{32}$");
 
         }
 
         public static class HttpQueries
         {
+            public static readonly RequestValidation RESPONSE_TYPE = new RequestValidation("response_type", @"^code$");
+            public static readonly RequestValidation CODE_CHALLENGE_METHOD = new RequestValidation("code_challenge_method", @"^S256$");
+            public static readonly RequestValidation CODE_CHALLENGE = new RequestValidation("code_challenge", @"^[A-Za-z0-9_-]{43,128}$");
+            public static readonly RequestValidation STATUS = new RequestValidation("status", @".*");
         }
         public static class HttpBodies
         {
             public static readonly RequestValidation EMAIL = new RequestValidation("email", @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
             public static readonly RequestValidation PASSWORD = new RequestValidation("password",@"^[0-9a-zA-Z]{64}$");
+            public static readonly RequestValidation GRANT_TYPE = new RequestValidation("grant_type", @"^authorization_code$");
+            public static readonly RequestValidation CODE_VERIFIER = new RequestValidation("code_verifier", @"^[A-Za-z0-9\-._~]{43,128}$");
+            public static readonly RequestValidation AUTH_CODE = new RequestValidation("code", @"^[0-9a-zA-Z]{64}$");
         }
 
         /// <summary>
@@ -109,5 +119,28 @@ namespace AuthFoundation.Common
             public const int TIME = 15;
         }
 
+        public static class AuthCode
+        {
+            public const int LENGTH = 64;
+            public const int EXPIRE_SEC = 300;
+            public const string CHARACTORS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            public const string REDIS_KEY_PREFIX = "auth_code:";
+        }
+
+        public static class AccessToken
+        {
+            public const int LENGTH = 64;
+            public const string CHARACTORS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            public const string REDIS_KEY_PREFIX = "access_token:";
+            public const string TOKEN_TYPE_BEARER = "Bearer";
+        }
+
+        public static class ResponseType
+        {
+            public const string CODE = "code";
+            public const string CODE_TOKEN = "code token";
+            public const string CODE_TOKEN_ID_TOKEN = "code token id_token";
+            public const string TOKEN = "token";
+        }
     }
 }

@@ -5,15 +5,19 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
-public partial class osolab_user
+public partial class client_term
 {
-    public string osolab_id { get; set; }
+    public long term_id { get; set; }
 
-    public string email { get; set; }
+    public string client_id { get; set; }
 
-    public string password { get; set; }
+    public string term_version { get; set; }
 
-    public string nonce { get; set; }
+    public string term_title { get; set; }
+
+    public string term_url { get; set; }
+
+    public bool required { get; set; }
 
     public DateTime create_datetime { get; set; }
 
@@ -21,9 +25,7 @@ public partial class osolab_user
 
     public byte status { get; set; }
 
-    public virtual ICollection<user_client_scope> user_client_scopes { get; set; } = new List<user_client_scope>();
-
-    public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
+    public virtual client_master client { get; set; }
 
     public virtual ICollection<user_term> user_terms { get; set; } = new List<user_term>();
 }

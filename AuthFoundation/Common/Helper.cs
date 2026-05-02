@@ -1,5 +1,7 @@
 ﻿using AuthFoundation.Data;
 using AuthFoundation.Models;
+using AuthFoundation.Session;
+using Azure.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR.Protocol;
 using Newtonsoft.Json;
@@ -29,7 +31,8 @@ namespace AuthFoundation.Common
         /// <exception cref="ApiException"></exception>
         public static client_master CertClient(OsolabAuthContext dbContex, string clientId)
         {
-            client_master? client = dbContex.client_masters.SingleOrDefault(x => x.client_id == clientId);
+            client_master? client = dbContex.client_masters.SingleOrDefault(
+                x => x.client_id == clientId && x.status == Code.Status.ACTIVE);
 
             if (client == null)
             {
@@ -158,6 +161,28 @@ namespace AuthFoundation.Common
             byte[] keyByte = Encoding.UTF8.GetBytes(key);
             byte[] hashPass = HMACSHA256.HashData(keyByte, passNonceByte);
             return BitConverter.ToString(hashPass).Replace("-", String.Empty); ;
+        }
+
+        public static async Task<bool> LoginCertificationAsync(RedisClient redis, HttpRequest request)
+        {
+            request.Cookies["session_id"]
+
+        }
+
+        public static async Task<AuthSession?> TryGetLoginSessionAsync(RedisClient redis, string? sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                return null;
+            }
+
+            string? raw = await redis.GetStringAsync(AuthSession.GetRedisKey(sessionId));
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            return JsonConvert.DeserializeObject<AuthSession>(raw);
         }
     }
 }

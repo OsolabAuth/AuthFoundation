@@ -27,6 +27,14 @@
          "ObjectType": 0
       },
       {
+         "Name": "[auth].[client_scopes]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[auth].[client_terms]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[auth].[data_key_master]",
          "ObjectType": 0
       },
@@ -35,7 +43,15 @@
          "ObjectType": 0
       },
       {
+         "Name": "[auth].[user_client_scopes]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[auth].[user_info]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[auth].[user_terms]",
          "ObjectType": 0
       }
    ],

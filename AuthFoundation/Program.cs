@@ -29,7 +29,11 @@ builder.Services.AddSingleton<IRedisClient, RedisClient>();
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+var disableHttpsRedirection = builder.Configuration.GetValue<bool>("DisableHttpsRedirection");
+if (!disableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
