@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -10,16 +10,25 @@ namespace AuthFoundation.Controllers.Auth
     [ApiController]
     [Route("Client/Register")]
     [Route("register")]
+    /// <summary>
+    /// ClientRegistrationController class.
+    /// </summary>
     public class ClientRegistrationController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
 
+        /// <summary>
+        /// Initializes a new instance of ClientRegistrationController.
+        /// </summary>
         public ClientRegistrationController(OsolabAuthContext dbContext)
         {
             _dbContext = dbContext;
         }
 
         [HttpPost]
+        /// <summary>
+        /// Executes RegisterClient.
+        /// </summary>
         public async Task<IActionResult> RegisterClient()
         {
             try
@@ -29,7 +38,7 @@ namespace AuthFoundation.Controllers.Auth
 
                 DateTime now = DateTime.UtcNow;
                 string clientId = GenerateUniqueClientId();
-                string clientSecret = Helper.GenerateRandomCode(32, Code.AccessToken.CHARACTORS);
+                string clientSecret = Helper.GenerateHex(64).ToLowerInvariant();
 
                 client_master client = new client_master
                 {
@@ -57,6 +66,9 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// Executes GenerateUniqueClientId.
+        /// </summary>
         private string GenerateUniqueClientId()
         {
             for (int i = 0; i < 10; i++)
@@ -69,20 +81,32 @@ namespace AuthFoundation.Controllers.Auth
                 }
             }
 
-            throw new ApiException(Code.ID_GENERATION_ERORR, "failed to generate client_id");
+            throw new ApiException(Code.ID_GENERATION_ERROR, "failed to generate client_id");
         }
 
+        /// <summary>
+        /// Executes GenerateNumericString.
+        /// </summary>
         private static string GenerateNumericString(int length)
         {
             const string digits = "0123456789";
             return Helper.GenerateRandomCode(length, digits);
         }
 
+        /// <summary>
+        /// Input class.
+        /// </summary>
         private class Input
         {
             [JsonProperty("client_name")]
+            /// <summary>
+            /// Gets or sets ClientName.
+            /// </summary>
             public string ClientName { get; set; } = string.Empty;
 
+            /// <summary>
+            /// Executes CreateAsync.
+            /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 Helper.ValidateTypeApplicationJson(context.Request.ContentType);
@@ -96,26 +120,57 @@ namespace AuthFoundation.Controllers.Auth
                 return body;
             }
 
+            /// <summary>
+            /// Executes Validate.
+            /// </summary>
             public void Validate()
             {
                 ValidateUtil.IndispensableParam(ClientName, "client_name");
             }
         }
 
+        /// <summary>
+        /// Output class.
+        /// </summary>
         private class Output
         {
+            /// <summary>
+            /// Gets or sets StatusCode.
+            /// </summary>
             public string StatusCode { get; }
+
+            /// <summary>
+            /// Gets or sets Message.
+            /// </summary>
             public string Message { get; }
+
+            /// <summary>
+            /// Gets or sets ClientId.
+            /// </summary>
             public string? ClientId { get; }
+
+            /// <summary>
+            /// Gets or sets ClientSecret.
+            /// </summary>
             public string? ClientSecret { get; }
+
+            /// <summary>
+            /// Gets or sets ClientName.
+            /// </summary>
             public string? ClientName { get; }
 
+            /// <summary>
+            /// Initializes a new instance of Output.
+            /// </summary>
             public Output(ApiException ex)
             {
                 StatusCode = ex.Code;
                 Message = ex.ErrorMessage;
             }
 
+            /// <summary>
+            /// Initializes a new instance of Output.
+            /// </summary>
             public Output(string clientId, string clientSecret, string clientName)
             {
                 StatusCode = Code.SUCCESS.Code;

@@ -5,25 +5,58 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
+/// <summary>
+/// osolab_user class.
+/// </summary>
 public partial class osolab_user
 {
+    /// <summary>
+    /// Gets or sets osolab_id.
+    /// </summary>
     public string osolab_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets email.
+    /// </summary>
     public string email { get; set; }
 
+    /// <summary>
+    /// Gets or sets password.
+    /// </summary>
     public string password { get; set; }
 
+    /// <summary>
+    /// Gets or sets nonce.
+    /// </summary>
     public string nonce { get; set; }
 
+    /// <summary>
+    /// Gets or sets create_datetime.
+    /// </summary>
     public DateTime create_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets update_datetime.
+    /// </summary>
     public DateTime update_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets status.
+    /// </summary>
     public byte status { get; set; }
 
+    /// <summary>
+    /// Gets or sets user_client_scopes.
+    /// </summary>
     public virtual ICollection<user_client_scope> user_client_scopes { get; set; } = new List<user_client_scope>();
 
+    /// <summary>
+    /// Gets or sets user_infos.
+    /// </summary>
     public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
 
+    /// <summary>
+    /// Gets or sets user_terms.
+    /// </summary>
     public virtual ICollection<user_term> user_terms { get; set; } = new List<user_term>();
 }

@@ -7,31 +7,67 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthFoundation.Data;
 
+/// <summary>
+/// OsolabAuthContext class.
+/// </summary>
 public partial class OsolabAuthContext : DbContext
 {
+    /// <summary>
+    /// Initializes a new instance of OsolabAuthContext.
+    /// </summary>
     public OsolabAuthContext(DbContextOptions<OsolabAuthContext> options)
         : base(options)
     {
     }
 
+    /// <summary>
+    /// Gets or sets client_data_keys.
+    /// </summary>
     public virtual DbSet<client_data_key> client_data_keys { get; set; }
 
+    /// <summary>
+    /// Gets or sets client_masters.
+    /// </summary>
     public virtual DbSet<client_master> client_masters { get; set; }
 
+    /// <summary>
+    /// Gets or sets client_scopes.
+    /// </summary>
     public virtual DbSet<client_scope> client_scopes { get; set; }
 
+    /// <summary>
+    /// Gets or sets client_terms.
+    /// </summary>
     public virtual DbSet<client_term> client_terms { get; set; }
 
+    /// <summary>
+    /// Gets or sets data_key_masters.
+    /// </summary>
     public virtual DbSet<data_key_master> data_key_masters { get; set; }
 
+    /// <summary>
+    /// Gets or sets osolab_users.
+    /// </summary>
     public virtual DbSet<osolab_user> osolab_users { get; set; }
 
+    /// <summary>
+    /// Gets or sets user_client_scopes.
+    /// </summary>
     public virtual DbSet<user_client_scope> user_client_scopes { get; set; }
 
+    /// <summary>
+    /// Gets or sets user_infos.
+    /// </summary>
     public virtual DbSet<user_info> user_infos { get; set; }
 
+    /// <summary>
+    /// Gets or sets user_terms.
+    /// </summary>
     public virtual DbSet<user_term> user_terms { get; set; }
 
+    /// <summary>
+    /// Executes OnModelCreating.
+    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<client_data_key>(entity =>

@@ -2,13 +2,14 @@
 
 namespace AuthFoundation.Common
 {
+    /// <summary>
+    /// ValidateUtil class.
+    /// </summary>
     public static class ValidateUtil
     {
         /// <summary>
-        /// 必須チェック
+        /// Executes IndispensableParam.
         /// </summary>
-        /// <param name="argValue">チェックする値</param>
-        /// <param name="argMessage">メッセージに指定する値</param>
         public static void IndispensableParam(string argValue, string argMessage)
         {
             if (string.IsNullOrEmpty(argValue))
@@ -18,12 +19,8 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Patternチェック
+        /// Executes FormatParam.
         /// </summary>
-        /// <param name="argValue">チェックする値</param>
-        /// <param name="argMessage">メッセージに指定する値</param>
-        /// <param name="pattern">チェックするパターン</param>
-        /// <param name="nullOrEnptyPermission">nullと空文字を許可するフラグ(true:nullと空文字を許可、false:nullと空文字を不許可)</param>
         public static void FormatParam(string argValue, string argMessage, string pattern, bool nullOrEnptyPermission = false)
         {
             if (nullOrEnptyPermission == true && string.IsNullOrEmpty(argValue))

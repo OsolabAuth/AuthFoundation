@@ -4,15 +4,15 @@ using Newtonsoft.Json;
 namespace AuthFoundation.Session
 {
     /// <summary>
-    /// AccessTokenSession class.
+    /// RefreshTokenSession class.
     /// </summary>
-    public class AccessTokenSession
+    public class RefreshTokenSession
     {
-        [JsonProperty("access_token")]
+        [JsonProperty("refresh_token")]
         /// <summary>
-        /// Gets or sets AccessToken.
+        /// Gets or sets RefreshToken.
         /// </summary>
-        public string AccessToken { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
 
         [JsonProperty("osolab_id")]
         /// <summary>
@@ -43,24 +43,24 @@ namespace AuthFoundation.Session
         /// </summary>
         public async Task CreateSession(IRedisClient redis)
         {
-            int expireSec = AppConfig.AccessTokenExpireSec;
+            int expireSec = AppConfig.RefreshTokenExpireSec;
             if (expireSec <= 0)
             {
-                throw new ApiException(Common.Code.INTERNAL_SERVER_ERROR, "Invalid configuration value");
+                throw new ApiException(Code.INTERNAL_SERVER_ERROR, "Invalid configuration value");
             }
 
             TimeSpan ttl = TimeSpan.FromSeconds(expireSec);
             ExpireAt = DateTimeHelper.ToJstString(DateTimeHelper.GetJstNow().AddSeconds(expireSec));
             string value = JsonConvert.SerializeObject(this);
-            await redis.SetStringAsync(GetRedisKey(AccessToken), value, ttl);
+            await redis.SetStringAsync(GetRedisKey(RefreshToken), value, ttl);
         }
 
         /// <summary>
         /// Executes GetRedisKey.
         /// </summary>
-        public static string GetRedisKey(string accessToken)
+        public static string GetRedisKey(string refreshToken)
         {
-            return $"{Code.AccessToken.REDIS_KEY_PREFIX}{accessToken}";
+            return $"{Code.RefreshToken.REDIS_KEY_PREFIX}{refreshToken}";
         }
     }
 }

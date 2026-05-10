@@ -19,29 +19,30 @@
     const form = document.getElementById("loginForm");
     document.getElementById("signupBtn").addEventListener("click", () => {
       const sid = document.getElementById("session").textContent;
-      window.location.href = "/Signup/Account/view?session_id=" + encodeURIComponent(sid);
+      window.location.href = "/signup?session_id=" + encodeURIComponent(sid);
     });
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const sid = document.getElementById("session").textContent.trim();
+      const body = new URLSearchParams({
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value
+      });
       const res = await fetch("/login", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "x-session-id": document.getElementById("session").textContent
+          "Content-Type": "application/x-www-form-urlencoded",
+          ...(sid ? { "x-session-id": sid } : {})
         },
-        body: JSON.stringify({
-          email: document.getElementById("email").value,
-          password: document.getElementById("password").value
-        })
+        body: body.toString()
       });
       const data = await res.json();
       document.getElementById("result").textContent = JSON.stringify(data, null, 2);
-      if (res.ok && data.redirectUrl) {
-        window.location.href = data.redirectUrl;
-        return;
-      }
-      if (res.ok && data.nextUrl) {
-        window.location.href = data.nextUrl;
+      if (res.ok && data.result === "redirect") {
+        const location = res.headers.get("Location");
+        if (location) {
+          window.location.href = location;
+        }
       }
     });
   </script>

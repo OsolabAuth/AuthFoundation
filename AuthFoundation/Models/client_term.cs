@@ -5,27 +5,63 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
+/// <summary>
+/// client_term class.
+/// </summary>
 public partial class client_term
 {
+    /// <summary>
+    /// Gets or sets term_id.
+    /// </summary>
     public long term_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets client_id.
+    /// </summary>
     public string client_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets term_version.
+    /// </summary>
     public string term_version { get; set; }
 
+    /// <summary>
+    /// Gets or sets term_title.
+    /// </summary>
     public string term_title { get; set; }
 
+    /// <summary>
+    /// Gets or sets term_url.
+    /// </summary>
     public string term_url { get; set; }
 
+    /// <summary>
+    /// Gets or sets required.
+    /// </summary>
     public bool required { get; set; }
 
+    /// <summary>
+    /// Gets or sets create_datetime.
+    /// </summary>
     public DateTime create_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets update_datetime.
+    /// </summary>
     public DateTime update_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets status.
+    /// </summary>
     public byte status { get; set; }
 
+    /// <summary>
+    /// Gets or sets client.
+    /// </summary>
     public virtual client_master client { get; set; }
 
+    /// <summary>
+    /// Gets or sets user_terms.
+    /// </summary>
     public virtual ICollection<user_term> user_terms { get; set; } = new List<user_term>();
 }

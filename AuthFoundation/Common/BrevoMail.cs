@@ -1,6 +1,9 @@
 ﻿using System.Text;
 using System.Text.Json;
 
+/// <summary>
+/// BrevoMail class.
+/// </summary>
 public class BrevoMail
 {
     private readonly HttpClient _httpClient;
@@ -8,6 +11,9 @@ public class BrevoMail
     private readonly string _senderEmail;
     private readonly string _senderName;
 
+    /// <summary>
+    /// Initializes a new instance of BrevoMail.
+    /// </summary>
     public BrevoMail(HttpClient httpClient, IConfiguration config)
     {
         _httpClient = httpClient;
@@ -21,6 +27,9 @@ public class BrevoMail
         _senderName = config["Brevo:SenderName"] ?? "App";
     }
 
+    /// <summary>
+    /// Executes SendMailAsync.
+    /// </summary>
     public async Task SendMailAsync(string toEmail, string toName, string subject, string html)
     {
         var body = new

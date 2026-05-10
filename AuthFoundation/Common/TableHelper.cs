@@ -3,16 +3,14 @@ using AuthFoundation.Models;
 
 namespace AuthFoundation.Common
 {
+    /// <summary>
+    /// TableHelper class.
+    /// </summary>
     public class TableHelper
     {
         /// <summary>
-        /// 新規ユーザー登録処理
+        /// Executes CreateNewOsolabUser.
         /// </summary>
-        /// <param name="osolabAuthContext"></param>
-        /// <param name="email"></param>
-        /// <param name="password"></param>
-        /// <returns></returns>
-        /// <exception cref="ApiException"></exception>
         public static osolab_user CreateNewOsolabUser(OsolabAuthContext osolabAuthContext, string email, string password)
         {
             string newOsolabId = string.Empty;
@@ -28,19 +26,20 @@ namespace AuthFoundation.Common
             }
             if (string.IsNullOrEmpty(newOsolabId))
             {
-                throw new ApiException(Common.Code.ID_GENERATION_ERORR, Common.Code.ID_GENERATION_ERORR.ErrorMessage);
+                throw new ApiException(Common.Code.ID_GENERATION_ERROR, Common.Code.ID_GENERATION_ERROR.ErrorMessage);
             }
 
             string nonce = Helper.GenerateRandomCode(Code.Nonce.LENGTH, Code.Nonce.CHARACTORS);
             string passHash = Helper.GetPassHash(password, nonce);
+            DateTime now = DateTime.UtcNow;
             return new osolab_user()
             {
                 osolab_id = newOsolabId,
                 email = email,
                 nonce = nonce,
                 password = passHash,
-                create_datetime = DateTime.Now,
-                update_datetime = DateTime.Now,
+                create_datetime = now,
+                update_datetime = now,
                 status = Code.Status.TENTATIVE
             };
         }

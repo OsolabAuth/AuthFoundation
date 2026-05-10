@@ -8,11 +8,13 @@ namespace AuthFoundation.Controllers.Signup
 {
     [ApiController]
     [Route("Signup/Verify")]
+    /// <summary>     /// SignupVerifyController class.     /// </summary>
     public class SignupVerifyController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
 
+        /// <summary>         /// Initializes a new instance of SignupVerifyController.         /// </summary>
         public SignupVerifyController(OsolabAuthContext dbContext, IRedisClient redis)
         {
             _dbContext = dbContext;
@@ -20,6 +22,7 @@ namespace AuthFoundation.Controllers.Signup
         }
 
         [HttpGet]
+        /// <summary>         /// Executes Verify.         /// </summary>
         public async Task<IActionResult> Verify()
         {
             try
@@ -76,6 +79,7 @@ namespace AuthFoundation.Controllers.Signup
             }
         }
 
+        /// <summary>         /// Executes GetAuthzSession.         /// </summary>
         private async Task<AuthorizationSession> GetAuthzSession(string authzSessionId)
         {
             string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(authzSessionId));
@@ -93,6 +97,7 @@ namespace AuthFoundation.Controllers.Signup
             return s;
         }
 
+        /// <summary>         /// Executes HasRequiredConsentAsync.         /// </summary>
         private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
         {
             string[] requestedScopes = requestedScope
@@ -127,6 +132,7 @@ namespace AuthFoundation.Controllers.Signup
             return requiredScopeSet.All(agreedScopeSet.Contains) && requestedScopes.All(agreedScopeSet.Contains);
         }
 
+        /// <summary>         /// Executes BuildAuthorizeUrl.         /// </summary>
         private static string BuildAuthorizeUrl(AuthorizationSession s)
         {
             return "/Authorize"

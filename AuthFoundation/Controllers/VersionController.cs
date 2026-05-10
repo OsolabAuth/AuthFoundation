@@ -4,11 +4,17 @@ namespace AuthFoundation.Controllers
 {
     [ApiController]
     [Route("Version")]
+    /// <summary>
+    /// VersionController class.
+    /// </summary>
     public class VersionController : ControllerBase
     {
         private const string version = "develop1.0.0";
 
         [HttpGet(Name = "GetVersion")]
+        /// <summary>
+        /// Executes GetVersion.
+        /// </summary>
         public async Task<IActionResult> GetVersion()
         {
             HttpContext context = Request.HttpContext;
@@ -16,31 +22,46 @@ namespace AuthFoundation.Controllers
             return new OkObjectResult(new Output(version));
         }
         /// <summary>
-        /// 入力値クラス
+        /// Input class.
         /// </summary>
         public class Input
         {
+            /// <summary>
+            /// Gets or sets Value.
+            /// </summary>
             public string Value { get; set; }
 
+            /// <summary>
+            /// Initializes a new instance of Input.
+            /// </summary>
             public Input(HttpContext context)
             {
                 Value = string.Empty;
             }
         }
         /// <summary>
-        /// 返却値クラス
+        /// Output class.
         /// </summary>
         private class Output
         {
+            /// <summary>
+            /// Gets or sets StatusCode.
+            /// </summary>
             public string StatusCode { get; }
+
+            /// <summary>
+            /// Gets or sets Message.
+            /// </summary>
             public string Message { get; }
 
+            /// <summary>
+            /// Gets or sets Version.
+            /// </summary>
             public string? Version { get; }
 
             /// <summary>
-            /// 例外
+            /// Initializes a new instance of Output.
             /// </summary>
-            /// <param name="ex">例外</param>
             public Output(Common.ApiException ex)
             {
                 StatusCode = ex.Code;
@@ -48,9 +69,8 @@ namespace AuthFoundation.Controllers
             }
 
             /// <summary>
-            /// 正常
+            /// Initializes a new instance of Output.
             /// </summary>
-            /// <param name="version"></param>
             public Output(string version)
             {
                 StatusCode = Common.Code.SUCCESS.Code;

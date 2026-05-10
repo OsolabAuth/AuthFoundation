@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using AuthFoundation.Common;
@@ -13,12 +13,14 @@ namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
     [Route("login")]
+    /// <summary>     /// LoginController class.     /// </summary>
     public class LoginController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
 
+        /// <summary>         /// Initializes a new instance of LoginController.         /// </summary>
         public LoginController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
         {
             _dbContext = dbContext;
@@ -27,6 +29,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         [HttpGet("view", Name = "GetLoginView")]
+        /// <summary>         /// Executes GetLoginView.         /// </summary>
         public IActionResult GetLoginView()
         {
             string sessionId = Request.Query["session_id"].ToString();
@@ -35,6 +38,7 @@ namespace AuthFoundation.Controllers.Auth
             return Content(html, "text/html; charset=utf-8");
         }
 
+        /// <summary>         /// Executes LoadTemplate.         /// </summary>
         private string LoadTemplate(string fileName)
         {
             string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Auth", fileName);
@@ -42,6 +46,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         [HttpPost(Name = "PostLogin")]
+        /// <summary>         /// Executes PostLogin.         /// </summary>
         public async Task<IActionResult> PostLogin()
         {
             try
@@ -101,6 +106,7 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>         /// Executes GetAuthorizationSessionAsync.         /// </summary>
         private async Task<AuthorizationSession> GetAuthorizationSessionAsync(string sessionId)
         {
             string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
@@ -118,6 +124,7 @@ namespace AuthFoundation.Controllers.Auth
             return authzSession;
         }
 
+        /// <summary>         /// Executes IsSameHash.         /// </summary>
         private static bool IsSameHash(string expectedHash, string actualHash)
         {
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expectedHash);
@@ -125,6 +132,7 @@ namespace AuthFoundation.Controllers.Auth
             return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
         }
 
+        /// <summary>         /// Executes CreateAuthCodeFromAuthorizationSessionAsync.         /// </summary>
         private async Task<AuthCodeSession> CreateAuthCodeFromAuthorizationSessionAsync(AuthorizationSession authzSession)
         {
             osolab_user? user = await _dbContext.osolab_users
@@ -152,6 +160,7 @@ namespace AuthFoundation.Controllers.Auth
             return codeSession;
         }
 
+        /// <summary>         /// Executes HasRequiredConsentAsync.         /// </summary>
         private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
         {
             string[] requestedScopes = requestedScope
@@ -192,26 +201,34 @@ namespace AuthFoundation.Controllers.Auth
             return requiredScopeSet.All(agreedScopes.Contains) && requestedScopes.All(agreedScopes.Contains);
         }
 
+        /// <summary>         /// Executes BuildRedirectUri.         /// </summary>
         private static string BuildRedirectUri(string redirectUri, string code, string state)
         {
             string separator = redirectUri.Contains('?') ? "&" : "?";
             return $"{redirectUri}{separator}code={Uri.EscapeDataString(code)}&state={Uri.EscapeDataString(state)}";
         }
 
+        /// <summary>         /// Input class.         /// </summary>
         public class Input
         {
+            /// <summary>             /// Gets or sets SessionId.             /// </summary>
             public string SessionId { get; set; } = string.Empty;
+            /// <summary>             /// Gets or sets Body.             /// </summary>
             public JsonBody Body { get; set; } = new();
 
+            /// <summary>             /// JsonBody class.             /// </summary>
             public class JsonBody
             {
                 [JsonProperty("email")]
+                /// <summary>                 /// Gets or sets Email.                 /// </summary>
                 public string Email { get; set; } = string.Empty;
 
                 [JsonProperty("password")]
+                /// <summary>                 /// Gets or sets Password.                 /// </summary>
                 public string Password { get; set; } = string.Empty;
             }
 
+            /// <summary>             /// Executes CreateAsync.             /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -232,6 +249,7 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            /// <summary>             /// Executes ValidationCheck.             /// </summary>
             public void ValidationCheck()
             {
                 ValidateUtil.IndispensableParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key);
@@ -243,25 +261,35 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>         /// Output class.         /// </summary>
         private class Output
         {
+            /// <summary>             /// Gets or sets StatusCode.             /// </summary>
             public string StatusCode { get; set; } = Code.SUCCESS.Code;
+            /// <summary>             /// Gets or sets Message.             /// </summary>
             public string Message { get; set; } = Code.SUCCESS.ErrorMessage;
+            /// <summary>             /// Gets or sets NextAction.             /// </summary>
             public string? NextAction { get; set; }
+            /// <summary>             /// Gets or sets AuthSessionId.             /// </summary>
             public string? AuthSessionId { get; set; }
+            /// <summary>             /// Gets or sets NextUrl.             /// </summary>
             public string? NextUrl { get; set; }
+            /// <summary>             /// Gets or sets RedirectUrl.             /// </summary>
             public string? RedirectUrl { get; set; }
 
+            /// <summary>             /// Executes ForNextAction.             /// </summary>
             public static Output ForNextAction(string nextAction, string authSessionId, string nextUrl)
             {
                 return new Output { NextAction = nextAction, AuthSessionId = authSessionId, NextUrl = nextUrl };
             }
 
+            /// <summary>             /// Executes ForRedirect.             /// </summary>
             public static Output ForRedirect(string redirectUrl)
             {
                 return new Output { RedirectUrl = redirectUrl };
             }
 
+            /// <summary>             /// Executes ForError.             /// </summary>
             public static Output ForError(ApiException ex)
             {
                 return new Output { StatusCode = ex.Code, Message = ex.ErrorMessage };

@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AuthFoundation.Common;
@@ -12,11 +12,13 @@ namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
     [Route("api/auth/token")]
+    /// <summary>     /// TokenController class.     /// </summary>
     public class TokenController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
 
+        /// <summary>         /// Initializes a new instance of TokenController.         /// </summary>
         public TokenController(OsolabAuthContext dbContext, IRedisClient redis)
         {
             _dbContext = dbContext;
@@ -24,6 +26,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         [HttpPost(Name = "PostAuthToken")]
+        /// <summary>         /// Executes PostToken.         /// </summary>
         public async Task<IActionResult> PostToken()
         {
             try
@@ -94,6 +97,7 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>         /// Executes IsPkceValid.         /// </summary>
         private static bool IsPkceValid(string codeVerifier, string codeChallenge, string codeChallengeMethod)
         {
             if (codeChallengeMethod != "S256")
@@ -107,6 +111,7 @@ namespace AuthFoundation.Controllers.Auth
             return IsSameValue(calculated, codeChallenge);
         }
 
+        /// <summary>         /// Executes GenerateIdToken.         /// </summary>
         private static string GenerateIdToken(AuthCodeSession authCodeSession)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -133,6 +138,7 @@ namespace AuthFoundation.Controllers.Auth
             return $"{signingInput}.{signature}";
         }
 
+        /// <summary>         /// Executes Base64UrlEncode.         /// </summary>
         private static string Base64UrlEncode(byte[] data)
         {
             return Convert.ToBase64String(data)
@@ -141,6 +147,7 @@ namespace AuthFoundation.Controllers.Auth
                 .Replace('/', '_');
         }
 
+        /// <summary>         /// Executes IsSameValue.         /// </summary>
         private static bool IsSameValue(string expected, string actual)
         {
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
@@ -148,31 +155,42 @@ namespace AuthFoundation.Controllers.Auth
             return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
         }
 
+        /// <summary>         /// Input class.         /// </summary>
         public class Input
         {
+            /// <summary>             /// Gets or sets FlowType.             /// </summary>
             public string FlowType { get; set; } = string.Empty;
+            /// <summary>             /// Gets or sets Body.             /// </summary>
             public JsonBody Body { get; set; } = new();
 
+            /// <summary>             /// JsonBody class.             /// </summary>
             public class JsonBody
             {
                 [JsonProperty("grant_type")]
+                /// <summary>                 /// Gets or sets GrantType.                 /// </summary>
                 public string GrantType { get; set; } = string.Empty;
 
                 [JsonProperty("client_id")]
+                /// <summary>                 /// Gets or sets ClientId.                 /// </summary>
                 public string ClientId { get; set; } = string.Empty;
 
                 [JsonProperty("client_secret")]
+                /// <summary>                 /// Gets or sets ClientSecret.                 /// </summary>
                 public string ClientSecret { get; set; } = string.Empty;
 
                 [JsonProperty("code_verifier")]
+                /// <summary>                 /// Gets or sets CodeVerifier.                 /// </summary>
                 public string CodeVerifier { get; set; } = string.Empty;
 
                 [JsonProperty("code")]
+                /// <summary>                 /// Gets or sets Code.                 /// </summary>
                 public string Code { get; set; } = string.Empty;
             }
 
+            /// <summary>             /// Initializes a new instance of Input.             /// </summary>
             private Input() { }
 
+            /// <summary>             /// Executes CreateAsync.             /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -201,6 +219,7 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            /// <summary>             /// Executes ValidationCheck.             /// </summary>
             public void ValidationCheck()
             {
                 ValidateUtil.IndispensableParam(FlowType, Code.HttpHeaders.X_FLOW_TYPE.Key);
@@ -221,21 +240,30 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>         /// Output class.         /// </summary>
         private class Output
         {
+            /// <summary>             /// Gets or sets StatusCode.             /// </summary>
             public string StatusCode { get; }
+            /// <summary>             /// Gets or sets Message.             /// </summary>
             public string Message { get; }
+            /// <summary>             /// Gets or sets AccessToken.             /// </summary>
             public string? AccessToken { get; }
+            /// <summary>             /// Gets or sets IdToken.             /// </summary>
             public string? IdToken { get; }
+            /// <summary>             /// Gets or sets TokenType.             /// </summary>
             public string? TokenType { get; }
+            /// <summary>             /// Gets or sets ExpiresIn.             /// </summary>
             public int? ExpiresIn { get; }
 
+            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
             public Output(ApiException ex)
             {
                 StatusCode = ex.Code;
                 Message = ex.ErrorMessage;
             }
 
+            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
             public Output(string accessToken, string idToken)
             {
                 StatusCode = Common.Code.SUCCESS.Code;

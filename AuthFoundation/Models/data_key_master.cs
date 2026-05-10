@@ -5,11 +5,23 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
+/// <summary>
+/// data_key_master class.
+/// </summary>
 public partial class data_key_master
 {
+    /// <summary>
+    /// Gets or sets data_key.
+    /// </summary>
     public string data_key { get; set; }
 
+    /// <summary>
+    /// Gets or sets create_datetime.
+    /// </summary>
     public DateTime create_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets update_datetime.
+    /// </summary>
     public DateTime update_datetime { get; set; }
 }

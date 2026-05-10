@@ -5,26 +5,28 @@ using System.Net.NetworkInformation;
 namespace AuthFoundation.Common;
 
 /// <summary>
-/// API用の業務例外。
-/// コード、HTTPステータス、表示用メッセージを保持する。
+/// ApiException class.
 /// </summary>
 public class ApiException : Exception
 {
     /// <summary>
-    /// 業務エラーコード
+    /// Gets or sets Code.
     /// </summary>
     public string Code { get; }
 
     /// <summary>
-    /// 返却したいHTTPステータス
+    /// Gets or sets Status.
     /// </summary>
     public HttpStatusCode Status { get; }
 
     /// <summary>
-    /// API返却用メッセージ
+    /// Gets or sets ErrorMessage.
     /// </summary>
     public string ErrorMessage { get; set; }
 
+    /// <summary>
+    /// Initializes a new instance of ApiException.
+    /// </summary>
     public ApiException(
         string code,
         HttpStatusCode status,
@@ -36,6 +38,9 @@ public class ApiException : Exception
         ErrorMessage = errorMessage;
     }
 
+    /// <summary>
+    /// Initializes a new instance of ApiException.
+    /// </summary>
     public ApiException(
         string code,
         HttpStatusCode status,
@@ -48,6 +53,9 @@ public class ApiException : Exception
         ErrorMessage = errorMessage;
     }
 
+    /// <summary>
+    /// Initializes a new instance of ApiException.
+    /// </summary>
     public ApiException(ApiException baseEx, string errorMessage)
     {
         Code = baseEx.Code;

@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
@@ -8,16 +8,19 @@ namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
     [Route("Logout")]
+    /// <summary>     /// LogoutController class.     /// </summary>
     public class LogoutController : ControllerBase
     {
         private readonly IRedisClient _redis;
 
+        /// <summary>         /// Initializes a new instance of LogoutController.         /// </summary>
         public LogoutController(IRedisClient redis)
         {
             _redis = redis;
         }
 
         [HttpPost]
+        /// <summary>         /// Executes PostLogout.         /// </summary>
         public async Task<IActionResult> PostLogout()
         {
             try
@@ -70,12 +73,17 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>         /// Input class.         /// </summary>
         public class Input
         {
+            /// <summary>             /// Gets or sets LogoutAll.             /// </summary>
             public bool LogoutAll { get; set; }
+            /// <summary>             /// Gets or sets AccessToken.             /// </summary>
             public string? AccessToken { get; set; }
+            /// <summary>             /// Gets or sets IdTokenJti.             /// </summary>
             public string? IdTokenJti { get; set; }
 
+            /// <summary>             /// Executes CreateAsync.             /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;

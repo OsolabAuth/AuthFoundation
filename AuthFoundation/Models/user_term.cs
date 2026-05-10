@@ -5,29 +5,68 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
+/// <summary>
+/// user_term class.
+/// </summary>
 public partial class user_term
 {
+    /// <summary>
+    /// Gets or sets sequence_id.
+    /// </summary>
     public long sequence_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets osolab_id.
+    /// </summary>
     public string osolab_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets client_id.
+    /// </summary>
     public string client_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets term_id.
+    /// </summary>
     public long term_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets term_version.
+    /// </summary>
     public string term_version { get; set; }
 
+    /// <summary>
+    /// Gets or sets agreed_at.
+    /// </summary>
     public DateTime agreed_at { get; set; }
 
+    /// <summary>
+    /// Gets or sets create_datetime.
+    /// </summary>
     public DateTime create_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets update_datetime.
+    /// </summary>
     public DateTime update_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets status.
+    /// </summary>
     public byte status { get; set; }
 
+    /// <summary>
+    /// Gets or sets client.
+    /// </summary>
     public virtual client_master client { get; set; }
 
+    /// <summary>
+    /// Gets or sets osolab.
+    /// </summary>
     public virtual osolab_user osolab { get; set; }
 
+    /// <summary>
+    /// Gets or sets term.
+    /// </summary>
     public virtual client_term term { get; set; }
 }

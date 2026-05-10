@@ -13,10 +13,14 @@
   <script>
     document.getElementById("f").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const res = await fetch("/Signup/Account", {
+      const body = new URLSearchParams({
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value
+      });
+      const res = await fetch("/signup/account", {
         method: "POST",
-        headers: {"Content-Type":"application/json","x-session-id":document.getElementById("sid").textContent},
-        body: JSON.stringify({email:document.getElementById("email").value,password:document.getElementById("password").value})
+        headers: {"Content-Type":"application/x-www-form-urlencoded","x-session-id":document.getElementById("sid").textContent.trim()},
+        body: body.toString()
       });
       const data = await res.json();
       document.getElementById("r").textContent = JSON.stringify(data, null, 2);

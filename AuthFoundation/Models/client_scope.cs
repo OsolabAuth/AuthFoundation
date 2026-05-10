@@ -5,21 +5,48 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
+/// <summary>
+/// client_scope class.
+/// </summary>
 public partial class client_scope
 {
+    /// <summary>
+    /// Gets or sets sequence_id.
+    /// </summary>
     public long sequence_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets client_id.
+    /// </summary>
     public string client_id { get; set; }
 
+    /// <summary>
+    /// Gets or sets scope.
+    /// </summary>
     public string scope { get; set; }
 
+    /// <summary>
+    /// Gets or sets required.
+    /// </summary>
     public bool required { get; set; }
 
+    /// <summary>
+    /// Gets or sets create_datetime.
+    /// </summary>
     public DateTime create_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets update_datetime.
+    /// </summary>
     public DateTime update_datetime { get; set; }
 
+    /// <summary>
+    /// Gets or sets status.
+    /// </summary>
     public byte status { get; set; }
 
+    /// <summary>
+    /// Gets or sets client.
+    /// </summary>
     public virtual client_master client { get; set; }
 }

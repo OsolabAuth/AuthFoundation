@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
@@ -8,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 AppConfig.Initialize(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 
 builder.Services.AddDbContext<OsolabAuthContext>(options =>
     options.UseSqlServer(
@@ -26,6 +27,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 });
 
 builder.Services.AddSingleton<IRedisClient, RedisClient>();
+builder.Services.AddSingleton<OidcSigningService>();
 
 var app = builder.Build();
 

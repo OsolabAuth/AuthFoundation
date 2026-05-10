@@ -1,15 +1,14 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
-    [Route("Authorize")]
+    [Route("authorize")]
     public class AuthorizeController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
@@ -27,22 +26,36 @@ namespace AuthFoundation.Controllers.Auth
             try
             {
                 Input input = Input.Create(Request.HttpContext);
-                input.ValidationCheck();
+                input.Validate();
 
-                client_master client = Helper.CertClient(_dbContext, input.ClientId);
+                Helper.CertClient(_dbContext, input.ClientId);
+                if (!Helper.IsRedirectUriFormatValid(input.RedirectUri))
+                {
+                    throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                }
 
-                AuthSession? loginSession = await Helper.TryGetLoginSessionAsync(Request.Cookies["session_id"]);
-                bool hasConsent = loginSession != null && await HasRequiredConsentAsync(loginSession.OsolabId, input.ClientId, input.Scope);
+                string? cookieSessionId = Request.Cookies[Code.AUTH_SESSION_COOKIE_KEY]
+                    ?? Request.Cookies["session_id"];
+
+                AuthSession? loginSession = await Helper.TryGetLoginSessionAsync(_redis, cookieSessionId);
+                bool hasConsent = loginSession != null
+                    && await HasRequiredConsentAsync(loginSession.OsolabId, input.ClientId, input.Scope);
 
                 if (loginSession != null && hasConsent)
                 {
                     AuthCodeSession codeSession = CreateAuthCodeSession(input, loginSession.OsolabId, loginSession.Email);
                     await codeSession.CreateSession(_redis);
-                    string redirectUri = BuildRedirectUri(input.RedirectUri, codeSession.Code, input.State);
+
+                    string redirectUri = Helper.BuildRedirectUri(input.RedirectUri, new Dictionary<string, string>
+                    {
+                        ["code"] = codeSession.Code,
+                        ["state"] = input.State
+                    });
+
                     return Redirect(redirectUri);
                 }
 
-                string authzSessionId = Helper.GenerateRandomCode(Code.Session.LENGTH, Code.Session.CHARACTORS);
+                string authzSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
                 AuthorizationSession authzSession = new AuthorizationSession
                 {
                     SessionId = authzSessionId,
@@ -60,28 +73,33 @@ namespace AuthFoundation.Controllers.Auth
 
                 if (loginSession == null)
                 {
-                    return Redirect($"/login/view?session_id={Uri.EscapeDataString(authzSessionId)}");
+                    return Redirect($"/login?session_id={Uri.EscapeDataString(authzSessionId)}");
                 }
 
-                return Redirect($"/term/view?session_id={Uri.EscapeDataString(authzSessionId)}");
+                return Redirect($"/terms/view?session_id={Uri.EscapeDataString(authzSessionId)}");
             }
-            catch (ApiException aex)
+            catch (ApiException ex)
             {
-                return new ObjectResult(Output.ForError(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new { response_code = ex.Code, message = ex.ErrorMessage })
+                {
+                    StatusCode = (int)ex.Status
+                };
             }
             catch (Exception ex)
             {
-                ApiException aex = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(Output.ForError(aex)) { StatusCode = (int)aex.Status };
+                ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                return new ObjectResult(new { response_code = apiEx.Code, message = apiEx.ErrorMessage })
+                {
+                    StatusCode = (int)apiEx.Status
+                };
             }
         }
 
         private static AuthCodeSession CreateAuthCodeSession(Input input, string osolabId, string email)
         {
-            string code = Helper.GenerateRandomCode(Code.AuthCode.LENGTH, Code.AuthCode.CHARACTORS);
             return new AuthCodeSession
             {
-                Code = code,
+                Code = Helper.GenerateRandomCode(Code.AuthCode.LENGTH, Code.AuthCode.CHARACTORS),
                 OsolabId = osolabId,
                 Email = email,
                 ClientId = input.ClientId,
@@ -96,40 +114,28 @@ namespace AuthFoundation.Controllers.Auth
 
         private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
         {
-            string[] requestedScopes = requestedScope
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
+            string[] requestedScopes = Helper.ParseScopes(requestedScope);
 
-            client_term[] requiredTerms = await _dbContext.client_terms
+            List<client_term> requiredTerms = await _dbContext.client_terms
                 .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
-                .ToArrayAsync();
+                .ToListAsync();
 
-            client_scope[] requiredScopes = await _dbContext.client_scopes
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
-                .ToArrayAsync();
-
-            bool hasAllRequiredTerms = await _dbContext.user_terms
+            List<user_term> agreedTermRows = await _dbContext.user_terms
                 .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
-                .Select(x => new { x.term_id, x.term_version })
-                .ToListAsync()
-                .ContinueWith(t =>
-                {
-                    var agreed = t.Result.ToHashSet();
-                    return requiredTerms.All(rt => agreed.Contains(new { term_id = rt.term_id, term_version = rt.term_version }));
-                });
+                .ToListAsync();
 
+            bool hasAllRequiredTerms = requiredTerms.All(rt =>
+                agreedTermRows.Any(ut => ut.term_id == rt.term_id && ut.term_version == rt.term_version));
             if (!hasAllRequiredTerms)
             {
                 return false;
             }
 
-            if (requestedScopes.Length == 0)
-            {
-                return true;
-            }
+            HashSet<string> requiredScopeSet = await _dbContext.client_scopes
+                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
+                .Select(x => x.scope)
+                .ToHashSetAsync(StringComparer.Ordinal);
 
-            var requiredScopeSet = requiredScopes.Select(x => x.scope).ToHashSet(StringComparer.Ordinal);
             if (!requiredScopeSet.IsSubsetOf(requestedScopes))
             {
                 return false;
@@ -138,18 +144,12 @@ namespace AuthFoundation.Controllers.Auth
             HashSet<string> agreedScopes = await _dbContext.user_client_scopes
                 .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
                 .Select(x => x.scope)
-                .ToHashSetAsync();
+                .ToHashSetAsync(StringComparer.Ordinal);
 
             return requiredScopeSet.All(agreedScopes.Contains) && requestedScopes.All(agreedScopes.Contains);
         }
 
-        private static string BuildRedirectUri(string redirectUri, string code, string state)
-        {
-            string separator = redirectUri.Contains('?') ? "&" : "?";
-            return $"{redirectUri}{separator}code={Uri.EscapeDataString(code)}&state={Uri.EscapeDataString(state)}";
-        }
-
-        public class Input
+        public sealed class Input
         {
             public string ResponseType { get; set; } = string.Empty;
             public string ClientId { get; set; } = string.Empty;
@@ -176,31 +176,24 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
-            public void ValidationCheck()
+            public void Validate()
             {
                 ValidateUtil.IndispensableParam(ResponseType, Code.HttpQueries.RESPONSE_TYPE.Key);
                 ValidateUtil.FormatParam(ResponseType, Code.HttpQueries.RESPONSE_TYPE.Key, Code.HttpQueries.RESPONSE_TYPE.Regex);
-                ValidateUtil.IndispensableParam(ClientId, "client_id");
-                ValidateUtil.FormatParam(ClientId, "client_id", Code.HttpHeaders.X_AUTH_CLIENT_ID.Regex);
-                ValidateUtil.IndispensableParam(RedirectUri, "redirect_uri");
-                ValidateUtil.IndispensableParam(State, "state");
-                ValidateUtil.IndispensableParam(Scope, "scope");
-                ValidateUtil.IndispensableParam(Nonce, "nonce");
+                ValidateUtil.IndispensableParam(ClientId, Code.HttpQueries.CLIENT_ID.Key);
+                ValidateUtil.FormatParam(ClientId, Code.HttpQueries.CLIENT_ID.Key, Code.HttpQueries.CLIENT_ID.Regex);
+                ValidateUtil.IndispensableParam(RedirectUri, Code.HttpQueries.REDIRECT_URI.Key);
+                ValidateUtil.FormatParam(RedirectUri, Code.HttpQueries.REDIRECT_URI.Key, Code.HttpQueries.REDIRECT_URI.Regex);
+                ValidateUtil.IndispensableParam(State, Code.HttpQueries.STATE.Key);
+                ValidateUtil.FormatParam(State, Code.HttpQueries.STATE.Key, Code.HttpQueries.STATE.Regex);
+                ValidateUtil.IndispensableParam(Scope, Code.HttpQueries.SCOPE.Key);
+                ValidateUtil.FormatParam(Scope, Code.HttpQueries.SCOPE.Key, Code.HttpQueries.SCOPE.Regex);
                 ValidateUtil.IndispensableParam(CodeChallengeMethod, Code.HttpQueries.CODE_CHALLENGE_METHOD.Key);
                 ValidateUtil.FormatParam(CodeChallengeMethod, Code.HttpQueries.CODE_CHALLENGE_METHOD.Key, Code.HttpQueries.CODE_CHALLENGE_METHOD.Regex);
                 ValidateUtil.IndispensableParam(CodeChallenge, Code.HttpQueries.CODE_CHALLENGE.Key);
                 ValidateUtil.FormatParam(CodeChallenge, Code.HttpQueries.CODE_CHALLENGE.Key, Code.HttpQueries.CODE_CHALLENGE.Regex);
-            }
-        }
-
-        private class Output
-        {
-            public string StatusCode { get; set; } = Common.Code.SUCCESS.Code;
-            public string Message { get; set; } = Common.Code.SUCCESS.ErrorMessage;
-
-            public static Output ForError(ApiException ex)
-            {
-                return new Output { StatusCode = ex.Code, Message = ex.ErrorMessage };
+                ValidateUtil.IndispensableParam(Nonce, Code.HttpQueries.NONCE.Key);
+                ValidateUtil.FormatParam(Nonce, Code.HttpQueries.NONCE.Key, Code.HttpQueries.NONCE.Regex);
             }
         }
     }

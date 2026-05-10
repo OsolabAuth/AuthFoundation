@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
@@ -11,12 +11,14 @@ namespace AuthFoundation.Controllers.Signup
 {
     [ApiController]
     [Route("Signup/Account")]
+    /// <summary>     /// SignupAccountController class.     /// </summary>
     public class SignupAccountController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
 
+        /// <summary>         /// Initializes a new instance of SignupAccountController.         /// </summary>
         public SignupAccountController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
         {
             _dbContext = dbContext;
@@ -25,6 +27,7 @@ namespace AuthFoundation.Controllers.Signup
         }
 
         [HttpGet("view")]
+        /// <summary>         /// Executes GetSignupView.         /// </summary>
         public IActionResult GetSignupView()
         {
             string sessionId = Request.Query["session_id"].ToString();
@@ -33,6 +36,7 @@ namespace AuthFoundation.Controllers.Signup
             return Content(html, "text/html; charset=utf-8");
         }
 
+        /// <summary>         /// Executes LoadTemplate.         /// </summary>
         private string LoadTemplate(string fileName)
         {
             string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Signup", fileName);
@@ -40,6 +44,7 @@ namespace AuthFoundation.Controllers.Signup
         }
 
         [HttpPost(Name = "PostSignupAccount")]
+        /// <summary>         /// Executes PostAccount.         /// </summary>
         public async Task<IActionResult> PostAccount()
         {
             try
@@ -82,6 +87,7 @@ namespace AuthFoundation.Controllers.Signup
             }
         }
 
+        /// <summary>         /// Executes GetAuthorizationSessionAsync.         /// </summary>
         private async Task<AuthorizationSession> GetAuthorizationSessionAsync(string sessionId)
         {
             string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
@@ -91,17 +97,22 @@ namespace AuthFoundation.Controllers.Signup
             return s;
         }
 
+        /// <summary>         /// Input class.         /// </summary>
         public class Input
         {
+            /// <summary>             /// Gets or sets SessionId.             /// </summary>
             public string SessionId { get; set; } = string.Empty;
+            /// <summary>             /// Gets or sets Body.             /// </summary>
             public JsonBody Body { get; set; } = new();
 
+            /// <summary>             /// JsonBody class.             /// </summary>
             public class JsonBody
             {
                 [JsonProperty("email")] public string Email { get; set; } = string.Empty;
                 [JsonProperty("password")] public string Password { get; set; } = string.Empty;
             }
 
+            /// <summary>             /// Executes CreateAsync.             /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -112,6 +123,7 @@ namespace AuthFoundation.Controllers.Signup
                 return new Input { SessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString(), Body = body };
             }
 
+            /// <summary>             /// Executes ValidationCheck.             /// </summary>
             public void ValidationCheck()
             {
                 ValidateUtil.IndispensableParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key);
@@ -123,12 +135,18 @@ namespace AuthFoundation.Controllers.Signup
             }
         }
 
+        /// <summary>         /// Output class.         /// </summary>
         private class Output
         {
+            /// <summary>             /// Gets or sets StatusCode.             /// </summary>
             public string StatusCode { get; }
+            /// <summary>             /// Gets or sets Message.             /// </summary>
             public string Message { get; }
+            /// <summary>             /// Gets or sets VerifyUrl.             /// </summary>
             public string? VerifyUrl { get; }
+            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
             public Output(ApiException ex) { StatusCode = ex.Code; Message = ex.ErrorMessage; }
+            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
             public Output(string verifyUrl)
             {
                 StatusCode = Code.SUCCESS.Code;

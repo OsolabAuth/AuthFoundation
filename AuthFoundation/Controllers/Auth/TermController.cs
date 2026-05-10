@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
@@ -11,12 +11,14 @@ namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
     [Route("term")]
+    /// <summary>     /// TermController class.     /// </summary>
     public class TermController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
 
+        /// <summary>         /// Initializes a new instance of TermController.         /// </summary>
         public TermController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
         {
             _dbContext = dbContext;
@@ -25,6 +27,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         [HttpGet("view", Name = "GetTermView")]
+        /// <summary>         /// Executes GetTermView.         /// </summary>
         public IActionResult GetTermView()
         {
             string sessionId = Request.Query["session_id"].ToString();
@@ -33,6 +36,7 @@ namespace AuthFoundation.Controllers.Auth
             return Content(html, "text/html; charset=utf-8");
         }
 
+        /// <summary>         /// Executes LoadTemplate.         /// </summary>
         private string LoadTemplate(string fileName)
         {
             string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Auth", fileName);
@@ -40,6 +44,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         [HttpGet(Name = "GetTerm")]
+        /// <summary>         /// Executes GetTerm.         /// </summary>
         public async Task<IActionResult> GetTerm()
         {
             try
@@ -61,6 +66,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         [HttpPost(Name = "PostTerm")]
+        /// <summary>         /// Executes PostTerm.         /// </summary>
         public async Task<IActionResult> PostTerm()
         {
             try
@@ -92,6 +98,7 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>         /// Executes GetAuthorizationSessionAsync.         /// </summary>
         private async Task<AuthorizationSession> GetAuthorizationSessionAsync(string authSessionId)
         {
             string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(authSessionId));
@@ -101,6 +108,7 @@ namespace AuthFoundation.Controllers.Auth
             return session;
         }
 
+        /// <summary>         /// Executes SaveConsentAsync.         /// </summary>
         private async Task SaveConsentAsync(AuthorizationSession session)
         {
             if (string.IsNullOrWhiteSpace(session.OsolabId)) throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "login session is required");
@@ -129,6 +137,7 @@ namespace AuthFoundation.Controllers.Auth
             await _dbContext.SaveChangesAsync();
         }
 
+        /// <summary>         /// Executes BuildRedirectUri.         /// </summary>
         private static string BuildRedirectUri(string redirectUri, string code, string state)
         {
             string separator = redirectUri.Contains('?') ? "&" : "?";

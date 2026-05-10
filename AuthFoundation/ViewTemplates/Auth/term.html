@@ -8,24 +8,63 @@
 <body>
   <h1>Consent</h1>
   <p>Authorization session: <code id="session">__SESSION_ID__</code></p>
-  <p>Agree terms and scope to continue.</p>
-  <button id="agreeBtn">Agree</button>
+  <div id="terms"></div>
+  <p>
+    <button id="agreeBtn">同意して続行</button>
+    <button id="denyBtn">同意しない</button>
+  </p>
   <pre id="result"></pre>
   <script>
-    document.getElementById("agreeBtn").addEventListener("click", async () => {
-      const res = await fetch("/term", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-session-id": document.getElementById("session").textContent
-        }
+    const sid = document.getElementById("session").textContent.trim();
+    const termsDiv = document.getElementById("terms");
+
+    async function loadTerms() {
+      const res = await fetch("/terms", {
+        headers: { "x-session-id": sid }
       });
       const data = await res.json();
       document.getElementById("result").textContent = JSON.stringify(data, null, 2);
-      if (res.ok && data.redirectUri) {
-        window.location.href = data.redirectUri;
+      if (!res.ok) {
+        return;
       }
-    });
+
+      const terms = Array.isArray(data.terms) ? data.terms : [];
+      termsDiv.innerHTML = terms.map((t) => {
+        return `<label><input type="checkbox" name="term_id" value="${t.term_id}" checked /> ${t.title} (${t.version})</label><br/>`;
+      }).join("");
+    }
+
+    async function submitConsent(accepted) {
+      const body = new URLSearchParams();
+      body.set("accepted", accepted ? "true" : "false");
+
+      const checked = Array.from(document.querySelectorAll("input[name='term_id']:checked"));
+      checked.forEach((el) => body.append("term_ids", el.value));
+      if (checked.length === 0) {
+        body.append("term_ids", "0");
+      }
+
+      const res = await fetch("/terms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "x-session-id": sid
+        },
+        body: body.toString()
+      });
+      const data = await res.json();
+      document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+      if (res.ok && data.result === "redirect") {
+        const location = res.headers.get("Location");
+        if (location) {
+          window.location.href = location;
+        }
+      }
+    }
+
+    document.getElementById("agreeBtn").addEventListener("click", () => submitConsent(true));
+    document.getElementById("denyBtn").addEventListener("click", () => submitConsent(false));
+    loadTerms();
   </script>
 </body>
 </html>
