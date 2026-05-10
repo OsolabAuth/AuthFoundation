@@ -163,13 +163,18 @@ namespace AuthFoundation.Common
                 return true;
             }
 
-            if (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+            if (!uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            return false;
+            return uri.Host.StartsWith("osolab-", StringComparison.OrdinalIgnoreCase)
+                && uri.Host.EndsWith("-local", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

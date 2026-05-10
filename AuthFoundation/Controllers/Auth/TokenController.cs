@@ -1,6 +1,5 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
@@ -11,267 +10,242 @@ using Newtonsoft.Json;
 namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
+    [Route("token")]
     [Route("api/auth/token")]
-    /// <summary>     /// TokenController class.     /// </summary>
     public class TokenController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
+        private readonly OidcSigningService _oidcSigningService;
 
-        /// <summary>         /// Initializes a new instance of TokenController.         /// </summary>
-        public TokenController(OsolabAuthContext dbContext, IRedisClient redis)
+        public TokenController(OsolabAuthContext dbContext, IRedisClient redis, OidcSigningService oidcSigningService)
         {
             _dbContext = dbContext;
             _redis = redis;
+            _oidcSigningService = oidcSigningService;
         }
 
-        [HttpPost(Name = "PostAuthToken")]
-        /// <summary>         /// Executes PostToken.         /// </summary>
+        [HttpPost]
         public async Task<IActionResult> PostToken()
         {
             try
             {
                 Input input = await Input.CreateAsync(Request.HttpContext);
-                input.ValidationCheck();
+                input.Validate();
 
-                client_master client = Helper.CertClient(_dbContext, input.Body.ClientId);
-                if (client.status != Code.Status.ACTIVE)
+                string clientId = ValidateClient(input);
+
+                string? raw = await _redis.GetStringAsync(AuthCodeSession.GetRedisKey(input.AuthorizationCode));
+                if (string.IsNullOrWhiteSpace(raw))
                 {
-                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
-                }
-                if (!IsSameValue(client.client_secret, input.Body.ClientSecret))
-                {
-                    throw new ApiException(Code.ILLEGAL_CLIENT, "client_secretが不正です");
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
                 }
 
-                string authCodeRedisKey = AuthCodeSession.GetRedisKey(input.Body.Code);
-                string? authCodeRaw = await _redis.GetStringAsync(authCodeRedisKey);
-                if (string.IsNullOrEmpty(authCodeRaw))
+                AuthCodeSession? codeSession = JsonConvert.DeserializeObject<AuthCodeSession>(raw);
+                if (codeSession == null)
                 {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "認可コードが不正です");
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
                 }
 
-                AuthCodeSession? authCodeSession = JsonConvert.DeserializeObject<AuthCodeSession>(authCodeRaw);
-                if (authCodeSession == null)
+                if (!string.Equals(codeSession.ClientId, clientId, StringComparison.Ordinal))
                 {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "認可コードが不正です");
-                }
-                if (authCodeSession.ClientId != input.Body.ClientId)
-                {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "認可コードが不正です");
-                }
-                if (!IsPkceValid(input.Body.CodeVerifier, authCodeSession.CodeChallenge, authCodeSession.CodeChallengeMethod))
-                {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "PKCE検証に失敗しました");
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
                 }
 
-                string accessToken = Helper.GenerateRandomCode(Code.AccessToken.LENGTH, Code.AccessToken.CHARACTORS);
+                if (!string.Equals(codeSession.RedirectUri, input.RedirectUri, StringComparison.Ordinal))
+                {
+                    throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                }
+
+                if (!IsPkceValid(input.CodeVerifier, codeSession.CodeChallenge, codeSession.CodeChallengeMethod))
+                {
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
+                }
+
+                string tokenId = Helper.GenerateHex(32).ToLowerInvariant();
+                string accessToken = $"{codeSession.OsolabId}_{tokenId}_{clientId}";
+                string refreshToken = $"{codeSession.OsolabId}_{Helper.GenerateHex(32).ToLowerInvariant()}_{clientId}";
+
                 AccessTokenSession accessTokenSession = new AccessTokenSession
                 {
                     AccessToken = accessToken,
-                    OsolabId = authCodeSession.OsolabId,
-                    ClientId = authCodeSession.ClientId,
-                    Scope = authCodeSession.Scope
+                    OsolabId = codeSession.OsolabId,
+                    ClientId = clientId,
+                    Scope = codeSession.Scope
                 };
                 await accessTokenSession.CreateSession(_redis);
 
-                string idToken = GenerateIdToken(authCodeSession);
-                await _redis.DeleteAsync(authCodeRedisKey);
-
-                return new OkObjectResult(new Output(accessToken, idToken));
-            }
-            catch (ApiException aex)
-            {
-                return new ObjectResult(new Output(aex))
+                RefreshTokenSession refreshTokenSession = new RefreshTokenSession
                 {
-                    StatusCode = (int)aex.Status
+                    RefreshToken = refreshToken,
+                    OsolabId = codeSession.OsolabId,
+                    ClientId = clientId,
+                    Scope = codeSession.Scope
+                };
+                await refreshTokenSession.CreateSession(_redis);
+
+                string idToken = _oidcSigningService.CreateIdToken(codeSession, Helper.ParseScopes(codeSession.Scope));
+
+                await _redis.DeleteAsync(AuthCodeSession.GetRedisKey(input.AuthorizationCode));
+
+                return Ok(new
+                {
+                    response_code = Code.SUCCESS.Code,
+                    access_token = accessToken,
+                    refresh_token = refreshToken,
+                    token_type = Code.AccessToken.TOKEN_TYPE_BEARER,
+                    expires_in = AppConfig.AccessTokenExpireSec,
+                    refresh_token_expires_in = AppConfig.RefreshTokenExpireSec,
+                    scope = codeSession.Scope,
+                    id_token = idToken
+                });
+            }
+            catch (ApiException ex)
+            {
+                return new ObjectResult(new ErrorOutput(ex))
+                {
+                    StatusCode = (int)ex.Status
                 };
             }
             catch (Exception ex)
             {
-                return new ObjectResult(
-                    new Output(new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message)))
+                ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)Code.INTERNAL_SERVER_ERROR.Status
+                    StatusCode = (int)apiEx.Status
                 };
             }
         }
 
-        /// <summary>         /// Executes IsPkceValid.         /// </summary>
-        private static bool IsPkceValid(string codeVerifier, string codeChallenge, string codeChallengeMethod)
+        private string ValidateClient(Input input)
         {
-            if (codeChallengeMethod != "S256")
+            if (!string.IsNullOrWhiteSpace(input.BasicClientId))
+            {
+                if (!string.IsNullOrWhiteSpace(input.ClientId) && !string.Equals(input.ClientId, input.BasicClientId, StringComparison.Ordinal))
+                {
+                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                }
+
+                client_master client = Helper.CertClient(_dbContext, input.BasicClientId);
+                if (!FixedTimeEquals(client.client_secret, input.BasicClientSecret ?? string.Empty))
+                {
+                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                }
+
+                return input.BasicClientId;
+            }
+
+            if (string.IsNullOrWhiteSpace(input.ClientId))
+            {
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+            }
+
+            Helper.CertClient(_dbContext, input.ClientId);
+            return input.ClientId;
+        }
+
+        private static bool IsPkceValid(string verifier, string challenge, string method)
+        {
+            if (!string.Equals(method, "S256", StringComparison.Ordinal))
             {
                 return false;
             }
 
-            byte[] verifierBytes = Encoding.ASCII.GetBytes(codeVerifier);
-            byte[] hashed = SHA256.HashData(verifierBytes);
-            string calculated = Base64UrlEncode(hashed);
-            return IsSameValue(calculated, codeChallenge);
+            byte[] bytes = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+            string calculated = Base64UrlEncode(bytes);
+            return FixedTimeEquals(calculated, challenge);
         }
 
-        /// <summary>         /// Executes GenerateIdToken.         /// </summary>
-        private static string GenerateIdToken(AuthCodeSession authCodeSession)
-        {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            DateTimeOffset exp = now.AddSeconds(AppConfig.IdTokenExpireSec);
-            string headerJson = System.Text.Json.JsonSerializer.Serialize(new { alg = "HS256", typ = "JWT" });
-            string payloadJson = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                iss = "AuthFoundation",
-                sub = authCodeSession.OsolabId,
-                aud = authCodeSession.ClientId,
-                iat = now.ToUnixTimeSeconds(),
-                exp = exp.ToUnixTimeSeconds(),
-                nonce = authCodeSession.Nonce,
-                email = authCodeSession.Email
-            });
-
-            string header = Base64UrlEncode(Encoding.UTF8.GetBytes(headerJson));
-            string payload = Base64UrlEncode(Encoding.UTF8.GetBytes(payloadJson));
-            string signingInput = $"{header}.{payload}";
-
-            byte[] key = Encoding.UTF8.GetBytes(AppConfig.PasswordHashKey);
-            byte[] sig = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(signingInput));
-            string signature = Base64UrlEncode(sig);
-            return $"{signingInput}.{signature}";
-        }
-
-        /// <summary>         /// Executes Base64UrlEncode.         /// </summary>
-        private static string Base64UrlEncode(byte[] data)
-        {
-            return Convert.ToBase64String(data)
-                .TrimEnd('=')
-                .Replace('+', '-')
-                .Replace('/', '_');
-        }
-
-        /// <summary>         /// Executes IsSameValue.         /// </summary>
-        private static bool IsSameValue(string expected, string actual)
+        private static bool FixedTimeEquals(string expected, string actual)
         {
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
             byte[] actualBytes = Encoding.UTF8.GetBytes(actual);
-            return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+            return expectedBytes.Length == actualBytes.Length
+                && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
         }
 
-        /// <summary>         /// Input class.         /// </summary>
-        public class Input
+        private static string Base64UrlEncode(byte[] data)
         {
-            /// <summary>             /// Gets or sets FlowType.             /// </summary>
+            return Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }
+
+        public sealed class Input
+        {
             public string FlowType { get; set; } = string.Empty;
-            /// <summary>             /// Gets or sets Body.             /// </summary>
-            public JsonBody Body { get; set; } = new();
+            public string GrantType { get; set; } = string.Empty;
+            public string ClientId { get; set; } = string.Empty;
+            public string AuthorizationCode { get; set; } = string.Empty;
+            public string CodeVerifier { get; set; } = string.Empty;
+            public string RedirectUri { get; set; } = string.Empty;
+            public string? BasicClientId { get; set; }
+            public string? BasicClientSecret { get; set; }
 
-            /// <summary>             /// JsonBody class.             /// </summary>
-            public class JsonBody
-            {
-                [JsonProperty("grant_type")]
-                /// <summary>                 /// Gets or sets GrantType.                 /// </summary>
-                public string GrantType { get; set; } = string.Empty;
-
-                [JsonProperty("client_id")]
-                /// <summary>                 /// Gets or sets ClientId.                 /// </summary>
-                public string ClientId { get; set; } = string.Empty;
-
-                [JsonProperty("client_secret")]
-                /// <summary>                 /// Gets or sets ClientSecret.                 /// </summary>
-                public string ClientSecret { get; set; } = string.Empty;
-
-                [JsonProperty("code_verifier")]
-                /// <summary>                 /// Gets or sets CodeVerifier.                 /// </summary>
-                public string CodeVerifier { get; set; } = string.Empty;
-
-                [JsonProperty("code")]
-                /// <summary>                 /// Gets or sets Code.                 /// </summary>
-                public string Code { get; set; } = string.Empty;
-            }
-
-            /// <summary>             /// Initializes a new instance of Input.             /// </summary>
-            private Input() { }
-
-            /// <summary>             /// Executes CreateAsync.             /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
-                Helper.ValidateTypeApplicationJson(request.ContentType);
+                Helper.ValidateTypeFormUrlEncoded(request.ContentType);
 
-                using var reader = new StreamReader(request.Body, Encoding.UTF8);
-                string rawJson = await reader.ReadToEndAsync();
-                JsonBody? body = null;
-                try
-                {
-                    body = JsonConvert.DeserializeObject<JsonBody>(rawJson);
-                }
-                catch
-                {
-                }
+                IFormCollection form = await request.ReadFormAsync();
 
-                if (body == null)
+                string? basicClientId = null;
+                string? basicClientSecret = null;
+                string authorization = request.Headers.Authorization.ToString();
+                if (authorization.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "JSONオブジェクトが不正です");
+                    string encoded = authorization["Basic ".Length..].Trim();
+                    string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+                    string[] parts = decoded.Split(':', 2);
+                    if (parts.Length == 2)
+                    {
+                        basicClientId = parts[0];
+                        basicClientSecret = parts[1];
+                    }
                 }
 
                 return new Input
                 {
                     FlowType = request.Headers[Code.HttpHeaders.X_FLOW_TYPE.Key].ToString(),
-                    Body = body
+                    GrantType = form["grant_type"].ToString(),
+                    ClientId = form["client_id"].ToString(),
+                    AuthorizationCode = form["code"].ToString(),
+                    CodeVerifier = form["code_verifier"].ToString(),
+                    RedirectUri = form["redirect_uri"].ToString(),
+                    BasicClientId = basicClientId,
+                    BasicClientSecret = basicClientSecret
                 };
             }
 
-            /// <summary>             /// Executes ValidationCheck.             /// </summary>
-            public void ValidationCheck()
+            public void Validate()
             {
                 ValidateUtil.IndispensableParam(FlowType, Code.HttpHeaders.X_FLOW_TYPE.Key);
                 ValidateUtil.FormatParam(FlowType, Code.HttpHeaders.X_FLOW_TYPE.Key, Code.HttpHeaders.X_FLOW_TYPE.Regex);
+                ValidateUtil.IndispensableParam(GrantType, Code.HttpBodies.GRANT_TYPE.Key);
+                ValidateUtil.FormatParam(GrantType, Code.HttpBodies.GRANT_TYPE.Key, Code.HttpBodies.GRANT_TYPE.Regex);
 
-                ValidateUtil.IndispensableParam(Body.GrantType, Code.HttpBodies.GRANT_TYPE.Key);
-                ValidateUtil.FormatParam(Body.GrantType, Code.HttpBodies.GRANT_TYPE.Key, Code.HttpBodies.GRANT_TYPE.Regex);
+                if (string.IsNullOrWhiteSpace(BasicClientId))
+                {
+                    ValidateUtil.IndispensableParam(ClientId, Code.HttpQueries.CLIENT_ID.Key);
+                    ValidateUtil.FormatParam(ClientId, Code.HttpQueries.CLIENT_ID.Key, Code.HttpQueries.CLIENT_ID.Regex);
+                }
 
-                ValidateUtil.IndispensableParam(Body.ClientId, "client_id");
-                ValidateUtil.FormatParam(Body.ClientId, "client_id", Code.HttpHeaders.X_AUTH_CLIENT_ID.Regex);
-
-                ValidateUtil.IndispensableParam(Body.ClientSecret, "client_secret");
-                ValidateUtil.IndispensableParam(Body.CodeVerifier, Code.HttpBodies.CODE_VERIFIER.Key);
-                ValidateUtil.FormatParam(Body.CodeVerifier, Code.HttpBodies.CODE_VERIFIER.Key, Code.HttpBodies.CODE_VERIFIER.Regex);
-
-                ValidateUtil.IndispensableParam(Body.Code, Code.HttpBodies.AUTH_CODE.Key);
-                ValidateUtil.FormatParam(Body.Code, Code.HttpBodies.AUTH_CODE.Key, Code.HttpBodies.AUTH_CODE.Regex);
+                ValidateUtil.IndispensableParam(AuthorizationCode, Code.HttpBodies.AUTH_CODE.Key);
+                ValidateUtil.FormatParam(AuthorizationCode, Code.HttpBodies.AUTH_CODE.Key, Code.HttpBodies.AUTH_CODE.Regex);
+                ValidateUtil.IndispensableParam(CodeVerifier, Code.HttpBodies.CODE_VERIFIER.Key);
+                ValidateUtil.FormatParam(CodeVerifier, Code.HttpBodies.CODE_VERIFIER.Key, Code.HttpBodies.CODE_VERIFIER.Regex);
+                ValidateUtil.IndispensableParam(RedirectUri, Code.HttpQueries.REDIRECT_URI.Key);
+                ValidateUtil.FormatParam(RedirectUri, Code.HttpQueries.REDIRECT_URI.Key, Code.HttpQueries.REDIRECT_URI.Regex);
             }
         }
 
-        /// <summary>         /// Output class.         /// </summary>
-        private class Output
+        private sealed class ErrorOutput
         {
-            /// <summary>             /// Gets or sets StatusCode.             /// </summary>
-            public string StatusCode { get; }
-            /// <summary>             /// Gets or sets Message.             /// </summary>
-            public string Message { get; }
-            /// <summary>             /// Gets or sets AccessToken.             /// </summary>
-            public string? AccessToken { get; }
-            /// <summary>             /// Gets or sets IdToken.             /// </summary>
-            public string? IdToken { get; }
-            /// <summary>             /// Gets or sets TokenType.             /// </summary>
-            public string? TokenType { get; }
-            /// <summary>             /// Gets or sets ExpiresIn.             /// </summary>
-            public int? ExpiresIn { get; }
+            public string response_code { get; }
+            public string message { get; }
 
-            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
-            public Output(ApiException ex)
+            public ErrorOutput(ApiException ex)
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
-            }
-
-            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
-            public Output(string accessToken, string idToken)
-            {
-                StatusCode = Common.Code.SUCCESS.Code;
-                Message = Common.Code.SUCCESS.ErrorMessage;
-                AccessToken = accessToken;
-                IdToken = idToken;
-                TokenType = Code.AccessToken.TOKEN_TYPE_BEARER;
-                ExpiresIn = AppConfig.AccessTokenExpireSec;
+                response_code = ex.Code;
+                message = ex.ErrorMessage;
             }
         }
     }

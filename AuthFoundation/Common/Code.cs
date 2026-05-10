@@ -65,7 +65,7 @@ namespace AuthFoundation.Common
         {
             public static readonly RequestValidation RESPONSE_TYPE = new("response_type", @"^code$");
             public static readonly RequestValidation CLIENT_ID = new("client_id", @"^[0-9]{32}$");
-            public static readonly RequestValidation REDIRECT_URI = new("redirect_uri", @"^(https://.+|http://localhost(:[0-9]+)?(/.*)?)$");
+            public static readonly RequestValidation REDIRECT_URI = new("redirect_uri", @"^(https://.+|http://(localhost|osolab-[A-Za-z0-9-]+-local)(:[0-9]+)?(/.*)?)$");
             public static readonly RequestValidation STATE = new("state", @"^.{1,255}$");
             public static readonly RequestValidation SCOPE = new("scope", @"^[A-Za-z0-9_ ]+$");
             public static readonly RequestValidation CODE_CHALLENGE_METHOD = new("code_challenge_method", @"^S256$");

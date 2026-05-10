@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -8,26 +8,43 @@
 <body>
   <h1>Login</h1>
   <p>Authorization session: <code id="session">__SESSION_ID__</code></p>
+
   <form id="loginForm">
-    <label>email <input type="email" id="email" required /></label><br />
-    <label>password(hash) <input type="text" id="password" required /></label><br />
+    <label>Email <input type="email" id="email" required /></label><br />
+    <label>Password <input type="password" id="password" required /></label><br />
     <button type="submit">Login</button>
   </form>
+
   <p><button id="signupBtn" type="button">Signup</button></p>
   <pre id="result"></pre>
+
   <script>
     const form = document.getElementById("loginForm");
+
+    async function sha256HexUpper(text) {
+      const bytes = new TextEncoder().encode(text);
+      const hash = await crypto.subtle.digest("SHA-256", bytes);
+      return Array.from(new Uint8Array(hash))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
+        .toUpperCase();
+    }
+
     document.getElementById("signupBtn").addEventListener("click", () => {
-      const sid = document.getElementById("session").textContent;
-      window.location.href = "/signup?session_id=" + encodeURIComponent(sid);
+      const sid = document.getElementById("session").textContent.trim();
+      window.location.href = "/Signup/Account/view?session_id=" + encodeURIComponent(sid);
     });
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
       const sid = document.getElementById("session").textContent.trim();
+      const passHash = await sha256HexUpper(document.getElementById("password").value);
       const body = new URLSearchParams({
         email: document.getElementById("email").value,
-        password: document.getElementById("password").value
+        password: passHash
       });
+
       const res = await fetch("/login", {
         method: "POST",
         headers: {
@@ -36,13 +53,19 @@
         },
         body: body.toString()
       });
-      const data = await res.json();
+
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
       document.getElementById("result").textContent = JSON.stringify(data, null, 2);
-      if (res.ok && data.result === "redirect") {
-        const location = res.headers.get("Location");
-        if (location) {
-          window.location.href = location;
-        }
+
+      const location = res.headers.get("Location");
+      if (res.ok && data.result === "redirect" && location) {
+        window.location.href = location;
       }
     });
   </script>
