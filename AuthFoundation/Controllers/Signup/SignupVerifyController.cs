@@ -56,13 +56,15 @@ namespace AuthFoundation.Controllers.Signup
                 string loginSessionId = Helper.GenerateRandomCode(Code.Session.LENGTH, Code.Session.CHARACTORS);
                 AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);
                 await loginSession.CreateSession(_redis);
-                Response.Cookies.Append("session_id", loginSessionId, new CookieOptions
+                CookieOptions cookieOptions = new CookieOptions
                 {
                     HttpOnly = true,
                     Secure = false,
                     SameSite = SameSiteMode.Lax,
                     MaxAge = TimeSpan.FromSeconds(AppConfig.SessionExpireSec)
-                });
+                };
+                Response.Cookies.Append(Code.AUTH_SESSION_COOKIE_KEY, loginSessionId, cookieOptions);
+                Response.Cookies.Append("session_id", loginSessionId, cookieOptions);
 
                 AuthorizationSession authz = await GetAuthzSession(verify.SessionId);
                 bool hasConsent = await HasRequiredConsentAsync(user.osolab_id, authz.ClientId, authz.Scope);
@@ -71,7 +73,7 @@ namespace AuthFoundation.Controllers.Signup
                     return Redirect(BuildAuthorizeUrl(authz));
                 }
 
-                return Redirect($"/term/view?session_id={Uri.EscapeDataString(authz.SessionId)}");
+                return Redirect($"/terms/view?session_id={Uri.EscapeDataString(authz.SessionId)}");
             }
             catch (ApiException aex)
             {
@@ -100,10 +102,7 @@ namespace AuthFoundation.Controllers.Signup
         /// <summary>         /// Executes HasRequiredConsentAsync.         /// </summary>
         private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
         {
-            string[] requestedScopes = requestedScope
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
+            string[] requestedScopes = Helper.ParseScopes(requestedScope);
 
             var requiredTerms = _dbContext.client_terms
                 .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)

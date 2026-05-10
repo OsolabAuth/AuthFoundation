@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
@@ -50,7 +51,8 @@ namespace AuthFoundation.Controllers.Auth
                     throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
                 }
 
-                string inputPassHash = Helper.GetPassHash(input.Password, user.nonce);
+                string passwordHashHex = NormalizePasswordHash(input.Password);
+                string inputPassHash = Helper.GetPassHash(passwordHashHex, user.nonce);
                 if (!IsSameValue(user.password, inputPassHash))
                 {
                     throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
@@ -202,6 +204,18 @@ namespace AuthFoundation.Controllers.Auth
             return requiredScopeSet.All(agreedScopes.Contains) && requestedScopes.All(agreedScopes.Contains);
         }
 
+        private static string NormalizePasswordHash(string passwordInput)
+        {
+            if (Regex.IsMatch(passwordInput, Code.HttpBodies.PASSWORD.Regex))
+            {
+                return passwordInput.ToUpperInvariant();
+            }
+
+            byte[] plainBytes = Encoding.UTF8.GetBytes(passwordInput);
+            byte[] sha = SHA256.HashData(plainBytes);
+            return Convert.ToHexString(sha);
+        }
+
         private static bool IsSameValue(string expected, string actual)
         {
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
@@ -240,7 +254,10 @@ namespace AuthFoundation.Controllers.Auth
                 ValidateUtil.IndispensableParam(Email, Code.HttpBodies.EMAIL.Key);
                 ValidateUtil.FormatParam(Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
                 ValidateUtil.IndispensableParam(Password, Code.HttpBodies.PASSWORD.Key);
-                ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
+                if (!Regex.IsMatch(Password, Code.HttpBodies.PASSWORD.Regex))
+                {
+                    ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, @"^.{1,256}$");
+                }
             }
         }
 

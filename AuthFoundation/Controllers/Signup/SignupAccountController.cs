@@ -1,6 +1,4 @@
-﻿using System.IO;
-using System.Text;
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
@@ -108,19 +106,25 @@ namespace AuthFoundation.Controllers.Signup
             /// <summary>             /// JsonBody class.             /// </summary>
             public class JsonBody
             {
-                [JsonProperty("email")] public string Email { get; set; } = string.Empty;
-                [JsonProperty("password")] public string Password { get; set; } = string.Empty;
+                public string Email { get; set; } = string.Empty;
+                public string Password { get; set; } = string.Empty;
             }
 
             /// <summary>             /// Executes CreateAsync.             /// </summary>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
-                Helper.ValidateTypeApplicationJson(request.ContentType);
-                using var reader = new StreamReader(request.Body, Encoding.UTF8);
-                JsonBody? body = JsonConvert.DeserializeObject<JsonBody>(await reader.ReadToEndAsync());
-                if (body == null) throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "invalid json object");
-                return new Input { SessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString(), Body = body };
+                Helper.ValidateTypeFormUrlEncoded(request.ContentType);
+                IFormCollection form = await request.ReadFormAsync();
+                return new Input
+                {
+                    SessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString(),
+                    Body = new JsonBody
+                    {
+                        Email = form["email"].ToString(),
+                        Password = form["password"].ToString()
+                    }
+                };
             }
 
             /// <summary>             /// Executes ValidationCheck.             /// </summary>
@@ -156,3 +160,4 @@ namespace AuthFoundation.Controllers.Signup
         }
     }
 }
+
