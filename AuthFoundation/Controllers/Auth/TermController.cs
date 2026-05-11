@@ -1,28 +1,43 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// 利用規約同意を処理します。
+    /// </summary>
     [ApiController]
     [Route("terms")]
     public class TermController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
-        private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
+        private readonly AuthorizeExecutionService _authorizeExecutionService;
 
-        public TermController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
+        /// <summary>
+        /// TermController を初期化します。
+        /// </summary>
+        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="environment">ホスティング環境</param>
+        /// <param name="authorizeExecutionService">認可実行サービス</param>
+        public TermController(
+            OsolabAuthContext dbContext,
+            IWebHostEnvironment environment,
+            AuthorizeExecutionService authorizeExecutionService)
         {
             _dbContext = dbContext;
-            _redis = redis;
             _environment = environment;
+            _authorizeExecutionService = authorizeExecutionService;
         }
 
+        /// <summary>
+        /// 同意画面を返します。
+        /// </summary>
+        /// <returns>同意画面</returns>
         [HttpGet("view")]
         public IActionResult GetTermView()
         {
@@ -32,6 +47,10 @@ namespace AuthFoundation.Controllers.Auth
             return Content(html, "text/html; charset=utf-8");
         }
 
+        /// <summary>
+        /// 同意対象の規約一覧を返します。
+        /// </summary>
+        /// <returns>規約一覧</returns>
         [HttpGet]
         public async Task<IActionResult> GetTerms()
         {
@@ -43,7 +62,7 @@ namespace AuthFoundation.Controllers.Auth
 
                 AuthorizationSession session = await GetAuthorizationSessionRequiredAsync(sessionId);
 
-                List<client_term> requiredTerms = await _dbContext.client_terms
+                List<client_term> terms = await _dbContext.client_terms
                     .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE)
                     .OrderBy(x => x.term_id)
                     .ToListAsync();
@@ -51,7 +70,7 @@ namespace AuthFoundation.Controllers.Auth
                 return Ok(new
                 {
                     client_id = session.ClientId,
-                    terms = requiredTerms.Select(x => new
+                    terms = terms.Select(x => new
                     {
                         term_id = x.term_id,
                         title = x.term_title,
@@ -72,6 +91,10 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// 同意結果を保存し、認可処理を再開します。
+        /// </summary>
+        /// <returns>処理結果</returns>
         [HttpPost]
         public async Task<IActionResult> PostTerms()
         {
@@ -94,35 +117,15 @@ namespace AuthFoundation.Controllers.Auth
 
                 await SaveConsentAsync(session, input.TermIds);
 
-                osolab_user? user = await _dbContext.osolab_users.AsNoTracking()
-                    .SingleOrDefaultAsync(x => x.osolab_id == session.OsolabId && x.status == Code.Status.ACTIVE);
-                if (user == null)
+                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(
+                    input.SessionId,
+                    AuthSession.GetCookieSessionId(Request));
+                if (string.IsNullOrWhiteSpace(location))
                 {
-                    throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
+                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
                 }
 
-                AuthCodeSession codeSession = new AuthCodeSession
-                {
-                    Code = Helper.GenerateRandomCode(Code.AuthCode.LENGTH, Code.AuthCode.CHARACTORS),
-                    OsolabId = session.OsolabId,
-                    Email = user.email,
-                    ClientId = session.ClientId,
-                    RedirectUri = session.RedirectUri,
-                    Scope = session.Scope,
-                    CodeChallenge = session.CodeChallenge,
-                    CodeChallengeMethod = session.CodeChallengeMethod,
-                    Nonce = session.Nonce,
-                    State = session.State
-                };
-                await codeSession.CreateSession(_redis);
-
-                string location = Helper.BuildRedirectUri(session.RedirectUri, new Dictionary<string, string>
-                {
-                    ["code"] = codeSession.Code,
-                    ["state"] = session.State
-                });
                 Response.Headers.Location = location;
-
                 return Ok(new { result = "redirect" });
             }
             catch (ApiException ex)
@@ -136,22 +139,27 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// HTML テンプレートを読み込みます。
+        /// </summary>
+        /// <param name="fileName">ファイル名</param>
+        /// <returns>HTML 文字列</returns>
         private string LoadTemplate(string fileName)
         {
             string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Auth", fileName);
             return System.IO.File.ReadAllText(path);
         }
 
+        /// <summary>
+        /// 認可セッションを取得します。
+        /// </summary>
+        /// <param name="sessionId">認可セッションID</param>
+        /// <returns>認可セッション</returns>
+        /// <exception cref="ApiException">00006:画面の有効期限切れ</exception>
         private async Task<AuthorizationSession> GetAuthorizationSessionRequiredAsync(string sessionId)
         {
-            string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
-            }
-
-            AuthorizationSession? session = JsonConvert.DeserializeObject<AuthorizationSession>(raw);
-            if (session == null)
+            AuthorizationSession session = await _authorizeExecutionService.LoadAuthorizationSessionAsync(sessionId);
+            if (string.IsNullOrWhiteSpace(session.SessionId))
             {
                 throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
             }
@@ -159,6 +167,12 @@ namespace AuthFoundation.Controllers.Auth
             return session;
         }
 
+        /// <summary>
+        /// 同意結果を保存します。
+        /// </summary>
+        /// <param name="session">認可セッション</param>
+        /// <param name="acceptedTermIds">同意した規約ID</param>
+        /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
         private async Task SaveConsentAsync(AuthorizationSession session, IReadOnlyCollection<long> acceptedTermIds)
         {
             if (string.IsNullOrWhiteSpace(session.OsolabId))
@@ -228,20 +242,43 @@ namespace AuthFoundation.Controllers.Auth
             await _dbContext.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// 同意入力を表します。
+        /// </summary>
         public sealed class Input
         {
+            /// <summary>
+            /// 認可セッションIDを取得または設定します。
+            /// </summary>
             public string SessionId { get; set; } = string.Empty;
+
+            /// <summary>
+            /// 同意結果を取得または設定します。
+            /// </summary>
             public bool Accepted { get; set; }
+
+            /// <summary>
+            /// 同意の生文字列を取得または設定します。
+            /// </summary>
             public string AcceptedRaw { get; set; } = string.Empty;
+
+            /// <summary>
+            /// 同意した規約ID一覧を取得または設定します。
+            /// </summary>
             public List<long> TermIds { get; set; } = new();
 
+            /// <summary>
+            /// HTTP リクエストから入力を生成します。
+            /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>同意入力</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
                 Helper.ValidateTypeFormUrlEncoded(request.ContentType);
 
                 IFormCollection form = await request.ReadFormAsync();
-                List<long> termIds = new();
+                List<long> termIds = new List<long>();
                 foreach (string? value in form["term_ids"])
                 {
                     if (string.IsNullOrWhiteSpace(value))
@@ -265,6 +302,9 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            /// <summary>
+            /// 入力値を検証します。
+            /// </summary>
             public void Validate()
             {
                 ValidateUtil.IndispensableParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key);
@@ -274,11 +314,25 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// エラー応答を表します。
+        /// </summary>
         private sealed class ErrorOutput
         {
+            /// <summary>
+            /// 応答コードを取得します。
+            /// </summary>
             public string response_code { get; }
+
+            /// <summary>
+            /// メッセージを取得します。
+            /// </summary>
             public string message { get; }
 
+            /// <summary>
+            /// エラー応答を初期化します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
             public ErrorOutput(ApiException ex)
             {
                 response_code = ex.Code;

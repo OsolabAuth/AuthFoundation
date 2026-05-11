@@ -1,20 +1,22 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
-using AuthFoundation.Session;
-using Newtonsoft.Json;
 
 namespace AuthFoundation.Common
 {
     /// <summary>
-    /// Helper class.
+    /// 共通ヘルパーを提供します。
     /// </summary>
     public static class Helper
     {
         /// <summary>
-        /// Executes CertClient.
+        /// クライアント検証
         /// </summary>
+        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="clientId">クライアントID</param>
+        /// <returns>クライアント情報</returns>
+        /// <exception cref="ApiException">00002:クライアントが不正</exception>
         public static client_master CertClient(OsolabAuthContext dbContext, string clientId)
         {
             client_master? client = dbContext.client_masters.SingleOrDefault(
@@ -29,8 +31,10 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes ValidateTypeApplicationJson.
+        /// Content-Type が JSON であることを検証します。
         /// </summary>
+        /// <param name="type">Content-Type</param>
+        /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
         public static void ValidateTypeApplicationJson(string? type)
         {
             if (HasContentType(type, Code.Content.TYPE_JSON))
@@ -42,8 +46,10 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes ValidateTypeFormUrlEncoded.
+        /// Content-Type が form-urlencoded であることを検証します。
         /// </summary>
+        /// <param name="type">Content-Type</param>
+        /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
         public static void ValidateTypeFormUrlEncoded(string? type)
         {
             if (HasContentType(type, Code.Content.TYPE_X_WWW_FORM))
@@ -55,8 +61,11 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes HasContentType.
+        /// Content-Type を比較します。
         /// </summary>
+        /// <param name="contentType">Content-Type</param>
+        /// <param name="expected">期待値</param>
+        /// <returns>一致する場合は true</returns>
         public static bool HasContentType(string? contentType, string expected)
         {
             if (string.IsNullOrWhiteSpace(contentType))
@@ -69,8 +78,11 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes GenerateRandomCode.
+        /// ランダム文字列を生成します。
         /// </summary>
+        /// <param name="length">文字数</param>
+        /// <param name="useCharacters">使用文字</param>
+        /// <returns>ランダム文字列</returns>
         public static string GenerateRandomCode(int length, string useCharacters)
         {
             byte[] bytes = new byte[length];
@@ -86,8 +98,10 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes GenerateHex.
+        /// 16進文字列を生成します。
         /// </summary>
+        /// <param name="length">文字数</param>
+        /// <returns>16進文字列</returns>
         public static string GenerateHex(int length)
         {
             if (length <= 0)
@@ -102,8 +116,11 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes GetPassHash.
+        /// パスワードハッシュを計算します。
         /// </summary>
+        /// <param name="passwordHashHex">パスワードハッシュ</param>
+        /// <param name="nonce">nonce</param>
+        /// <returns>認証用ハッシュ</returns>
         public static string GetPassHash(string passwordHashHex, string nonce)
         {
             string passNonce = passwordHashHex + nonce;
@@ -114,27 +131,10 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes TryGetLoginSessionAsync.
+        /// Scope を配列へ分解します。
         /// </summary>
-        public static async Task<AuthSession?> TryGetLoginSessionAsync(IRedisClient redis, string? sessionId)
-        {
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                return null;
-            }
-
-            string? raw = await redis.GetStringAsync(AuthSession.GetRedisKey(sessionId));
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return null;
-            }
-
-            return JsonConvert.DeserializeObject<AuthSession>(raw);
-        }
-
-        /// <summary>
-        /// Executes ParseScopes.
-        /// </summary>
+        /// <param name="scope">Scope 文字列</param>
+        /// <returns>Scope 配列</returns>
         public static string[] ParseScopes(string? scope)
         {
             if (string.IsNullOrWhiteSpace(scope))
@@ -149,8 +149,10 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes IsRedirectUriFormatValid.
+        /// RedirectUri の形式を検証します。
         /// </summary>
+        /// <param name="redirectUri">RedirectUri</param>
+        /// <returns>許可された形式の場合は true</returns>
         public static bool IsRedirectUriFormatValid(string redirectUri)
         {
             if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out Uri? uri))
@@ -178,8 +180,11 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Executes BuildRedirectUri.
+        /// RedirectUri を組み立てます。
         /// </summary>
+        /// <param name="baseUri">ベース URI</param>
+        /// <param name="parameters">クエリパラメータ</param>
+        /// <returns>組み立てた URI</returns>
         public static string BuildRedirectUri(string baseUri, IDictionary<string, string> parameters)
         {
             string separator = baseUri.Contains('?') ? "&" : "?";

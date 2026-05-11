@@ -1,43 +1,52 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// ログアウト処理を提供します。
+    /// </summary>
     [ApiController]
     [Route("Logout")]
-    /// <summary>     /// LogoutController class.     /// </summary>
     public class LogoutController : ControllerBase
     {
         private readonly IRedisClient _redis;
 
-        /// <summary>         /// Initializes a new instance of LogoutController.         /// </summary>
+        /// <summary>
+        /// LogoutController を初期化します。
+        /// </summary>
+        /// <param name="redis">Redis クライアント</param>
         public LogoutController(IRedisClient redis)
         {
             _redis = redis;
         }
 
+        /// <summary>
+        /// ログアウトを実行します。
+        /// </summary>
+        /// <returns>ログアウト結果</returns>
         [HttpPost]
-        /// <summary>         /// Executes PostLogout.         /// </summary>
         public async Task<IActionResult> PostLogout()
         {
             try
             {
                 Input input = await Input.CreateAsync(Request.HttpContext);
-                string? loginSessionId = Request.Cookies["session_id"];
+                string? loginSessionId = AuthSession.GetCookieSessionId(Request);
                 AuthSession? loginSession = null;
                 if (!string.IsNullOrWhiteSpace(loginSessionId))
                 {
-                    string? raw = await _redis.GetStringAsync(AuthSession.GetRedisKey(loginSessionId));
-                    if (!string.IsNullOrWhiteSpace(raw))
+                    AuthSession session = new AuthSession();
+                    string? raw = await session.ReadValueFromRedisAsync(_redis, loginSessionId);
+                    if (!string.IsNullOrWhiteSpace(raw) && session.SetValue(raw))
                     {
-                        loginSession = JsonConvert.DeserializeObject<AuthSession>(raw);
+                        loginSession = session;
                         await _redis.DeleteAsync(AuthSession.GetRedisKey(loginSessionId));
                     }
                 }
 
+                Response.Cookies.Delete(Code.AUTH_SESSION_COOKIE_KEY);
                 Response.Cookies.Delete("session_id");
 
                 if (!string.IsNullOrWhiteSpace(input.AccessToken))
@@ -73,30 +82,46 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
-        /// <summary>         /// Input class.         /// </summary>
+        /// <summary>
+        /// ログアウト入力を表します。
+        /// </summary>
         public class Input
         {
-            /// <summary>             /// Gets or sets LogoutAll.             /// </summary>
+            /// <summary>
+            /// 全端末ログアウトかどうかを取得または設定します。
+            /// </summary>
             public bool LogoutAll { get; set; }
-            /// <summary>             /// Gets or sets AccessToken.             /// </summary>
+
+            /// <summary>
+            /// アクセストークンを取得または設定します。
+            /// </summary>
             public string? AccessToken { get; set; }
-            /// <summary>             /// Gets or sets IdTokenJti.             /// </summary>
+
+            /// <summary>
+            /// ID トークン JTI を取得または設定します。
+            /// </summary>
             public string? IdTokenJti { get; set; }
 
-            /// <summary>             /// Executes CreateAsync.             /// </summary>
+            /// <summary>
+            /// HTTP リクエストから入力を生成します。
+            /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>ログアウト入力</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
                 Helper.ValidateTypeApplicationJson(request.ContentType);
-                using var reader = new StreamReader(request.Body);
+
+                using StreamReader reader = new StreamReader(request.Body);
                 string raw = await reader.ReadToEndAsync();
                 JObject body = string.IsNullOrWhiteSpace(raw) ? new JObject() : JObject.Parse(raw);
                 string auth = request.Headers["Authorization"].ToString();
                 string? token = null;
                 if (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 {
-                    token = auth.Substring("Bearer ".Length).Trim();
+                    token = auth["Bearer ".Length..].Trim();
                 }
+
                 return new Input
                 {
                     LogoutAll = body.Value<bool?>("logout_all") ?? false,

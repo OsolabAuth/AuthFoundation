@@ -1,28 +1,43 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
+using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 
 namespace AuthFoundation.Controllers.Signup
 {
+    /// <summary>
+    /// メール確認後の有効化を処理します。
+    /// </summary>
     [ApiController]
     [Route("Signup/Verify")]
-    /// <summary>     /// SignupVerifyController class.     /// </summary>
     public class SignupVerifyController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
+        private readonly AuthorizeExecutionService _authorizeExecutionService;
 
-        /// <summary>         /// Initializes a new instance of SignupVerifyController.         /// </summary>
-        public SignupVerifyController(OsolabAuthContext dbContext, IRedisClient redis)
+        /// <summary>
+        /// SignupVerifyController を初期化します。
+        /// </summary>
+        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="redis">Redis クライアント</param>
+        /// <param name="authorizeExecutionService">認可実行サービス</param>
+        public SignupVerifyController(
+            OsolabAuthContext dbContext,
+            IRedisClient redis,
+            AuthorizeExecutionService authorizeExecutionService)
         {
             _dbContext = dbContext;
             _redis = redis;
+            _authorizeExecutionService = authorizeExecutionService;
         }
 
+        /// <summary>
+        /// メール確認を完了します。
+        /// </summary>
+        /// <returns>遷移結果</returns>
         [HttpGet]
-        /// <summary>         /// Executes Verify.         /// </summary>
         public async Task<IActionResult> Verify()
         {
             try
@@ -30,19 +45,19 @@ namespace AuthFoundation.Controllers.Signup
                 string token = Request.Query["token"].ToString();
                 ValidateUtil.IndispensableParam(token, "token");
 
-                string? raw = await _redis.GetStringAsync(MailVerificationSession.GetRedisKey(token));
+                MailVerificationSession verify = new MailVerificationSession();
+                string? raw = await verify.ReadValueFromRedisAsync(_redis, token);
                 if (string.IsNullOrWhiteSpace(raw))
                 {
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification token is invalid");
                 }
 
-                MailVerificationSession? verify = JsonConvert.DeserializeObject<MailVerificationSession>(raw);
-                if (verify == null)
+                if (!verify.SetValue(raw))
                 {
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification session is invalid");
                 }
 
-                var user = _dbContext.osolab_users.SingleOrDefault(x => x.osolab_id == verify.OsolabId && x.status == Code.Status.TENTATIVE);
+                osolab_user? user = _dbContext.osolab_users.SingleOrDefault(x => x.osolab_id == verify.OsolabId && x.status == Code.Status.TENTATIVE);
                 if (user == null)
                 {
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "tentative user is not found");
@@ -55,94 +70,21 @@ namespace AuthFoundation.Controllers.Signup
 
                 string loginSessionId = Helper.GenerateRandomCode(Code.Session.LENGTH, Code.Session.CHARACTORS);
                 AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);
-                await loginSession.CreateSession(_redis);
-                CookieOptions cookieOptions = new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = false,
-                    SameSite = SameSiteMode.Lax,
-                    MaxAge = TimeSpan.FromSeconds(AppConfig.SessionExpireSec)
-                };
-                Response.Cookies.Append(Code.AUTH_SESSION_COOKIE_KEY, loginSessionId, cookieOptions);
-                Response.Cookies.Append("session_id", loginSessionId, cookieOptions);
+                await loginSession.WriteToRedisAsync(_redis);
+                loginSession.AppendCookie(Response);
 
-                AuthorizationSession authz = await GetAuthzSession(verify.SessionId);
-                bool hasConsent = await HasRequiredConsentAsync(user.osolab_id, authz.ClientId, authz.Scope);
-                if (hasConsent)
+                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.SessionId, loginSessionId);
+                if (string.IsNullOrWhiteSpace(location))
                 {
-                    return Redirect(BuildAuthorizeUrl(authz));
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
                 }
 
-                return Redirect($"/terms/view?session_id={Uri.EscapeDataString(authz.SessionId)}");
+                return Redirect(location);
             }
             catch (ApiException aex)
             {
                 return new ObjectResult(new { StatusCode = aex.Code, Message = aex.ErrorMessage }) { StatusCode = (int)aex.Status };
             }
-        }
-
-        /// <summary>         /// Executes GetAuthzSession.         /// </summary>
-        private async Task<AuthorizationSession> GetAuthzSession(string authzSessionId)
-        {
-            string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(authzSessionId));
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is not found");
-            }
-
-            AuthorizationSession? s = JsonConvert.DeserializeObject<AuthorizationSession>(raw);
-            if (s == null)
-            {
-                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
-            }
-
-            return s;
-        }
-
-        /// <summary>         /// Executes HasRequiredConsentAsync.         /// </summary>
-        private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
-        {
-            string[] requestedScopes = Helper.ParseScopes(requestedScope);
-
-            var requiredTerms = _dbContext.client_terms
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
-                .ToList();
-            var agreedTerms = _dbContext.user_terms
-                .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
-                .ToList();
-            if (!requiredTerms.All(rt => agreedTerms.Any(ut => ut.term_id == rt.term_id && ut.term_version == rt.term_version)))
-            {
-                return false;
-            }
-
-            var requiredScopeSet = _dbContext.client_scopes
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
-                .Select(x => x.scope)
-                .ToHashSet(StringComparer.Ordinal);
-            if (!requiredScopeSet.IsSubsetOf(requestedScopes))
-            {
-                return false;
-            }
-
-            var agreedScopeSet = _dbContext.user_client_scopes
-                .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
-                .Select(x => x.scope)
-                .ToHashSet();
-            return requiredScopeSet.All(agreedScopeSet.Contains) && requestedScopes.All(agreedScopeSet.Contains);
-        }
-
-        /// <summary>         /// Executes BuildAuthorizeUrl.         /// </summary>
-        private static string BuildAuthorizeUrl(AuthorizationSession s)
-        {
-            return "/Authorize"
-                + "?response_type=" + Uri.EscapeDataString(s.ResponseType)
-                + "&client_id=" + Uri.EscapeDataString(s.ClientId)
-                + "&redirect_uri=" + Uri.EscapeDataString(s.RedirectUri)
-                + "&state=" + Uri.EscapeDataString(s.State)
-                + "&scope=" + Uri.EscapeDataString(s.Scope)
-                + "&code_challenge_method=" + Uri.EscapeDataString(s.CodeChallengeMethod)
-                + "&code_challenge=" + Uri.EscapeDataString(s.CodeChallenge)
-                + "&nonce=" + Uri.EscapeDataString(s.Nonce);
         }
     }
 }

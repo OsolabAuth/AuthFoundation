@@ -5,7 +5,6 @@ using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 
 namespace AuthFoundation.Controllers.Auth
 {
@@ -35,14 +34,9 @@ namespace AuthFoundation.Controllers.Auth
 
                 string clientId = ValidateClient(input);
 
-                string? raw = await _redis.GetStringAsync(AuthCodeSession.GetRedisKey(input.AuthorizationCode));
-                if (string.IsNullOrWhiteSpace(raw))
-                {
-                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
-                }
-
-                AuthCodeSession? codeSession = JsonConvert.DeserializeObject<AuthCodeSession>(raw);
-                if (codeSession == null)
+                AuthCodeSession codeSession = new AuthCodeSession();
+                string? raw = await codeSession.ReadValueFromRedisAsync(_redis, input.AuthorizationCode);
+                if (string.IsNullOrWhiteSpace(raw) || !codeSession.SetValue(raw))
                 {
                     throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
                 }

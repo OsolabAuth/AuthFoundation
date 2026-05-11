@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using AuthFoundation.Common;
@@ -6,11 +6,12 @@ using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// ログイン処理を提供します。
+    /// </summary>
     [ApiController]
     [Route("login")]
     public class LoginController : ControllerBase
@@ -18,14 +19,31 @@ namespace AuthFoundation.Controllers.Auth
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
+        private readonly AuthorizeExecutionService _authorizeExecutionService;
 
-        public LoginController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
+        /// <summary>
+        /// LoginController を初期化します。
+        /// </summary>
+        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="redis">Redis クライアント</param>
+        /// <param name="environment">ホスティング環境</param>
+        /// <param name="authorizeExecutionService">認可実行サービス</param>
+        public LoginController(
+            OsolabAuthContext dbContext,
+            IRedisClient redis,
+            IWebHostEnvironment environment,
+            AuthorizeExecutionService authorizeExecutionService)
         {
             _dbContext = dbContext;
             _redis = redis;
             _environment = environment;
+            _authorizeExecutionService = authorizeExecutionService;
         }
 
+        /// <summary>
+        /// ログイン画面を返します。
+        /// </summary>
+        /// <returns>ログイン画面</returns>
         [HttpGet]
         [HttpGet("view")]
         public IActionResult GetLogin()
@@ -36,6 +54,10 @@ namespace AuthFoundation.Controllers.Auth
             return Content(html, "text/html; charset=utf-8");
         }
 
+        /// <summary>
+        /// ログインを実行します。
+        /// </summary>
+        /// <returns>ログイン結果</returns>
         [HttpPost]
         public async Task<IActionResult> PostLogin()
         {
@@ -60,8 +82,8 @@ namespace AuthFoundation.Controllers.Auth
 
                 string loginSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
                 AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);
-                await loginSession.CreateSession(_redis);
-                SetAuthCookie(loginSessionId);
+                await loginSession.WriteToRedisAsync(_redis);
+                loginSession.AppendCookie(Response);
 
                 if (string.IsNullOrWhiteSpace(input.SessionId))
                 {
@@ -73,8 +95,8 @@ namespace AuthFoundation.Controllers.Auth
                     });
                 }
 
-                AuthorizationSession? authzSession = await GetAuthorizationSessionIfExistsAsync(input.SessionId);
-                if (authzSession == null)
+                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(input.SessionId, loginSessionId);
+                if (string.IsNullOrWhiteSpace(location))
                 {
                     return Ok(new Output
                     {
@@ -84,26 +106,13 @@ namespace AuthFoundation.Controllers.Auth
                     });
                 }
 
-                authzSession.OsolabId = user.osolab_id;
-                await authzSession.CreateSession(_redis);
-
-                bool hasConsent = await HasRequiredConsentAsync(user.osolab_id, authzSession.ClientId, authzSession.Scope);
-                if (hasConsent)
+                Response.Headers.Location = location;
+                return Ok(new Output
                 {
-                    AuthCodeSession codeSession = await CreateAuthCodeFromAuthorizationSessionAsync(authzSession, user.email);
-                    string location = Helper.BuildRedirectUri(authzSession.RedirectUri, new Dictionary<string, string>
-                    {
-                        ["code"] = codeSession.Code,
-                        ["state"] = authzSession.State
-                    });
-
-                    Response.Headers.Location = location;
-                    return Ok(new Output { result = "redirect", response_code = Code.SUCCESS.Code, message = Code.SUCCESS.ErrorMessage });
-                }
-
-                string termLocation = $"/terms/view?session_id={Uri.EscapeDataString(input.SessionId)}";
-                Response.Headers.Location = termLocation;
-                return Ok(new Output { result = "redirect", response_code = Code.SUCCESS.Code, message = Code.SUCCESS.ErrorMessage });
+                    result = "redirect",
+                    response_code = Code.SUCCESS.Code,
+                    message = Code.SUCCESS.ErrorMessage
+                });
             }
             catch (ApiException ex)
             {
@@ -116,94 +125,22 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
-        private void SetAuthCookie(string sessionId)
-        {
-            CookieOptions options = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = false,
-                SameSite = SameSiteMode.Lax,
-                MaxAge = TimeSpan.FromSeconds(AppConfig.SessionExpireSec)
-            };
-
-            Response.Cookies.Append(Code.AUTH_SESSION_COOKIE_KEY, sessionId, options);
-            Response.Cookies.Append("session_id", sessionId, options);
-        }
-
+        /// <summary>
+        /// HTML テンプレートを読み込みます。
+        /// </summary>
+        /// <param name="fileName">ファイル名</param>
+        /// <returns>HTML 文字列</returns>
         private string LoadTemplate(string fileName)
         {
             string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Auth", fileName);
             return System.IO.File.ReadAllText(path);
         }
 
-        private async Task<AuthorizationSession?> GetAuthorizationSessionIfExistsAsync(string sessionId)
-        {
-            string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return null;
-            }
-
-            return JsonConvert.DeserializeObject<AuthorizationSession>(raw);
-        }
-
-        private async Task<AuthCodeSession> CreateAuthCodeFromAuthorizationSessionAsync(AuthorizationSession authzSession, string email)
-        {
-            AuthCodeSession codeSession = new AuthCodeSession
-            {
-                Code = Helper.GenerateRandomCode(Code.AuthCode.LENGTH, Code.AuthCode.CHARACTORS),
-                OsolabId = authzSession.OsolabId,
-                Email = email,
-                ClientId = authzSession.ClientId,
-                RedirectUri = authzSession.RedirectUri,
-                Scope = authzSession.Scope,
-                CodeChallenge = authzSession.CodeChallenge,
-                CodeChallengeMethod = authzSession.CodeChallengeMethod,
-                Nonce = authzSession.Nonce,
-                State = authzSession.State
-            };
-
-            await codeSession.CreateSession(_redis);
-            return codeSession;
-        }
-
-        private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
-        {
-            string[] requestedScopes = Helper.ParseScopes(requestedScope);
-
-            List<client_term> requiredTerms = await _dbContext.client_terms
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
-                .ToListAsync();
-
-            List<user_term> agreedTermRows = await _dbContext.user_terms
-                .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
-                .ToListAsync();
-
-            bool hasAllRequiredTerms = requiredTerms.All(rt =>
-                agreedTermRows.Any(ut => ut.term_id == rt.term_id && ut.term_version == rt.term_version));
-            if (!hasAllRequiredTerms)
-            {
-                return false;
-            }
-
-            HashSet<string> requiredScopeSet = await _dbContext.client_scopes
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
-                .Select(x => x.scope)
-                .ToHashSetAsync(StringComparer.Ordinal);
-
-            if (!requiredScopeSet.IsSubsetOf(requestedScopes))
-            {
-                return false;
-            }
-
-            HashSet<string> agreedScopes = await _dbContext.user_client_scopes
-                .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
-                .Select(x => x.scope)
-                .ToHashSetAsync(StringComparer.Ordinal);
-
-            return requiredScopeSet.All(agreedScopes.Contains) && requestedScopes.All(agreedScopes.Contains);
-        }
-
+        /// <summary>
+        /// パスワード入力値をハッシュ文字列へ正規化します。
+        /// </summary>
+        /// <param name="passwordInput">入力値</param>
+        /// <returns>SHA-256 ハッシュ文字列</returns>
         private static string NormalizePasswordHash(string passwordInput)
         {
             if (Regex.IsMatch(passwordInput, Code.HttpBodies.PASSWORD.Regex))
@@ -216,6 +153,12 @@ namespace AuthFoundation.Controllers.Auth
             return Convert.ToHexString(sha);
         }
 
+        /// <summary>
+        /// 文字列を固定時間比較します。
+        /// </summary>
+        /// <param name="expected">期待値</param>
+        /// <param name="actual">比較値</param>
+        /// <returns>一致する場合は true</returns>
         private static bool IsSameValue(string expected, string actual)
         {
             byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
@@ -224,12 +167,31 @@ namespace AuthFoundation.Controllers.Auth
                 && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
         }
 
+        /// <summary>
+        /// ログイン入力を表します。
+        /// </summary>
         public sealed class Input
         {
+            /// <summary>
+            /// 認可セッションIDを取得または設定します。
+            /// </summary>
             public string SessionId { get; set; } = string.Empty;
+
+            /// <summary>
+            /// メールアドレスを取得または設定します。
+            /// </summary>
             public string Email { get; set; } = string.Empty;
+
+            /// <summary>
+            /// パスワードを取得または設定します。
+            /// </summary>
             public string Password { get; set; } = string.Empty;
 
+            /// <summary>
+            /// HTTP リクエストから入力を生成します。
+            /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>ログイン入力</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -244,6 +206,9 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            /// <summary>
+            /// 入力値を検証します。
+            /// </summary>
             public void Validate()
             {
                 if (!string.IsNullOrWhiteSpace(SessionId))
@@ -261,14 +226,37 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// ログイン応答を表します。
+        /// </summary>
         private sealed class Output
         {
+            /// <summary>
+            /// 結果種別を取得または設定します。
+            /// </summary>
             public string? result { get; set; }
+
+            /// <summary>
+            /// 応答コードを取得または設定します。
+            /// </summary>
             public string? response_code { get; set; }
+
+            /// <summary>
+            /// メッセージを取得または設定します。
+            /// </summary>
             public string? message { get; set; }
 
-            public Output() { }
+            /// <summary>
+            /// 空の応答を初期化します。
+            /// </summary>
+            public Output()
+            {
+            }
 
+            /// <summary>
+            /// 例外から応答を初期化します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
             public Output(ApiException ex)
             {
                 result = "error";

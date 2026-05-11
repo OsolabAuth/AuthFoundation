@@ -28,6 +28,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 
 builder.Services.AddSingleton<IRedisClient, RedisClient>();
 builder.Services.AddSingleton<OidcSigningService>();
+builder.Services.AddScoped<AuthorizeExecutionService>();
 
 var app = builder.Build();
 

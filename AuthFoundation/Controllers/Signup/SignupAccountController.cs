@@ -1,22 +1,28 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 
 namespace AuthFoundation.Controllers.Signup
 {
+    /// <summary>
+    /// サインアップ仮登録を処理します。
+    /// </summary>
     [ApiController]
     [Route("Signup/Account")]
-    /// <summary>     /// SignupAccountController class.     /// </summary>
     public class SignupAccountController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
 
-        /// <summary>         /// Initializes a new instance of SignupAccountController.         /// </summary>
+        /// <summary>
+        /// SignupAccountController を初期化します。
+        /// </summary>
+        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="redis">Redis クライアント</param>
+        /// <param name="environment">ホスティング環境</param>
         public SignupAccountController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
         {
             _dbContext = dbContext;
@@ -24,8 +30,11 @@ namespace AuthFoundation.Controllers.Signup
             _environment = environment;
         }
 
+        /// <summary>
+        /// サインアップ画面を返します。
+        /// </summary>
+        /// <returns>サインアップ画面</returns>
         [HttpGet("view")]
-        /// <summary>         /// Executes GetSignupView.         /// </summary>
         public IActionResult GetSignupView()
         {
             string sessionId = Request.Query["session_id"].ToString();
@@ -34,15 +43,11 @@ namespace AuthFoundation.Controllers.Signup
             return Content(html, "text/html; charset=utf-8");
         }
 
-        /// <summary>         /// Executes LoadTemplate.         /// </summary>
-        private string LoadTemplate(string fileName)
-        {
-            string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Signup", fileName);
-            return System.IO.File.ReadAllText(path);
-        }
-
+        /// <summary>
+        /// 仮登録を作成します。
+        /// </summary>
+        /// <returns>確認メール用 URL</returns>
         [HttpPost(Name = "PostSignupAccount")]
-        /// <summary>         /// Executes PostAccount.         /// </summary>
         public async Task<IActionResult> PostAccount()
         {
             try
@@ -52,10 +57,18 @@ namespace AuthFoundation.Controllers.Signup
 
                 AuthorizationSession authz = await GetAuthorizationSessionAsync(input.SessionId);
                 client_master client = Helper.CertClient(_dbContext, authz.ClientId);
-                if (client.status != Code.Status.ACTIVE) throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                if (client.status != Code.Status.ACTIVE)
+                {
+                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                }
 
-                bool exists = _dbContext.osolab_users.Any(x => x.email == input.Body.Email && (x.status == Code.Status.TENTATIVE || x.status == Code.Status.ACTIVE));
-                if (exists) throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
+                bool exists = _dbContext.osolab_users.Any(x =>
+                    x.email == input.Body.Email
+                    && (x.status == Code.Status.TENTATIVE || x.status == Code.Status.ACTIVE));
+                if (exists)
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
+                }
 
                 osolab_user user = TableHelper.CreateNewOsolabUser(_dbContext, input.Body.Email, input.Body.Password);
                 user.status = Code.Status.TENTATIVE;
@@ -81,36 +94,82 @@ namespace AuthFoundation.Controllers.Signup
             catch (Exception ex)
             {
                 return new ObjectResult(new Output(new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message)))
-                { StatusCode = (int)Code.INTERNAL_SERVER_ERROR.Status };
+                {
+                    StatusCode = (int)Code.INTERNAL_SERVER_ERROR.Status
+                };
             }
         }
 
-        /// <summary>         /// Executes GetAuthorizationSessionAsync.         /// </summary>
-        private async Task<AuthorizationSession> GetAuthorizationSessionAsync(string sessionId)
+        /// <summary>
+        /// HTML テンプレートを読み込みます。
+        /// </summary>
+        /// <param name="fileName">ファイル名</param>
+        /// <returns>HTML 文字列</returns>
+        private string LoadTemplate(string fileName)
         {
-            string? raw = await _redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
-            if (string.IsNullOrWhiteSpace(raw)) throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is not found");
-            AuthorizationSession? s = JsonConvert.DeserializeObject<AuthorizationSession>(raw);
-            if (s == null) throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
-            return s;
+            string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Signup", fileName);
+            return System.IO.File.ReadAllText(path);
         }
 
-        /// <summary>         /// Input class.         /// </summary>
+        /// <summary>
+        /// 認可セッションを取得します。
+        /// </summary>
+        /// <param name="sessionId">認可セッションID</param>
+        /// <returns>認可セッション</returns>
+        /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
+        private async Task<AuthorizationSession> GetAuthorizationSessionAsync(string sessionId)
+        {
+            AuthorizationSession session = new AuthorizationSession();
+            string? raw = await session.ReadValueFromRedisAsync(_redis, sessionId);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is not found");
+            }
+
+            if (!session.SetValue(raw))
+            {
+                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
+            }
+
+            return session;
+        }
+
+        /// <summary>
+        /// サインアップ入力を表します。
+        /// </summary>
         public class Input
         {
-            /// <summary>             /// Gets or sets SessionId.             /// </summary>
+            /// <summary>
+            /// 認可セッションIDを取得または設定します。
+            /// </summary>
             public string SessionId { get; set; } = string.Empty;
-            /// <summary>             /// Gets or sets Body.             /// </summary>
-            public JsonBody Body { get; set; } = new();
 
-            /// <summary>             /// JsonBody class.             /// </summary>
+            /// <summary>
+            /// 入力ボディを取得または設定します。
+            /// </summary>
+            public JsonBody Body { get; set; } = new JsonBody();
+
+            /// <summary>
+            /// 入力ボディを表します。
+            /// </summary>
             public class JsonBody
             {
+                /// <summary>
+                /// メールアドレスを取得または設定します。
+                /// </summary>
                 public string Email { get; set; } = string.Empty;
+
+                /// <summary>
+                /// パスワードを取得または設定します。
+                /// </summary>
                 public string Password { get; set; } = string.Empty;
             }
 
-            /// <summary>             /// Executes CreateAsync.             /// </summary>
+            /// <summary>
+            /// HTTP リクエストから入力を生成します。
+            /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>サインアップ入力</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -127,7 +186,9 @@ namespace AuthFoundation.Controllers.Signup
                 };
             }
 
-            /// <summary>             /// Executes ValidationCheck.             /// </summary>
+            /// <summary>
+            /// 入力値を検証します。
+            /// </summary>
             public void ValidationCheck()
             {
                 ValidateUtil.IndispensableParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key);
@@ -139,18 +200,40 @@ namespace AuthFoundation.Controllers.Signup
             }
         }
 
-        /// <summary>         /// Output class.         /// </summary>
+        /// <summary>
+        /// サインアップ応答を表します。
+        /// </summary>
         private class Output
         {
-            /// <summary>             /// Gets or sets StatusCode.             /// </summary>
+            /// <summary>
+            /// 応答コードを取得します。
+            /// </summary>
             public string StatusCode { get; }
-            /// <summary>             /// Gets or sets Message.             /// </summary>
+
+            /// <summary>
+            /// メッセージを取得します。
+            /// </summary>
             public string Message { get; }
-            /// <summary>             /// Gets or sets VerifyUrl.             /// </summary>
+
+            /// <summary>
+            /// 確認 URL を取得します。
+            /// </summary>
             public string? VerifyUrl { get; }
-            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
-            public Output(ApiException ex) { StatusCode = ex.Code; Message = ex.ErrorMessage; }
-            /// <summary>             /// Initializes a new instance of Output.             /// </summary>
+
+            /// <summary>
+            /// エラー応答を初期化します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            public Output(ApiException ex)
+            {
+                StatusCode = ex.Code;
+                Message = ex.ErrorMessage;
+            }
+
+            /// <summary>
+            /// 正常応答を初期化します。
+            /// </summary>
+            /// <param name="verifyUrl">確認 URL</param>
             public Output(string verifyUrl)
             {
                 StatusCode = Code.SUCCESS.Code;
@@ -160,4 +243,3 @@ namespace AuthFoundation.Controllers.Signup
         }
     }
 }
-
