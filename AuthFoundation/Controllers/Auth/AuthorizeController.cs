@@ -70,44 +70,20 @@ namespace AuthFoundation.Controllers.Auth
         /// </summary>
         public sealed class Input
         {
-            /// <summary>
-            /// ResponseType を取得または設定します。
-            /// </summary>
             public string ResponseType { get; set; } = string.Empty;
 
-            /// <summary>
-            /// ClientId を取得または設定します。
-            /// </summary>
             public string ClientId { get; set; } = string.Empty;
 
-            /// <summary>
-            /// RedirectUri を取得または設定します。
-            /// </summary>
             public string RedirectUri { get; set; } = string.Empty;
 
-            /// <summary>
-            /// State を取得または設定します。
-            /// </summary>
             public string State { get; set; } = string.Empty;
 
-            /// <summary>
-            /// Scope を取得または設定します。
-            /// </summary>
             public string Scope { get; set; } = string.Empty;
 
-            /// <summary>
-            /// CodeChallengeMethod を取得または設定します。
-            /// </summary>
             public string CodeChallengeMethod { get; set; } = string.Empty;
 
-            /// <summary>
-            /// CodeChallenge を取得または設定します。
-            /// </summary>
             public string CodeChallenge { get; set; } = string.Empty;
 
-            /// <summary>
-            /// Nonce を取得または設定します。
-            /// </summary>
             public string Nonce { get; set; } = string.Empty;
 
             /// <summary>

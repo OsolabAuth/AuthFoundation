@@ -367,3 +367,4 @@ docs/
 docs/**/*.md
 # local docker env
 .env
+.vscode

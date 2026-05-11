@@ -139,14 +139,8 @@ namespace AuthFoundation.Controllers.Signup
         /// </summary>
         public class Input
         {
-            /// <summary>
-            /// 認可セッションIDを取得または設定します。
-            /// </summary>
             public string SessionId { get; set; } = string.Empty;
 
-            /// <summary>
-            /// 入力ボディを取得または設定します。
-            /// </summary>
             public JsonBody Body { get; set; } = new JsonBody();
 
             /// <summary>
@@ -154,14 +148,8 @@ namespace AuthFoundation.Controllers.Signup
             /// </summary>
             public class JsonBody
             {
-                /// <summary>
-                /// メールアドレスを取得または設定します。
-                /// </summary>
                 public string Email { get; set; } = string.Empty;
 
-                /// <summary>
-                /// パスワードを取得または設定します。
-                /// </summary>
                 public string Password { get; set; } = string.Empty;
             }
 
@@ -205,19 +193,10 @@ namespace AuthFoundation.Controllers.Signup
         /// </summary>
         private class Output
         {
-            /// <summary>
-            /// 応答コードを取得します。
-            /// </summary>
             public string StatusCode { get; }
 
-            /// <summary>
-            /// メッセージを取得します。
-            /// </summary>
             public string Message { get; }
 
-            /// <summary>
-            /// 確認 URL を取得します。
-            /// </summary>
             public string? VerifyUrl { get; }
 
             /// <summary>

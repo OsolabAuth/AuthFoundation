@@ -247,24 +247,12 @@ namespace AuthFoundation.Controllers.Auth
         /// </summary>
         public sealed class Input
         {
-            /// <summary>
-            /// 認可セッションIDを取得または設定します。
-            /// </summary>
             public string SessionId { get; set; } = string.Empty;
 
-            /// <summary>
-            /// 同意結果を取得または設定します。
-            /// </summary>
             public bool Accepted { get; set; }
 
-            /// <summary>
-            /// 同意の生文字列を取得または設定します。
-            /// </summary>
             public string AcceptedRaw { get; set; } = string.Empty;
 
-            /// <summary>
-            /// 同意した規約ID一覧を取得または設定します。
-            /// </summary>
             public List<long> TermIds { get; set; } = new();
 
             /// <summary>
@@ -319,14 +307,8 @@ namespace AuthFoundation.Controllers.Auth
         /// </summary>
         private sealed class ErrorOutput
         {
-            /// <summary>
-            /// 応答コードを取得します。
-            /// </summary>
             public string response_code { get; }
 
-            /// <summary>
-            /// メッセージを取得します。
-            /// </summary>
             public string message { get; }
 
             /// <summary>

@@ -87,19 +87,10 @@ namespace AuthFoundation.Controllers.Auth
         /// </summary>
         public class Input
         {
-            /// <summary>
-            /// 全端末ログアウトかどうかを取得または設定します。
-            /// </summary>
             public bool LogoutAll { get; set; }
 
-            /// <summary>
-            /// アクセストークンを取得または設定します。
-            /// </summary>
             public string? AccessToken { get; set; }
 
-            /// <summary>
-            /// ID トークン JTI を取得または設定します。
-            /// </summary>
             public string? IdTokenJti { get; set; }
 
             /// <summary>

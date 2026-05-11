@@ -172,19 +172,10 @@ namespace AuthFoundation.Controllers.Auth
         /// </summary>
         public sealed class Input
         {
-            /// <summary>
-            /// 認可セッションIDを取得または設定します。
-            /// </summary>
             public string SessionId { get; set; } = string.Empty;
 
-            /// <summary>
-            /// メールアドレスを取得または設定します。
-            /// </summary>
             public string Email { get; set; } = string.Empty;
 
-            /// <summary>
-            /// パスワードを取得または設定します。
-            /// </summary>
             public string Password { get; set; } = string.Empty;
 
             /// <summary>
@@ -231,19 +222,10 @@ namespace AuthFoundation.Controllers.Auth
         /// </summary>
         private sealed class Output
         {
-            /// <summary>
-            /// 結果種別を取得または設定します。
-            /// </summary>
             public string? result { get; set; }
 
-            /// <summary>
-            /// 応答コードを取得または設定します。
-            /// </summary>
             public string? response_code { get; set; }
 
-            /// <summary>
-            /// メッセージを取得または設定します。
-            /// </summary>
             public string? message { get; set; }
 
             /// <summary>
