@@ -1,0 +1,6 @@
+tunnel: REPLACE_WITH_TUNNEL_ID
+
+ingress:
+  - hostname: auth.example.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404
