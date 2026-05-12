@@ -47,7 +47,7 @@ function Invoke-OptionalCommand {
         return
     }
 
-    Write-Host "$Label: $Command"
+    Write-Host "${Label}: $Command"
     Invoke-Expression $Command
 
     if (-not $?) {
