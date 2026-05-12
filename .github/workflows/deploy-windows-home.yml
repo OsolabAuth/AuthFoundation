@@ -41,7 +41,7 @@ jobs:
           installation-path: "${{ env.DOTNET_INSTALL_DIR }}"
 
       - name: Restore
-        run: dotnet restore ./AuthFoundation/AuthFoundation.csproj
+        run: dotnet restore ./AuthFoundation.sln
 
       - name: Test
         run: dotnet test ./AuthFoundationTest/AuthFoundationTest.csproj --configuration Release --no-restore
