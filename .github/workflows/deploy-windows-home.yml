@@ -47,7 +47,7 @@ jobs:
           dotnet restore ./AuthFoundationTest/AuthFoundationTest.csproj
 
       - name: Test
-        run: dotnet test ./AuthFoundationTest/AuthFoundationTest.csproj --configuration Release --no-restore
+        run: dotnet test --project ./AuthFoundationTest/AuthFoundationTest.csproj --configuration Release --no-restore
 
       - name: Publish
         run: dotnet publish ./AuthFoundation/AuthFoundation.csproj --configuration Release --no-restore --output "${env:PUBLISH_DIR}"
