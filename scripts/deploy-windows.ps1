@@ -63,7 +63,7 @@ function Write-ProductionSettings {
         [Parameter(Mandatory = $true)]
         [string]$ActiveDir,
 
-        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string]$EncodedSettings
     )
 
