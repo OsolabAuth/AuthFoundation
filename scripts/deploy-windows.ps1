@@ -50,7 +50,7 @@ function Invoke-OptionalCommand {
     Write-Host "${Label}: $Command"
     Invoke-Expression $Command
 
-    if (-not $?) {
+    if ((-not $?) -or ($LASTEXITCODE -ne 0)) {
         throw "$Label failed."
     }
 }
