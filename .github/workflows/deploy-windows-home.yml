@@ -22,6 +22,7 @@ jobs:
         shell: pwsh
     env:
       DOTNET_VERSION: "10.0.x"
+      DOTNET_INSTALL_DIR: "${{ github.workspace }}\\_dotnet"
       PUBLISH_DIR: "${{ github.workspace }}\\artifacts\\publish"
       DEPLOY_ROOT: "${{ secrets.AUTH_DEPLOY_ROOT }}"
       RELEASE_ROOT: "${{ secrets.AUTH_RELEASE_ROOT }}"
@@ -37,6 +38,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "${{ env.DOTNET_VERSION }}"
+          installation-path: "${{ env.DOTNET_INSTALL_DIR }}"
 
       - name: Restore
         run: dotnet restore ./AuthFoundation/AuthFoundation.csproj
