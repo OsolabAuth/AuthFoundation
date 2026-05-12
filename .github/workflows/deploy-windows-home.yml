@@ -19,7 +19,7 @@ jobs:
       - auth-home
     defaults:
       run:
-        shell: pwsh
+        shell: powershell
     env:
       DOTNET_VERSION: "10.0.x"
       DOTNET_INSTALL_DIR: "${{ github.workspace }}\\_dotnet"
