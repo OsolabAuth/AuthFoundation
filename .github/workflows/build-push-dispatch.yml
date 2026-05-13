@@ -25,7 +25,8 @@ jobs:
       - name: Resolve image ref
         id: image
         run: |
-          image_ref="ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${{ github.sha }}"
+          owner_lc="$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          image_ref="ghcr.io/${owner_lc}/${IMAGE_NAME}:${{ github.sha }}"
           echo "image_ref=${image_ref}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
