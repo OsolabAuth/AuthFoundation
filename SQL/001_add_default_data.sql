@@ -22,4 +22,18 @@ VALUES
 ('00000000000000000000000000000000','latest_login_datetime', SYSDATETIME(), SYSDATETIME(),'1'),
 ('00000000000000000000000000000000','email_verified', SYSDATETIME(), SYSDATETIME(),'1');
 
+INSERT INTO [auth].[scope_master]([scope],[description],[confidential_only],[create_datetime],[update_datetime],[status])
+VALUES
+('openid', N'OpenID Connect authentication', 0, SYSDATETIME(), SYSDATETIME(), 1),
+('profile', N'Basic profile claims', 0, SYSDATETIME(), SYSDATETIME(), 1),
+('email', N'Email claims', 0, SYSDATETIME(), SYSDATETIME(), 1);
+
+INSERT INTO [auth].[scope_data_key]([scope],[data_key],[create_datetime],[update_datetime],[status])
+VALUES
+('openid', 'sub', SYSDATETIME(), SYSDATETIME(), 1),
+('profile', 'name', SYSDATETIME(), SYSDATETIME(), 1),
+('profile', 'preferred_username', SYSDATETIME(), SYSDATETIME(), 1),
+('email', 'email', SYSDATETIME(), SYSDATETIME(), 1),
+('email', 'email_verified', SYSDATETIME(), SYSDATETIME(), 1);
+
 COMMIT TRAN;

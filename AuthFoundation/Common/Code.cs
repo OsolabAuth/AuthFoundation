@@ -15,6 +15,7 @@ namespace AuthFoundation.Common
         public static readonly ApiException ILLEGAL_REDIRECT_URI = new("00005", HttpStatusCode.BadRequest, "illegal redirect_uri");
         public static readonly ApiException INVALID_AUTH_CODE = new("00007", HttpStatusCode.BadRequest, "invalid auth code");
         public static readonly ApiException UNAUTHORIZED = new("00008", HttpStatusCode.Unauthorized, "unauthorized");
+        public static readonly ApiException INVALID_SCOPE = new("00009", HttpStatusCode.BadRequest, "invalid scope");
 
         public static readonly ApiException INTERNAL_SERVER_ERROR = new("90000", HttpStatusCode.InternalServerError, "Unhandled server error");
         public static readonly ApiException ID_GENERATION_ERROR = new("90001", HttpStatusCode.InternalServerError, "ID generation failed");
@@ -185,5 +186,14 @@ namespace AuthFoundation.Common
             public const string LOGOUT_ALL_PREFIX = "logout_all:";
             public const string ID_TOKEN_PREFIX = "id_token_jti:";
         }
+
+        /// <summary>
+        /// 内部クライアントクラス
+        /// </summary>
+        public static class InnerClient
+        {
+            public const string OSOLAB_CLIENT_ID = "00000000000000000000000000000000";
+        }
+
     }
 }

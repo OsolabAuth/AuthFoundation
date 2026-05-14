@@ -58,7 +58,7 @@ namespace AuthFoundation.Controllers.Auth
                     throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorMessage);
                 }
 
-                string[] scopes = Helper.ParseScopes(tokenSession.Scope);
+                List<string> scopes = Helper.ParseScopes(tokenSession.Scope);
                 Dictionary<string, object> claims = new(StringComparer.Ordinal)
                 {
                     ["sub"] = user.osolab_id

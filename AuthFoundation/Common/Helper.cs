@@ -131,21 +131,21 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// Scope を配列へ分解します。
+        /// Scope をリストへ分解します。
         /// </summary>
         /// <param name="scope">Scope 文字列</param>
-        /// <returns>Scope 配列</returns>
-        public static string[] ParseScopes(string? scope)
+        /// <returns>Scope リスト</returns>
+        public static List<string> ParseScopes(string? scope)
         {
             if (string.IsNullOrWhiteSpace(scope))
             {
-                return Array.Empty<string>();
+                return new List<string>();
             }
 
             return scope
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.Ordinal)
-                .ToArray();
+                .ToList();
         }
 
         /// <summary>

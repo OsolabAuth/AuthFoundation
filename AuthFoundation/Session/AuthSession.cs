@@ -1,6 +1,8 @@
 using AuthFoundation.Common;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using ServiceStack;
 
 namespace AuthFoundation.Session
 {
@@ -34,12 +36,15 @@ namespace AuthFoundation.Session
 
         [JsonProperty("latest_auth_at")]
         public string LatestAuthAt { get; set; } = string.Empty;
+        [JsonIgnore]
+        public bool HasValue { get; set; } = false;
 
         /// <summary>
         /// ログインセッションを初期化します。
         /// </summary>
         public AuthSession()
         {
+            HasValue = false;
         }
 
         /// <summary>
@@ -55,6 +60,7 @@ namespace AuthFoundation.Session
             OsolabId = osolabId;
             Email = email;
             ClientId = clientId;
+            HasValue = true;
         }
 
         /// <summary>
@@ -127,7 +133,40 @@ namespace AuthFoundation.Session
             CreatedAt = session.CreatedAt;
             ExpiresAt = session.ExpiresAt;
             LatestAuthAt = session.LatestAuthAt;
+            HasValue = true;
             return true;
+        }
+
+        /// <summary>
+        /// Redisから値をプロパティに読み込む
+        /// </summary>
+        /// <param name="redis">Redis クライアント</param>
+        /// <param name="sessionId">セッションID</param>
+        public async void ReadFromRedisAsync(IRedisClient redis, string? sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                return;
+            }
+            string? jsonString = await redis.GetStringAsync(GetRedisKey(sessionId));
+
+            if (string.IsNullOrWhiteSpace(jsonString))
+            {
+                return;
+            }
+            AuthSession? session = JsonConvert.DeserializeObject<AuthSession>(jsonString);
+            if (session == null)
+            {
+                return;
+            }
+            SessionId = session.SessionId;
+            OsolabId = session.OsolabId;
+            Email = session.Email;
+            ClientId = session.ClientId;
+            CreatedAt = session.CreatedAt;
+            ExpiresAt = session.ExpiresAt;
+            LatestAuthAt = session.LatestAuthAt;
+            HasValue = true;
         }
 
         /// <summary>
