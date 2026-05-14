@@ -29,43 +29,47 @@ namespace AuthFoundation.Common
         /// </summary>
         /// <param name="session">認可セッション</param>
         /// <param name="loginSessionId">ログインセッションID</param>
-        /// <param name="reuseAuthorizationSession">既存認可セッションを再利用するかどうか</param>
         /// <returns>遷移先 URL</returns>
         public async Task<string> ExecuteAsync(
             AuthorizationSession session,
-            string? loginSessionId,
-            bool reuseAuthorizationSession = false)
+            string? loginSessionId)
         {
-            AuthSession? loginSession = await LoadLoginSessionAsync(loginSessionId);
-            bool hasConsent = loginSession != null
-                && await HasRequiredConsentAsync(loginSession.OsolabId, session.ClientId, session.Scope);
+            string sessionId = string.Empty;
+            List<string> requestedScopes = Helper.ParseScopes(session.Scope);
+            // 要求Scopeの検証
+            CertRequestScope(session.ClientId, requestedScopes);
 
-            if (loginSession != null && hasConsent)
+            // ログイン検証
+            AuthSession loginSession = new AuthSession();
+            loginSession.ReadFromRedisAsync(_redis, loginSessionId);
+
+            if (loginSession.HasValue)
             {
-                AuthCodeSession codeSession = CreateAuthCodeSession(session, loginSession);
-                await codeSession.WriteToRedisAsync(_redis);
-
-                return Helper.BuildRedirectUri(session.RedirectUri, new Dictionary<string, string>
+                //ログイン済みの場合、同意状況の検証を行う
+                bool hasTermConsent = await HasRequiredConsentTerm(loginSession.OsolabId, session.ClientId);
+                bool hasScopeConsent = await HasRequiredConsentScope(loginSession.OsolabId, session.ClientId, requestedScopes);
+                if (hasTermConsent && hasScopeConsent)
                 {
-                    ["code"] = codeSession.Code,
-                    ["state"] = session.State
-                });
+                    //同意済みの場合、認可コードの発行を行う
+                    AuthCodeSession codeSession = CreateAuthCodeSession(session, loginSession);
+                    await codeSession.WriteToRedisAsync(_redis);
+                    // 認可セッションは削除する
+                    await _redis.DeleteAsync(session.SessionId);
+                    // リクエストのリダイレクトURIにクエリを付与して、リダイレクトURIを生成
+                    Dictionary<string, string> queries = new Dictionary<string, string>
+                    {
+                        ["code"] = codeSession.Code,
+                        ["state"] = session.State
+                    };
+                    return Helper.BuildRedirectUri(session.RedirectUri, queries);
+                }
+                // 未同意の場合は、認可セッションを登録し、同意画面にセッションIDを付与してリダイレクトURIを生成
+                sessionId = await RegisterAuthorizationSession(_redis, session, loginSession.OsolabId);
+                return $"/terms/view?session_id={Uri.EscapeDataString(sessionId)}";
             }
-
-            if (!reuseAuthorizationSession || string.IsNullOrWhiteSpace(session.SessionId))
-            {
-                session.SessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
-            }
-
-            session.OsolabId = loginSession?.OsolabId ?? string.Empty;
-            await session.WriteToRedisAsync(_redis);
-
-            if (loginSession == null)
-            {
-                return $"/login?session_id={Uri.EscapeDataString(session.SessionId)}";
-            }
-
-            return $"/terms/view?session_id={Uri.EscapeDataString(session.SessionId)}";
+            // 未ログインの場合、認可セッションを登録し、ログイン画面にセッションIDを付与してリダイレクトURIを生成
+            sessionId = await RegisterAuthorizationSession(_redis, session, string.Empty);
+            return $"/login?session_id={Uri.EscapeDataString(sessionId)}";
         }
 
         /// <summary>
@@ -82,7 +86,7 @@ namespace AuthFoundation.Common
                 return null;
             }
 
-            return await ExecuteAsync(session, loginSessionId, true);
+            return await ExecuteAsync(session, loginSessionId);
         }
 
         /// <summary>
@@ -126,46 +130,58 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// ログインセッションを読み込みます。
+        /// 認可セッションを発行
         /// </summary>
-        /// <param name="sessionId">ログインセッションID</param>
-        /// <returns>ログインセッション</returns>
-        private async Task<AuthSession?> LoadLoginSessionAsync(string? sessionId)
+        /// <param name="redis">Redisクライアント</param>
+        /// <param name="session">認可セッション</param>
+        /// <param name="osolabId">ユーザーID</param>
+        /// <returns></returns>
+        public static async Task<string> RegisterAuthorizationSession(IRedisClient redis, AuthorizationSession session, string osolabId)
         {
-            AuthSession session = new AuthSession();
-            string? raw = await session.ReadValueFromRedisAsync(_redis, sessionId);
-            if (string.IsNullOrWhiteSpace(raw) || !session.SetValue(raw))
+            if (string.IsNullOrWhiteSpace(session.SessionId))
             {
-                return null;
+                session.SessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
             }
 
-            return session;
+            session.OsolabId = osolabId;
+            await session.WriteToRedisAsync(redis);
+            return session.SessionId;
         }
 
         /// <summary>
-        /// 必須同意がそろっているか判定します。
+        /// 利用規約への同意を判定
         /// </summary>
         /// <param name="osolabId">Osolab ID</param>
         /// <param name="clientId">クライアントID</param>
-        /// <param name="requestedScope">要求 Scope</param>
-        /// <returns>同意済みの場合は true</returns>
-        private async Task<bool> HasRequiredConsentAsync(string osolabId, string clientId, string requestedScope)
+        /// <returns>true:規約同意済み,false:未同意規約有</returns>
+        private async Task<bool> HasRequiredConsentTerm(string? osolabId, string? clientId)
         {
-            string[] requestedScopes = Helper.ParseScopes(requestedScope);
-
-            List<client_term> requiredTerms = await _dbContext.client_terms
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
+            List<client_term> clientTerms = await _dbContext.client_terms
+                .Where(x => x.client_id == clientId 
+                    || x.client_id ==Code.InnerClient.OSOLAB_CLIENT_ID 
+                    && x.status == Code.Status.ACTIVE 
+                    && x.required)
                 .ToListAsync();
 
-            List<user_term> agreedTermRows = await _dbContext.user_terms
-                .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
+            List<user_term> userTerms = await _dbContext.user_terms
+                .Where(x => x.osolab_id == osolabId 
+                    && x.client_id == clientId
+                    || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
+                    && x.status == Code.Status.ACTIVE)
                 .ToListAsync();
 
-            if (!requiredTerms.All(rt => agreedTermRows.Any(ut => ut.term_id == rt.term_id && ut.term_version == rt.term_version)))
-            {
-                return false;
-            }
+            return !clientTerms.All(ct => userTerms.Any(ut => ut.term_id == ct.term_id && ut.term_version == ct.term_version));
+        }
 
+        /// <summary>
+        /// スコープ連携への同意を判定
+        /// </summary>
+        /// <param name="osolabId">Osolab ID</param>
+        /// <param name="clientId">クライアントID</param>
+        /// <param name="requestedScopes">要求 Scope</param>
+        /// <returns></returns>
+        private async Task<bool> HasRequiredConsentScope(string? osolabId, string? clientId, List<string> requestedScopes)
+        {
             HashSet<string> requiredScopeSet = await _dbContext.client_scopes
                 .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
                 .Select(x => x.scope)
@@ -182,6 +198,26 @@ namespace AuthFoundation.Common
                 .ToHashSetAsync(StringComparer.Ordinal);
 
             return requiredScopeSet.All(agreedScopes.Contains) && requestedScopes.All(agreedScopes.Contains);
+        }
+
+        /// <summary>
+        /// 要求scopeの検証
+        /// </summary>
+        /// <param name="clientId">クライアントID</param>
+        /// <param name="requestedScopes">要求 Scope</param>
+        private async void CertRequestScope(string clientId, List<string> requestedScopes)
+        {
+            HashSet<string> requiredScopeSet = await _dbContext.client_scopes
+                .Where(x => x.client_id == clientId
+                    && x.status == Code.Status.ACTIVE
+                    && x.required)
+                .Select(x => x.scope)
+                .ToHashSetAsync(StringComparer.Ordinal);
+
+            if (!requiredScopeSet.IsSubsetOf(requestedScopes))
+            {
+                throw new ApiException(Code.INVALID_SCOPE, Code.INVALID_SCOPE.ErrorMessage);
+            };
         }
     }
 }
