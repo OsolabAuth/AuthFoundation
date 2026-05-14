@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+TestResults/
+*.user
+*.suo
+*.http
+Properties/launchSettings.json
+appsettings.Development.json
+efpt.config.json.user
