@@ -46,6 +46,18 @@ namespace AuthFoundation.Controllers.Auth
 
                 AuthorizationSession session = input.ToAuthorizationSession();
                 string location = await _authorizeExecutionService.ExecuteAsync(session, AuthSession.GetCookieSessionId(Request));
+                if (ShouldReturnBodySession(Request))
+                {
+                    return Ok(new
+                    {
+                        result = "redirect",
+                        redirect_url = RemoveSessionIdFromUrl(location),
+                        session_id = ExtractSessionId(location),
+                        response_code = Code.SUCCESS.Code,
+                        message = Code.SUCCESS.ErrorMessage
+                    });
+                }
+
                 return Redirect(location);
             }
             catch (ApiException ex)
@@ -63,6 +75,59 @@ namespace AuthFoundation.Controllers.Auth
                     StatusCode = (int)apiEx.Status
                 };
             }
+        }
+
+        private static bool ShouldReturnBodySession(HttpRequest request)
+        {
+            return string.Equals(
+                request.Headers["x-auth-ui-session-mode"].ToString(),
+                "body",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ExtractSessionId(string location)
+        {
+            string query = GetQuery(location);
+            foreach (string part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] pair = part.Split('=', 2);
+                if (pair.Length == 2 && string.Equals(pair[0], "session_id", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Uri.UnescapeDataString(pair[1]);
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static string RemoveSessionIdFromUrl(string location)
+        {
+            int questionIndex = location.IndexOf('?', StringComparison.Ordinal);
+            if (questionIndex < 0)
+            {
+                return location;
+            }
+
+            string basePart = location[..questionIndex];
+            string queryPart = location[(questionIndex + 1)..];
+            string filteredQuery = string.Join("&", queryPart
+                .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                .Where(part => !part.StartsWith("session_id=", StringComparison.OrdinalIgnoreCase)));
+
+            return string.IsNullOrWhiteSpace(filteredQuery)
+                ? basePart
+                : $"{basePart}?{filteredQuery}";
+        }
+
+        private static string GetQuery(string location)
+        {
+            int questionIndex = location.IndexOf('?', StringComparison.Ordinal);
+            if (questionIndex < 0 || questionIndex == location.Length - 1)
+            {
+                return string.Empty;
+            }
+
+            return location[(questionIndex + 1)..];
         }
 
         /// <summary>

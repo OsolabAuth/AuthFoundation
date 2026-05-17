@@ -100,6 +100,26 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        [HttpPost("list")]
+        public async Task<IActionResult> PostTermsList()
+        {
+            try
+            {
+                FormSessionInput input = await FormSessionInput.CreateAsync(Request.HttpContext);
+                input.Validate();
+                return await BuildTermsResponseAsync(input.SessionId);
+            }
+            catch (ApiException ex)
+            {
+                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
+            }
+            catch (Exception ex)
+            {
+                ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
+            }
+        }
+
         /// <summary>
         /// 同意結果を保存し、認可処理を再開します。
         /// </summary>
@@ -174,6 +194,33 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             return session;
+        }
+
+        private async Task<IActionResult> BuildTermsResponseAsync(string sessionId)
+        {
+            AuthorizationSession session = await GetAuthorizationSessionRequiredAsync(sessionId);
+
+            List<client_term> terms = await _dbContext.client_terms
+                .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE)
+                .OrderBy(x => x.term_id)
+                .ToListAsync();
+
+            Dictionary<string, term_master> termMasters = await _dbContext.term_masters
+                .Where(x => terms.Select(t => t.term_id).Contains(x.term_id))
+                .ToDictionaryAsync(x => x.term_id);
+
+            return Ok(new
+            {
+                client_id = session.ClientId,
+                terms = terms.Select(x => new
+                {
+                    term_id = x.term_id,
+                    title = termMasters.TryGetValue(x.term_id, out term_master? term) ? term.title : x.term_id,
+                    version = x.term_version,
+                    required = x.required == Code.Status.ACTIVE
+                }),
+                scopes = Helper.ParseScopes(session.Scope)
+            });
         }
 
         /// <summary>
@@ -287,7 +334,7 @@ namespace AuthFoundation.Controllers.Auth
 
                 return new Input
                 {
-                    SessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString(),
+                    SessionId = GetSessionId(request, form),
                     AcceptedRaw = form["accepted"].ToString(),
                     Accepted = string.Equals(form["accepted"].ToString(), "true", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(form["accepted"].ToString(), "on", StringComparison.OrdinalIgnoreCase),
@@ -295,13 +342,21 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            private static string GetSessionId(HttpRequest request, IFormCollection form)
+            {
+                string bodySessionId = form["session_id"].ToString();
+                return string.IsNullOrWhiteSpace(bodySessionId)
+                    ? request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString()
+                    : bodySessionId;
+            }
+
             /// <summary>
             /// 入力値を検証します。
             /// </summary>
             public void Validate()
             {
-                ValidateUtil.IndispensableParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key);
-                ValidateUtil.FormatParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key, Code.HttpHeaders.X_SESSION_ID.Regex);
+                ValidateUtil.IndispensableParam(SessionId, Code.HttpBodies.SESSION_ID.Key);
+                ValidateUtil.FormatParam(SessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
                 ValidateUtil.IndispensableParam(AcceptedRaw, Code.HttpBodies.ACCEPTED.Key);
                 ValidateUtil.FormatParam(AcceptedRaw, Code.HttpBodies.ACCEPTED.Key, Code.HttpBodies.ACCEPTED.Regex);
             }
@@ -324,6 +379,28 @@ namespace AuthFoundation.Controllers.Auth
             {
                 response_code = ex.Code;
                 message = ex.ErrorMessage;
+            }
+        }
+
+        private sealed class FormSessionInput
+        {
+            public string SessionId { get; set; } = string.Empty;
+
+            public static async Task<FormSessionInput> CreateAsync(HttpContext context)
+            {
+                HttpRequest request = context.Request;
+                Helper.ValidateTypeFormUrlEncoded(request.ContentType);
+                IFormCollection form = await request.ReadFormAsync();
+                return new FormSessionInput
+                {
+                    SessionId = form["session_id"].ToString()
+                };
+            }
+
+            public void Validate()
+            {
+                ValidateUtil.IndispensableParam(SessionId, Code.HttpBodies.SESSION_ID.Key);
+                ValidateUtil.FormatParam(SessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
             }
         }
     }

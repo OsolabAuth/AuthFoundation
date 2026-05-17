@@ -196,10 +196,18 @@ namespace AuthFoundation.Controllers.Auth
                 IFormCollection form = await request.ReadFormAsync();
                 return new Input
                 {
-                    SessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString(),
+                    SessionId = GetSessionId(request, form),
                     Email = form["email"].ToString(),
                     Password = form["password"].ToString()
                 };
+            }
+
+            private static string GetSessionId(HttpRequest request, IFormCollection form)
+            {
+                string bodySessionId = form["session_id"].ToString();
+                return string.IsNullOrWhiteSpace(bodySessionId)
+                    ? request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString()
+                    : bodySessionId;
             }
 
             /// <summary>
@@ -209,7 +217,7 @@ namespace AuthFoundation.Controllers.Auth
             {
                 if (!string.IsNullOrWhiteSpace(SessionId))
                 {
-                    ValidateUtil.FormatParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key, Code.HttpHeaders.X_SESSION_ID.Regex);
+                    ValidateUtil.FormatParam(SessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
                 }
 
                 ValidateUtil.IndispensableParam(Email, Code.HttpBodies.EMAIL.Key);

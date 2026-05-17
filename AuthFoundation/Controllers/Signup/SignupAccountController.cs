@@ -170,7 +170,7 @@ namespace AuthFoundation.Controllers.Signup
                 IFormCollection form = await request.ReadFormAsync();
                 return new Input
                 {
-                    SessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString(),
+                    SessionId = GetSessionId(request, form),
                     Body = new JsonBody
                     {
                         Email = form["email"].ToString(),
@@ -179,13 +179,21 @@ namespace AuthFoundation.Controllers.Signup
                 };
             }
 
+            private static string GetSessionId(HttpRequest request, IFormCollection form)
+            {
+                string bodySessionId = form["session_id"].ToString();
+                return string.IsNullOrWhiteSpace(bodySessionId)
+                    ? request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString()
+                    : bodySessionId;
+            }
+
             /// <summary>
             /// 入力値を検証します。
             /// </summary>
             public void ValidationCheck()
             {
-                ValidateUtil.IndispensableParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key);
-                ValidateUtil.FormatParam(SessionId, Code.HttpHeaders.X_SESSION_ID.Key, Code.HttpHeaders.X_SESSION_ID.Regex);
+                ValidateUtil.IndispensableParam(SessionId, Code.HttpBodies.SESSION_ID.Key);
+                ValidateUtil.FormatParam(SessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
                 ValidateUtil.IndispensableParam(Body.Email, Code.HttpBodies.EMAIL.Key);
                 ValidateUtil.FormatParam(Body.Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
                 ValidateUtil.IndispensableParam(Body.Password, Code.HttpBodies.PASSWORD.Key);
