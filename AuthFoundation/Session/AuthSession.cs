@@ -142,7 +142,7 @@ namespace AuthFoundation.Session
         /// </summary>
         /// <param name="redis">Redis クライアント</param>
         /// <param name="sessionId">セッションID</param>
-        public async void ReadFromRedisAsync(IRedisClient redis, string? sessionId)
+        public async Task ReadFromRedisAsync(IRedisClient redis, string? sessionId)
         {
             if (string.IsNullOrWhiteSpace(sessionId))
             {

@@ -37,11 +37,11 @@ namespace AuthFoundation.Common
             string sessionId = string.Empty;
             List<string> requestedScopes = Helper.ParseScopes(session.Scope);
             // 要求Scopeの検証
-            CertRequestScope(session.ClientId, requestedScopes);
+            await CertRequestScope(session.ClientId, requestedScopes);
 
             // ログイン検証
             AuthSession loginSession = new AuthSession();
-            loginSession.ReadFromRedisAsync(_redis, loginSessionId);
+            await loginSession.ReadFromRedisAsync(_redis, loginSessionId);
 
             if (loginSession.HasValue)
             {
@@ -168,7 +168,7 @@ namespace AuthFoundation.Common
                     && x.consent_result == Code.Status.ACTIVE)
                 .ToListAsync();
 
-            return !clientTerms.All(ct => userTerms.Any(ut => ut.term_id == ct.term_id && ut.term_version == ct.term_version));
+            return clientTerms.All(ct => userTerms.Any(ut => ut.term_id == ct.term_id && ut.term_version == ct.term_version));
         }
 
         /// <summary>
@@ -203,7 +203,7 @@ namespace AuthFoundation.Common
         /// </summary>
         /// <param name="clientId">クライアントID</param>
         /// <param name="requestedScopes">要求 Scope</param>
-        private async void CertRequestScope(string clientId, List<string> requestedScopes)
+        private async Task CertRequestScope(string clientId, List<string> requestedScopes)
         {
             HashSet<string> requiredScopeSet = await _dbContext.client_scopes
                 .Where(x => x.client_id == clientId
