@@ -36,6 +36,10 @@ namespace AuthFoundation.Common
         /// </summary>
         public static string ServiceDocumentationUrl { get; private set; } = "https://osolab.jp/document/auth";
         /// <summary>
+        /// Gets or sets AuthUiBaseUrl.
+        /// </summary>
+        public static string AuthUiBaseUrl { get; private set; } = "https://portal.osolab-auth.jp";
+        /// <summary>
         /// Gets or sets InnerClientId.
         /// </summary>
         public static string InnerClientId { get; private set; } = "00000000000000000000000000000000";
@@ -108,6 +112,12 @@ namespace AuthFoundation.Common
                 ServiceDocumentationUrl = serviceDoc;
             }
 
+            string? authUiBaseUrl = config["AuthUiBaseUrl"];
+            if (!string.IsNullOrWhiteSpace(authUiBaseUrl))
+            {
+                AuthUiBaseUrl = NormalizeBaseUrl(authUiBaseUrl);
+            }
+
             string? innerClientId = config["InnerClientId"];
             if (!string.IsNullOrWhiteSpace(innerClientId))
             {
@@ -160,6 +170,20 @@ namespace AuthFoundation.Common
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Executes NormalizeBaseUrl.
+        /// </summary>
+        private static string NormalizeBaseUrl(string value)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ApiException(Common.Code.INTERNAL_SERVER_ERROR, "環境設定値エラー");
+            }
+
+            return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
         }
     }
 }

@@ -1,0 +1,13 @@
+{
+  "GCP_PROJECT_ID": "osolab",
+  "GCP_REGION": "us-west1",
+  "ARTIFACT_REGISTRY_REPOSITORY": "auth",
+  "CLOUD_RUN_SERVICE": "authfoundation-api",
+  "CLOUD_RUN_IMAGE_NAME": "authfoundation-api",
+  "AUTH_ISSUER": "https://auth.osolab-auth.jp/",
+  "CLOUD_RUN_UPDATE_ENV_VARS": "AuthUiBaseUrl=https://portal.osolab-auth.jp,Cors__AllowedOrigins=https://portal.osolab-auth.jp",
+  "CLOUD_RUN_VPC_EGRESS": "private-ranges-only",
+  "CLOUD_RUN_NETWORK": "default",
+  "CLOUD_RUN_SUBNET": "default",
+  "CLOUD_RUN_UPDATE_SECRETS": "ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest"
+}

@@ -49,6 +49,11 @@ namespace AuthFoundation.Controllers.Auth
         public IActionResult GetLogin()
         {
             string sessionId = Request.Query["session_id"].ToString();
+            if (AuthUiUrl.IsConfigured)
+            {
+                return Redirect(AuthUiUrl.Build("/login", sessionId));
+            }
+
             string safeSessionId = System.Net.WebUtility.HtmlEncode(sessionId);
             string html = LoadTemplate("login.html").Replace("__SESSION_ID__", safeSessionId, StringComparison.Ordinal);
             return Content(html, "text/html; charset=utf-8");

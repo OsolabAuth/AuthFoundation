@@ -65,11 +65,11 @@ namespace AuthFoundation.Common
                 }
                 // 未同意の場合は、認可セッションを登録し、同意画面にセッションIDを付与してリダイレクトURIを生成
                 sessionId = await RegisterAuthorizationSession(_redis, session, loginSession.OsolabId);
-                return $"/terms/view?session_id={Uri.EscapeDataString(sessionId)}";
+                return AuthUiUrl.Build("/terms", sessionId);
             }
             // 未ログインの場合、認可セッションを登録し、ログイン画面にセッションIDを付与してリダイレクトURIを生成
             sessionId = await RegisterAuthorizationSession(_redis, session, string.Empty);
-            return $"/login?session_id={Uri.EscapeDataString(sessionId)}";
+            return AuthUiUrl.Build("/login", sessionId);
         }
 
         /// <summary>

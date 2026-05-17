@@ -38,6 +38,11 @@ namespace AuthFoundation.Controllers.Signup
         public IActionResult GetSignupView()
         {
             string sessionId = Request.Query["session_id"].ToString();
+            if (AuthUiUrl.IsConfigured)
+            {
+                return Redirect(AuthUiUrl.Build("/signup", sessionId));
+            }
+
             string safeSessionId = System.Net.WebUtility.HtmlEncode(sessionId);
             string html = LoadTemplate("signup-account.html").Replace("__SID__", safeSessionId, StringComparison.Ordinal);
             return Content(html, "text/html; charset=utf-8");

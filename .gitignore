@@ -368,3 +368,9 @@ docs/**/*.md
 # local docker env
 .env
 .vscode
+
+# Local GitHub Actions secrets input. Do not commit real secret values.
+deploy/github-actions.secrets.json
+
+# Local language/build cache
+*.lscache
