@@ -372,5 +372,9 @@ docs/**/*.md
 # Local GitHub Actions secrets input. Do not commit real secret values.
 deploy/github-actions.secrets.json
 
+# Local Codex rules clone
+.codex-rules/
+codex/
+
 # Local language/build cache
 *.lscache
