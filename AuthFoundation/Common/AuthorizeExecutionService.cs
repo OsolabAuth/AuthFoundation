@@ -157,17 +157,15 @@ namespace AuthFoundation.Common
         private async Task<bool> HasRequiredConsentTerm(string? osolabId, string? clientId)
         {
             List<client_term> clientTerms = await _dbContext.client_terms
-                .Where(x => x.client_id == clientId 
-                    || x.client_id ==Code.InnerClient.OSOLAB_CLIENT_ID 
-                    && x.status == Code.Status.ACTIVE 
-                    && x.required)
+                .Where(x => (x.client_id == clientId || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID)
+                    && x.status == Code.Status.ACTIVE
+                    && x.required == Code.Status.ACTIVE)
                 .ToListAsync();
 
-            List<user_term> userTerms = await _dbContext.user_terms
-                .Where(x => x.osolab_id == osolabId 
-                    && x.client_id == clientId
-                    || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
-                    && x.status == Code.Status.ACTIVE)
+            List<user_term_consent> userTerms = await _dbContext.user_term_consents
+                .Where(x => x.osolab_id == osolabId
+                    && (x.client_id == clientId || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID)
+                    && x.consent_result == Code.Status.ACTIVE)
                 .ToListAsync();
 
             return !clientTerms.All(ct => userTerms.Any(ut => ut.term_id == ct.term_id && ut.term_version == ct.term_version));
@@ -183,7 +181,7 @@ namespace AuthFoundation.Common
         private async Task<bool> HasRequiredConsentScope(string? osolabId, string? clientId, List<string> requestedScopes)
         {
             HashSet<string> requiredScopeSet = await _dbContext.client_scopes
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required)
+                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required == Code.Status.ACTIVE)
                 .Select(x => x.scope)
                 .ToHashSetAsync(StringComparer.Ordinal);
 
@@ -192,7 +190,7 @@ namespace AuthFoundation.Common
                 return false;
             }
 
-            HashSet<string> agreedScopes = await _dbContext.user_client_scopes
+            HashSet<string> agreedScopes = await _dbContext.user_client_scope_consents
                 .Where(x => x.osolab_id == osolabId && x.client_id == clientId && x.status == Code.Status.ACTIVE)
                 .Select(x => x.scope)
                 .ToHashSetAsync(StringComparer.Ordinal);
@@ -210,7 +208,7 @@ namespace AuthFoundation.Common
             HashSet<string> requiredScopeSet = await _dbContext.client_scopes
                 .Where(x => x.client_id == clientId
                     && x.status == Code.Status.ACTIVE
-                    && x.required)
+                    && x.required == Code.Status.ACTIVE)
                 .Select(x => x.scope)
                 .ToHashSetAsync(StringComparer.Ordinal);
 

@@ -5,63 +5,29 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
-/// <summary>
-/// client_master class.
-/// </summary>
 public partial class client_master
 {
-    /// <summary>
-    /// Gets or sets client_id.
-    /// </summary>
     public string client_id { get; set; }
 
-    /// <summary>
-    /// Gets or sets client_name.
-    /// </summary>
     public string client_name { get; set; }
 
-    /// <summary>
-    /// Gets or sets client_secret.
-    /// </summary>
     public string client_secret { get; set; }
 
-    /// <summary>
-    /// Gets or sets create_datetime.
-    /// </summary>
     public DateTime create_datetime { get; set; }
 
-    /// <summary>
-    /// Gets or sets update_datetime.
-    /// </summary>
     public DateTime update_datetime { get; set; }
 
-    /// <summary>
-    /// Gets or sets status.
-    /// </summary>
     public byte status { get; set; }
 
-    /// <summary>
-    /// Gets or sets client_scopes.
-    /// </summary>
+    public virtual ICollection<client_data_key> client_data_keys { get; set; } = new List<client_data_key>();
+
+    public virtual ICollection<client_redirect_uri> client_redirect_uris { get; set; } = new List<client_redirect_uri>();
+
     public virtual ICollection<client_scope> client_scopes { get; set; } = new List<client_scope>();
 
-    /// <summary>
-    /// Gets or sets client_terms.
-    /// </summary>
-    public virtual ICollection<client_term> client_terms { get; set; } = new List<client_term>();
+    public virtual ICollection<user_client_scope_consent> user_client_scope_consents { get; set; } = new List<user_client_scope_consent>();
 
-    /// <summary>
-    /// Gets or sets user_client_scopes.
-    /// </summary>
-    public virtual ICollection<user_client_scope> user_client_scopes { get; set; } = new List<user_client_scope>();
-
-    /// <summary>
-    /// Gets or sets user_infos.
-    /// </summary>
     public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
 
-    /// <summary>
-    /// Gets or sets user_terms.
-    /// </summary>
-    public virtual ICollection<user_term> user_terms { get; set; } = new List<user_term>();
+    public virtual ICollection<user_term_consent> user_term_consents { get; set; } = new List<user_term_consent>();
 }

@@ -27,11 +27,15 @@
          "ObjectType": 0
       },
       {
-         "Name": "[auth].[client_scopes]",
+         "Name": "[auth].[client_redirect_uri]",
          "ObjectType": 0
       },
       {
-         "Name": "[auth].[client_terms]",
+         "Name": "[auth].[client_scope]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[auth].[client_term]",
          "ObjectType": 0
       },
       {
@@ -43,7 +47,19 @@
          "ObjectType": 0
       },
       {
-         "Name": "[auth].[user_client_scopes]",
+         "Name": "[auth].[scope_data_key]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[auth].[scope_master]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[auth].[term_master]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[auth].[user_client_scope_consent]",
          "ObjectType": 0
       },
       {
@@ -51,7 +67,7 @@
          "ObjectType": 0
       },
       {
-         "Name": "[auth].[user_terms]",
+         "Name": "[auth].[user_term_consent]",
          "ObjectType": 0
       }
    ],

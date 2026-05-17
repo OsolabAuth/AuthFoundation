@@ -159,6 +159,7 @@ BEGIN
         [sequence_id] [bigint] IDENTITY(1,1) NOT NULL,
         [client_id] [varchar](32) NOT NULL,
         [term_id] [varchar](64) NOT NULL,
+        [term_version] [varchar](32) NOT NULL,
         [required] [tinyint] NOT NULL CONSTRAINT [DF_client_term_required] DEFAULT ((1)),
         [display_order] [int] NOT NULL CONSTRAINT [DF_client_term_display_order] DEFAULT ((1)),
         [create_datetime] [datetime2](0) NOT NULL,

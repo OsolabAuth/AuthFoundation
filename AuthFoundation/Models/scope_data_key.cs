@@ -5,15 +5,13 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
-public partial class user_info
+public partial class scope_data_key
 {
-    public string osolab_id { get; set; }
+    public long sequence_id { get; set; }
 
-    public string client_id { get; set; }
+    public string scope { get; set; }
 
     public string data_key { get; set; }
-
-    public string data_value { get; set; }
 
     public DateTime create_datetime { get; set; }
 
@@ -21,7 +19,7 @@ public partial class user_info
 
     public byte status { get; set; }
 
-    public virtual client_master client { get; set; }
+    public virtual data_key_master data_keyNavigation { get; set; }
 
-    public virtual osolab_user osolab { get; set; }
+    public virtual scope_master scopeNavigation { get; set; }
 }

@@ -7,67 +7,39 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthFoundation.Data;
 
-/// <summary>
-/// OsolabAuthContext class.
-/// </summary>
 public partial class OsolabAuthContext : DbContext
 {
-    /// <summary>
-    /// Initializes a new instance of OsolabAuthContext.
-    /// </summary>
     public OsolabAuthContext(DbContextOptions<OsolabAuthContext> options)
         : base(options)
     {
     }
 
-    /// <summary>
-    /// Gets or sets client_data_keys.
-    /// </summary>
     public virtual DbSet<client_data_key> client_data_keys { get; set; }
 
-    /// <summary>
-    /// Gets or sets client_masters.
-    /// </summary>
     public virtual DbSet<client_master> client_masters { get; set; }
 
-    /// <summary>
-    /// Gets or sets client_scopes.
-    /// </summary>
+    public virtual DbSet<client_redirect_uri> client_redirect_uris { get; set; }
+
     public virtual DbSet<client_scope> client_scopes { get; set; }
 
-    /// <summary>
-    /// Gets or sets client_terms.
-    /// </summary>
     public virtual DbSet<client_term> client_terms { get; set; }
 
-    /// <summary>
-    /// Gets or sets data_key_masters.
-    /// </summary>
     public virtual DbSet<data_key_master> data_key_masters { get; set; }
 
-    /// <summary>
-    /// Gets or sets osolab_users.
-    /// </summary>
     public virtual DbSet<osolab_user> osolab_users { get; set; }
 
-    /// <summary>
-    /// Gets or sets user_client_scopes.
-    /// </summary>
-    public virtual DbSet<user_client_scope> user_client_scopes { get; set; }
+    public virtual DbSet<scope_data_key> scope_data_keys { get; set; }
 
-    /// <summary>
-    /// Gets or sets user_infos.
-    /// </summary>
+    public virtual DbSet<scope_master> scope_masters { get; set; }
+
+    public virtual DbSet<term_master> term_masters { get; set; }
+
+    public virtual DbSet<user_client_scope_consent> user_client_scope_consents { get; set; }
+
     public virtual DbSet<user_info> user_infos { get; set; }
 
-    /// <summary>
-    /// Gets or sets user_terms.
-    /// </summary>
-    public virtual DbSet<user_term> user_terms { get; set; }
+    public virtual DbSet<user_term_consent> user_term_consents { get; set; }
 
-    /// <summary>
-    /// Executes OnModelCreating.
-    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<client_data_key>(entity =>
@@ -75,6 +47,8 @@ public partial class OsolabAuthContext : DbContext
             entity.HasKey(e => e.sequence_id);
 
             entity.ToTable("client_data_key", "auth");
+
+            entity.HasIndex(e => new { e.client_id, e.data_key }, "UQ_client_data_key_client_id_data_key").IsUnique();
 
             entity.Property(e => e.client_id)
                 .IsRequired()
@@ -86,6 +60,16 @@ public partial class OsolabAuthContext : DbContext
                 .HasMaxLength(64)
                 .IsUnicode(false);
             entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.client).WithMany(p => p.client_data_keys)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_client_data_key_client_id");
+
+            entity.HasOne(d => d.data_keyNavigation).WithMany(p => p.client_data_keys)
+                .HasForeignKey(d => d.data_key)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_client_data_key_data_key");
         });
 
         modelBuilder.Entity<client_master>(entity =>
@@ -108,62 +92,87 @@ public partial class OsolabAuthContext : DbContext
             entity.Property(e => e.update_datetime).HasPrecision(0);
         });
 
-        modelBuilder.Entity<client_scope>(entity =>
+        modelBuilder.Entity<client_redirect_uri>(entity =>
         {
             entity.HasKey(e => e.sequence_id);
 
-            entity.ToTable("client_scopes", "auth");
+            entity.ToTable("client_redirect_uri", "auth");
 
-            entity.HasIndex(e => new { e.client_id, e.scope }, "UX_client_scopes_client_scope").IsUnique();
+            entity.HasIndex(e => new { e.client_id, e.redirect_uri, e.status }, "IX_client_redirect_uri_client_id_redirect_uri_status");
+
+            entity.HasIndex(e => new { e.client_id, e.status }, "IX_client_redirect_uri_client_id_status");
+
+            entity.HasIndex(e => new { e.client_id, e.redirect_uri }, "UQ_client_redirect_uri_client_id_redirect_uri").IsUnique();
 
             entity.Property(e => e.client_id)
                 .IsRequired()
                 .HasMaxLength(32)
                 .IsUnicode(false);
             entity.Property(e => e.create_datetime).HasPrecision(0);
-            entity.Property(e => e.required).HasDefaultValue(true, "DF_client_scopes_required");
+            entity.Property(e => e.redirect_uri)
+                .IsRequired()
+                .HasMaxLength(2048);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.client).WithMany(p => p.client_redirect_uris)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_client_redirect_uri_client_id");
+        });
+
+        modelBuilder.Entity<client_scope>(entity =>
+        {
+            entity.HasKey(e => e.sequence_id);
+
+            entity.ToTable("client_scope", "auth");
+
+            entity.HasIndex(e => new { e.client_id, e.scope }, "UQ_client_scope_client_id_scope").IsUnique();
+
+            entity.Property(e => e.client_id)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.required).HasDefaultValue((byte)1, "DF_client_scope_required");
             entity.Property(e => e.scope)
                 .IsRequired()
-                .HasMaxLength(128)
+                .HasMaxLength(64)
                 .IsUnicode(false);
             entity.Property(e => e.update_datetime).HasPrecision(0);
 
             entity.HasOne(d => d.client).WithMany(p => p.client_scopes)
                 .HasForeignKey(d => d.client_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_client_scopes_client_id");
+                .HasConstraintName("FK_client_scope_client_id");
+
+            entity.HasOne(d => d.scopeNavigation).WithMany(p => p.client_scopes)
+                .HasForeignKey(d => d.scope)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_client_scope_scope");
         });
 
         modelBuilder.Entity<client_term>(entity =>
         {
-            entity.HasKey(e => e.term_id);
+            entity.HasKey(e => e.sequence_id);
 
-            entity.ToTable("client_terms", "auth");
-
-            entity.HasIndex(e => new { e.client_id, e.term_version }, "UX_client_terms_client_term_version").IsUnique();
+            entity.ToTable("client_term", "auth");
 
             entity.Property(e => e.client_id)
                 .IsRequired()
                 .HasMaxLength(32)
                 .IsUnicode(false);
             entity.Property(e => e.create_datetime).HasPrecision(0);
-            entity.Property(e => e.required).HasDefaultValue(true, "DF_client_terms_required");
-            entity.Property(e => e.term_title)
+            entity.Property(e => e.display_order).HasDefaultValue(1, "DF_client_term_display_order");
+            entity.Property(e => e.required).HasDefaultValue((byte)1, "DF_client_term_required");
+            entity.Property(e => e.term_id)
                 .IsRequired()
-                .HasMaxLength(128);
-            entity.Property(e => e.term_url)
-                .IsRequired()
-                .HasMaxLength(1024);
+                .HasMaxLength(64)
+                .IsUnicode(false);
             entity.Property(e => e.term_version)
                 .IsRequired()
                 .HasMaxLength(32)
                 .IsUnicode(false);
             entity.Property(e => e.update_datetime).HasPrecision(0);
-
-            entity.HasOne(d => d.client).WithMany(p => p.client_terms)
-                .HasForeignKey(d => d.client_id)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_client_terms_client_id");
         });
 
         modelBuilder.Entity<data_key_master>(entity =>
@@ -204,38 +213,118 @@ public partial class OsolabAuthContext : DbContext
             entity.Property(e => e.update_datetime).HasPrecision(0);
         });
 
-        modelBuilder.Entity<user_client_scope>(entity =>
+        modelBuilder.Entity<scope_data_key>(entity =>
         {
             entity.HasKey(e => e.sequence_id);
 
-            entity.ToTable("user_client_scopes", "auth");
+            entity.ToTable("scope_data_key", "auth");
 
-            entity.HasIndex(e => new { e.osolab_id, e.client_id, e.scope }, "UX_user_client_scopes_osolab_client_scope").IsUnique();
+            entity.HasIndex(e => new { e.scope, e.data_key }, "UQ_scope_data_key_scope_data_key").IsUnique();
 
-            entity.Property(e => e.agreed_at).HasPrecision(0);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.data_key)
+                .IsRequired()
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.scope)
+                .IsRequired()
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.data_keyNavigation).WithMany(p => p.scope_data_keys)
+                .HasForeignKey(d => d.data_key)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_scope_data_key_data_key");
+
+            entity.HasOne(d => d.scopeNavigation).WithMany(p => p.scope_data_keys)
+                .HasForeignKey(d => d.scope)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_scope_data_key_scope");
+        });
+
+        modelBuilder.Entity<scope_master>(entity =>
+        {
+            entity.HasKey(e => e.scope);
+
+            entity.ToTable("scope_master", "auth");
+
+            entity.Property(e => e.scope)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.description)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+        });
+
+        modelBuilder.Entity<term_master>(entity =>
+        {
+            entity.HasKey(e => e.term_id);
+
+            entity.ToTable("term_master", "auth");
+
+            entity.HasIndex(e => new { e.term_type, e.version }, "UQ_term_master_term_type_version").IsUnique();
+
+            entity.Property(e => e.term_id)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.content).IsRequired();
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.effective_end_datetime).HasPrecision(0);
+            entity.Property(e => e.effective_start_datetime).HasPrecision(0);
+            entity.Property(e => e.term_type)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.title)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+            entity.Property(e => e.version)
+                .IsRequired()
+                .HasMaxLength(32)
+                .IsUnicode(false);
+        });
+
+        modelBuilder.Entity<user_client_scope_consent>(entity =>
+        {
+            entity.HasKey(e => e.sequence_id);
+
+            entity.ToTable("user_client_scope_consent", "auth");
+
+            entity.HasIndex(e => new { e.osolab_id, e.client_id, e.scope }, "UQ_user_client_scope_consent_osolab_id_client_id_scope").IsUnique();
+
             entity.Property(e => e.client_id)
                 .IsRequired()
                 .HasMaxLength(32)
                 .IsUnicode(false);
+            entity.Property(e => e.consented_datetime).HasPrecision(0);
             entity.Property(e => e.create_datetime).HasPrecision(0);
             entity.Property(e => e.osolab_id)
                 .IsRequired()
                 .HasMaxLength(16);
             entity.Property(e => e.scope)
                 .IsRequired()
-                .HasMaxLength(128)
+                .HasMaxLength(64)
                 .IsUnicode(false);
             entity.Property(e => e.update_datetime).HasPrecision(0);
 
-            entity.HasOne(d => d.client).WithMany(p => p.user_client_scopes)
+            entity.HasOne(d => d.client).WithMany(p => p.user_client_scope_consents)
                 .HasForeignKey(d => d.client_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_user_client_scopes_client_id");
+                .HasConstraintName("FK_user_client_scope_consent_client_id");
 
-            entity.HasOne(d => d.osolab).WithMany(p => p.user_client_scopes)
+            entity.HasOne(d => d.osolab).WithMany(p => p.user_client_scope_consents)
                 .HasForeignKey(d => d.osolab_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_user_client_scopes_osolab_id");
+                .HasConstraintName("FK_user_client_scope_consent_osolab_id");
+
+            entity.HasOne(d => d.scopeNavigation).WithMany(p => p.user_client_scope_consents)
+                .HasForeignKey(d => d.scope)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_user_client_scope_consent_scope");
         });
 
         modelBuilder.Entity<user_info>(entity =>
@@ -274,43 +363,46 @@ public partial class OsolabAuthContext : DbContext
                 .HasConstraintName("FK_user_info_osolab_id");
         });
 
-        modelBuilder.Entity<user_term>(entity =>
+        modelBuilder.Entity<user_term_consent>(entity =>
         {
             entity.HasKey(e => e.sequence_id);
 
-            entity.ToTable("user_terms", "auth");
+            entity.ToTable("user_term_consent", "auth");
 
-            entity.HasIndex(e => new { e.osolab_id, e.client_id, e.term_id, e.term_version }, "UX_user_terms_osolab_client_term").IsUnique();
+            entity.HasIndex(e => new { e.osolab_id, e.client_id, e.term_id, e.consented_datetime }, "IX_user_term_consent_osolab_id_client_id_term_id_consented_datetime");
 
-            entity.Property(e => e.agreed_at).HasPrecision(0);
             entity.Property(e => e.client_id)
                 .IsRequired()
                 .HasMaxLength(32)
                 .IsUnicode(false);
+            entity.Property(e => e.consented_datetime).HasPrecision(0);
             entity.Property(e => e.create_datetime).HasPrecision(0);
             entity.Property(e => e.osolab_id)
                 .IsRequired()
                 .HasMaxLength(16);
+            entity.Property(e => e.term_id)
+                .IsRequired()
+                .HasMaxLength(64)
+                .IsUnicode(false);
             entity.Property(e => e.term_version)
                 .IsRequired()
                 .HasMaxLength(32)
                 .IsUnicode(false);
-            entity.Property(e => e.update_datetime).HasPrecision(0);
 
-            entity.HasOne(d => d.client).WithMany(p => p.user_terms)
+            entity.HasOne(d => d.client).WithMany(p => p.user_term_consents)
                 .HasForeignKey(d => d.client_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_user_terms_client_id");
+                .HasConstraintName("FK_user_term_consent_client_id");
 
-            entity.HasOne(d => d.osolab).WithMany(p => p.user_terms)
+            entity.HasOne(d => d.osolab).WithMany(p => p.user_term_consents)
                 .HasForeignKey(d => d.osolab_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_user_terms_osolab_id");
+                .HasConstraintName("FK_user_term_consent_osolab_id");
 
-            entity.HasOne(d => d.term).WithMany(p => p.user_terms)
+            entity.HasOne(d => d.term).WithMany(p => p.user_term_consents)
                 .HasForeignKey(d => d.term_id)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_user_terms_term_id");
+                .HasConstraintName("FK_user_term_consent_term_id");
         });
 
         OnModelCreatingPartial(modelBuilder);

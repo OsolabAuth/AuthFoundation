@@ -72,15 +72,19 @@ namespace AuthFoundation.Controllers.Auth
                     .OrderBy(x => x.term_id)
                     .ToListAsync();
 
+                Dictionary<string, term_master> termMasters = await _dbContext.term_masters
+                    .Where(x => terms.Select(t => t.term_id).Contains(x.term_id))
+                    .ToDictionaryAsync(x => x.term_id);
+
                 return Ok(new
                 {
                     client_id = session.ClientId,
                     terms = terms.Select(x => new
                     {
                         term_id = x.term_id,
-                        title = x.term_title,
+                        title = termMasters.TryGetValue(x.term_id, out term_master? term) ? term.title : x.term_id,
                         version = x.term_version,
-                        required = x.required
+                        required = x.required == Code.Status.ACTIVE
                     }),
                     scopes = Helper.ParseScopes(session.Scope)
                 });
@@ -178,7 +182,7 @@ namespace AuthFoundation.Controllers.Auth
         /// <param name="session">認可セッション</param>
         /// <param name="acceptedTermIds">同意した規約ID</param>
         /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
-        private async Task SaveConsentAsync(AuthorizationSession session, IReadOnlyCollection<long> acceptedTermIds)
+        private async Task SaveConsentAsync(AuthorizationSession session, IReadOnlyCollection<string> acceptedTermIds)
         {
             if (string.IsNullOrWhiteSpace(session.OsolabId))
             {
@@ -186,10 +190,10 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             List<client_term> requiredTerms = await _dbContext.client_terms
-                .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE && x.required)
+                .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE && x.required == Code.Status.ACTIVE)
                 .ToListAsync();
 
-            HashSet<long> acceptedSet = acceptedTermIds.ToHashSet();
+            HashSet<string> acceptedSet = acceptedTermIds.ToHashSet(StringComparer.Ordinal);
             if (requiredTerms.Any(x => !acceptedSet.Contains(x.term_id)))
             {
                 throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
@@ -198,32 +202,31 @@ namespace AuthFoundation.Controllers.Auth
             DateTime now = DateTime.UtcNow;
             foreach (client_term term in requiredTerms)
             {
-                bool exists = await _dbContext.user_terms.AnyAsync(x =>
+                bool exists = await _dbContext.user_term_consents.AnyAsync(x =>
                     x.osolab_id == session.OsolabId
                     && x.client_id == session.ClientId
                     && x.term_id == term.term_id
                     && x.term_version == term.term_version
-                    && x.status == Code.Status.ACTIVE);
+                    && x.consent_result == Code.Status.ACTIVE);
 
                 if (!exists)
                 {
-                    _dbContext.user_terms.Add(new user_term
+                    _dbContext.user_term_consents.Add(new user_term_consent
                     {
                         osolab_id = session.OsolabId,
                         client_id = session.ClientId,
                         term_id = term.term_id,
                         term_version = term.term_version,
-                        agreed_at = now,
-                        create_datetime = now,
-                        update_datetime = now,
-                        status = Code.Status.ACTIVE
+                        consent_result = Code.Status.ACTIVE,
+                        consented_datetime = now,
+                        create_datetime = now
                     });
                 }
             }
 
             foreach (string scope in Helper.ParseScopes(session.Scope))
             {
-                bool exists = await _dbContext.user_client_scopes.AnyAsync(x =>
+                bool exists = await _dbContext.user_client_scope_consents.AnyAsync(x =>
                     x.osolab_id == session.OsolabId
                     && x.client_id == session.ClientId
                     && x.scope == scope
@@ -231,12 +234,12 @@ namespace AuthFoundation.Controllers.Auth
 
                 if (!exists)
                 {
-                    _dbContext.user_client_scopes.Add(new user_client_scope
+                    _dbContext.user_client_scope_consents.Add(new user_client_scope_consent
                     {
                         osolab_id = session.OsolabId,
                         client_id = session.ClientId,
                         scope = scope,
-                        agreed_at = now,
+                        consented_datetime = now,
                         create_datetime = now,
                         update_datetime = now,
                         status = Code.Status.ACTIVE
@@ -258,7 +261,7 @@ namespace AuthFoundation.Controllers.Auth
 
             public string AcceptedRaw { get; set; } = string.Empty;
 
-            public List<long> TermIds { get; set; } = new();
+            public List<string> TermIds { get; set; } = new();
 
             /// <summary>
             /// HTTP リクエストから入力を生成します。
@@ -271,7 +274,7 @@ namespace AuthFoundation.Controllers.Auth
                 Helper.ValidateTypeFormUrlEncoded(request.ContentType);
 
                 IFormCollection form = await request.ReadFormAsync();
-                List<long> termIds = new List<long>();
+                List<string> termIds = new List<string>();
                 foreach (string? value in form["term_ids"])
                 {
                     if (string.IsNullOrWhiteSpace(value))
@@ -279,10 +282,7 @@ namespace AuthFoundation.Controllers.Auth
                         continue;
                     }
 
-                    if (long.TryParse(value, out long termId))
-                    {
-                        termIds.Add(termId);
-                    }
+                    termIds.Add(value);
                 }
 
                 return new Input

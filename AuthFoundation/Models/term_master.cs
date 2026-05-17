@@ -5,25 +5,27 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
-public partial class osolab_user
+public partial class term_master
 {
-    public string osolab_id { get; set; }
+    public string term_id { get; set; }
 
-    public string email { get; set; }
+    public string term_type { get; set; }
 
-    public string password { get; set; }
+    public string title { get; set; }
 
-    public string nonce { get; set; }
+    public string version { get; set; }
+
+    public string content { get; set; }
+
+    public DateTime effective_start_datetime { get; set; }
+
+    public DateTime? effective_end_datetime { get; set; }
 
     public DateTime create_datetime { get; set; }
 
     public DateTime update_datetime { get; set; }
 
     public byte status { get; set; }
-
-    public virtual ICollection<user_client_scope_consent> user_client_scope_consents { get; set; } = new List<user_client_scope_consent>();
-
-    public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
 
     public virtual ICollection<user_term_consent> user_term_consents { get; set; } = new List<user_term_consent>();
 }

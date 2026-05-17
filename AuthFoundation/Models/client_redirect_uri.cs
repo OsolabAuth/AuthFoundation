@@ -5,15 +5,15 @@ using System.Collections.Generic;
 
 namespace AuthFoundation.Models;
 
-public partial class user_info
+public partial class client_redirect_uri
 {
-    public string osolab_id { get; set; }
+    public long sequence_id { get; set; }
 
     public string client_id { get; set; }
 
-    public string data_key { get; set; }
+    public string redirect_uri { get; set; }
 
-    public string data_value { get; set; }
+    public byte is_default { get; set; }
 
     public DateTime create_datetime { get; set; }
 
@@ -22,6 +22,4 @@ public partial class user_info
     public byte status { get; set; }
 
     public virtual client_master client { get; set; }
-
-    public virtual osolab_user osolab { get; set; }
 }
