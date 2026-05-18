@@ -42,6 +42,7 @@ namespace AuthFoundation.Controllers.Temp
 
                 Models.client_master client = Helper.CertClient(_dbContext, input.ClientId);
                 List<string> clientScopes = _dbContext.client_scopes.Where(x => x.client_id == client.client_id).Select(x=> x.scope).ToList();
+                
                 List<string> clientRedirectUris = _dbContext.client_redirect_uris.Where(x => x.client_id == client.client_id).Select(x => x.redirect_uri).ToList();
 
                 return Ok(new
@@ -157,26 +158,6 @@ namespace AuthFoundation.Controllers.Temp
                     ClientId = request.Query["client_id"].ToString(),
                 };
             }
-
-            /// <summary>
-            /// 認可セッションへ変換します。
-            /// </summary>
-            /// <returns>認可セッション</returns>
-            public AuthorizationSession ToAuthorizationSession()
-            {
-                return new AuthorizationSession
-                {
-                    ResponseType = ResponseType,
-                    ClientId = ClientId,
-                    RedirectUri = RedirectUri,
-                    State = State,
-                    Scope = Scope,
-                    CodeChallengeMethod = CodeChallengeMethod,
-                    CodeChallenge = CodeChallenge,
-                    Nonce = Nonce
-                };
-            }
-
             /// <summary>
             /// 入力値を検証します。
             /// </summary>
