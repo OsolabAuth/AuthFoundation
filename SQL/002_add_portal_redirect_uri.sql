@@ -23,6 +23,23 @@ BEGIN
         SYSDATETIME(),
         1
     );
+        INSERT INTO [auth].[client_redirect_uri](
+        [client_id],
+        [redirect_uri],
+        [is_default],
+        [create_datetime],
+        [update_datetime],
+        [status]
+    )
+    VALUES (
+        '00000000000000000000000000000000',
+        N'https://portal.osolab-auth.jp/callback',
+        1,
+        SYSDATETIME(),
+        SYSDATETIME(),
+        1
+    );
+
 END
 
 COMMIT TRAN;

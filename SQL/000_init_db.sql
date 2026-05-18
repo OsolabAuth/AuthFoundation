@@ -8,6 +8,54 @@ IF SCHEMA_ID('auth') IS NULL
     EXEC('CREATE SCHEMA [auth]');
 GO
 
+-- Reset target auth tables before initialization.
+DECLARE @dropFkSql nvarchar(max);
+
+;WITH TargetTables AS (
+    SELECT OBJECT_ID(N'[auth].[user_info]') AS object_id
+    UNION ALL SELECT OBJECT_ID(N'[auth].[user_client_scope_consent]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[user_term_consent]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[client_scope]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[client_redirect_uri]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[client_data_key]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[scope_data_key]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[client_term]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[scope_master]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[data_key_master]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[client_master]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[osolab_user]')
+    UNION ALL SELECT OBJECT_ID(N'[auth].[term_master]')
+)
+SELECT @dropFkSql = STRING_AGG(
+    N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id))
+    + N'.' + QUOTENAME(OBJECT_NAME(fk.parent_object_id))
+    + N' DROP CONSTRAINT ' + QUOTENAME(fk.name),
+    N';' + CHAR(10))
+FROM sys.foreign_keys fk
+WHERE fk.parent_object_id IN (SELECT object_id FROM TargetTables WHERE object_id IS NOT NULL)
+   OR fk.referenced_object_id IN (SELECT object_id FROM TargetTables WHERE object_id IS NOT NULL);
+
+IF @dropFkSql IS NOT NULL AND LEN(@dropFkSql) > 0
+BEGIN
+    EXEC sp_executesql @dropFkSql;
+END
+GO
+
+DROP TABLE IF EXISTS [auth].[user_info];
+DROP TABLE IF EXISTS [auth].[user_client_scope_consent];
+DROP TABLE IF EXISTS [auth].[user_term_consent];
+DROP TABLE IF EXISTS [auth].[client_scope];
+DROP TABLE IF EXISTS [auth].[client_redirect_uri];
+DROP TABLE IF EXISTS [auth].[client_data_key];
+DROP TABLE IF EXISTS [auth].[scope_data_key];
+DROP TABLE IF EXISTS [auth].[client_term];
+DROP TABLE IF EXISTS [auth].[scope_master];
+DROP TABLE IF EXISTS [auth].[data_key_master];
+DROP TABLE IF EXISTS [auth].[client_master];
+DROP TABLE IF EXISTS [auth].[osolab_user];
+DROP TABLE IF EXISTS [auth].[term_master];
+GO
+
 IF OBJECT_ID(N'[auth].[client_master]', N'U') IS NULL
 BEGIN
     CREATE TABLE [auth].[client_master](
@@ -135,24 +183,6 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID(N'[auth].[term_master]', N'U') IS NULL
-BEGIN
-    CREATE TABLE [auth].[term_master](
-        [term_id] [varchar](64) NOT NULL,
-        [term_type] [varchar](32) NOT NULL,
-        [title] [nvarchar](255) NOT NULL,
-        [version] [varchar](32) NOT NULL,
-        [content] [nvarchar](max) NOT NULL,
-        [effective_start_datetime] [datetime2](0) NOT NULL,
-        [effective_end_datetime] [datetime2](0) NULL,
-        [create_datetime] [datetime2](0) NOT NULL,
-        [update_datetime] [datetime2](0) NOT NULL,
-        [status] [tinyint] NOT NULL,
-        CONSTRAINT [PK_term_master] PRIMARY KEY CLUSTERED ([term_id] ASC)
-    ) ON [PRIMARY];
-END
-GO
-
 IF OBJECT_ID(N'[auth].[client_term]', N'U') IS NULL
 BEGIN
     CREATE TABLE [auth].[client_term](
@@ -160,8 +190,8 @@ BEGIN
         [client_id] [varchar](32) NOT NULL,
         [term_id] [varchar](64) NOT NULL,
         [term_version] [varchar](32) NOT NULL,
+        [term_url] [nvarchar](2048) NOT NULL,
         [required] [tinyint] NOT NULL CONSTRAINT [DF_client_term_required] DEFAULT ((1)),
-        [display_order] [int] NOT NULL CONSTRAINT [DF_client_term_display_order] DEFAULT ((1)),
         [create_datetime] [datetime2](0) NOT NULL,
         [update_datetime] [datetime2](0) NOT NULL,
         [status] [tinyint] NOT NULL,
@@ -282,14 +312,6 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID(N'[auth].[FK_client_term_term_id]', N'F') IS NULL
-BEGIN
-    ALTER TABLE [auth].[client_term]
-        ADD CONSTRAINT [FK_client_term_term_id]
-        FOREIGN KEY([term_id]) REFERENCES [auth].[term_master]([term_id]);
-END
-GO
-
 IF OBJECT_ID(N'[auth].[FK_user_term_consent_osolab_id]', N'F') IS NULL
 BEGIN
     ALTER TABLE [auth].[user_term_consent]
@@ -303,14 +325,6 @@ BEGIN
     ALTER TABLE [auth].[user_term_consent]
         ADD CONSTRAINT [FK_user_term_consent_client_id]
         FOREIGN KEY([client_id]) REFERENCES [auth].[client_master]([client_id]);
-END
-GO
-
-IF OBJECT_ID(N'[auth].[FK_user_term_consent_term_id]', N'F') IS NULL
-BEGIN
-    ALTER TABLE [auth].[user_term_consent]
-        ADD CONSTRAINT [FK_user_term_consent_term_id]
-        FOREIGN KEY([term_id]) REFERENCES [auth].[term_master]([term_id]);
 END
 GO
 
@@ -404,13 +418,6 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_scope_data_key_scope_
 BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX [UQ_scope_data_key_scope_data_key]
     ON [auth].[scope_data_key]([scope], [data_key]);
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UQ_term_master_term_type_version' AND object_id = OBJECT_ID(N'[auth].[term_master]'))
-BEGIN
-    CREATE UNIQUE NONCLUSTERED INDEX [UQ_term_master_term_type_version]
-    ON [auth].[term_master]([term_type], [version]);
 END
 GO
 

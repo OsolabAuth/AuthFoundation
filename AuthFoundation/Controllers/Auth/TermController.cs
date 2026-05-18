@@ -72,18 +72,15 @@ namespace AuthFoundation.Controllers.Auth
                     .OrderBy(x => x.term_id)
                     .ToListAsync();
 
-                Dictionary<string, term_master> termMasters = await _dbContext.term_masters
-                    .Where(x => terms.Select(t => t.term_id).Contains(x.term_id))
-                    .ToDictionaryAsync(x => x.term_id);
-
                 return Ok(new
                 {
                     client_id = session.ClientId,
                     terms = terms.Select(x => new
                     {
                         term_id = x.term_id,
-                        title = termMasters.TryGetValue(x.term_id, out term_master? term) ? term.title : x.term_id,
+                        title = x.term_id,
                         version = x.term_version,
+                        term_url = x.term_url,
                         required = x.required == Code.Status.ACTIVE
                     }),
                     scopes = Helper.ParseScopes(session.Scope)
@@ -205,18 +202,15 @@ namespace AuthFoundation.Controllers.Auth
                 .OrderBy(x => x.term_id)
                 .ToListAsync();
 
-            Dictionary<string, term_master> termMasters = await _dbContext.term_masters
-                .Where(x => terms.Select(t => t.term_id).Contains(x.term_id))
-                .ToDictionaryAsync(x => x.term_id);
-
             return Ok(new
             {
                 client_id = session.ClientId,
                 terms = terms.Select(x => new
                 {
                     term_id = x.term_id,
-                    title = termMasters.TryGetValue(x.term_id, out term_master? term) ? term.title : x.term_id,
+                    title = x.term_id,
                     version = x.term_version,
+                    term_url = x.term_url,
                     required = x.required == Code.Status.ACTIVE
                 }),
                 scopes = Helper.ParseScopes(session.Scope)

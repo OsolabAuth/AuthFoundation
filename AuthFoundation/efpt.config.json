@@ -55,10 +55,6 @@
          "ObjectType": 0
       },
       {
-         "Name": "[auth].[term_master]",
-         "ObjectType": 0
-      },
-      {
          "Name": "[auth].[user_client_scope_consent]",
          "ObjectType": 0
       },
@@ -91,7 +87,7 @@
    "UseNoNavigations": false,
    "UseNoObjectFilter": false,
    "UseNodaTime": false,
-   "UseNullableReferences": false,
+   "UseNullableReferences": true,
    "UsePrefixNavigationNaming": false,
    "UseSchemaFolders": false,
    "UseSchemaNamespaces": false,

@@ -1,25 +1,22 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR.Protocol;
-using Newtonsoft.Json;
-using System.Numerics;
-using System.Text;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuthFoundation.Controllers.Client
 {
     [ApiController]
     [Route("Term")]
     /// <summary>
-    /// ClientRegistrationController class.
+    /// クライアント規約登録API
     /// </summary>
     public class TermController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
 
         /// <summary>
-        /// Initializes a new instance of ClientRegistrationController.
+        /// コンストラクタ
         /// </summary>
         public TermController(OsolabAuthContext dbContext)
         {
@@ -29,7 +26,6 @@ namespace AuthFoundation.Controllers.Client
         /// <summary>
         /// RP規約登録
         /// </summary>
-        /// <returns></returns>
         [HttpPost]
         public async Task<IActionResult> PostTerm()
         {
@@ -44,20 +40,13 @@ namespace AuthFoundation.Controllers.Client
                 client_term? clientTerm;
                 if (input.SeqIdLong < 0)
                 {
-                    int displayOrder = 0;
-
-                    client_term? maxDisplayOrder = _dbContext.client_terms.OrderByDescending(x => x.display_order).FirstOrDefault(x => x.client_id == input.ClientId);
-                    if (maxDisplayOrder != null)
-                    {
-                        displayOrder += maxDisplayOrder.display_order;
-                    }
                     clientTerm = new client_term
                     {
                         client_id = input.ClientId,
                         term_id = input.TermName,
                         term_version = input.TermVersion,
-                        required = input.byteRequired,
-                        display_order = displayOrder,
+                        term_url = input.TermUrl,
+                        required = input.RequiredByte,
                         create_datetime = now,
                         update_datetime = now,
                         status = Code.Status.ACTIVE
@@ -66,11 +55,22 @@ namespace AuthFoundation.Controllers.Client
                 }
                 else
                 {
-                     clientTerm = _dbContext.client_terms.FirstOrDefault(x => x.sequence_id == input.SeqIdLong && x.client_id == input.ClientId);
+                    clientTerm = await _dbContext.client_terms.FirstOrDefaultAsync(x =>
+                        x.sequence_id == input.SeqIdLong && x.client_id == input.ClientId);
+                    if (clientTerm is null)
+                    {
+                        throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "term not found");
+                    }
 
+                    clientTerm.term_id = input.TermName;
+                    clientTerm.term_version = input.TermVersion;
+                    clientTerm.term_url = input.TermUrl;
+                    clientTerm.required = input.RequiredByte;
+                    clientTerm.update_datetime = now;
+                    clientTerm.status = Code.Status.ACTIVE;
                 }
-                await _dbContext.SaveChangesAsync();
 
+                await _dbContext.SaveChangesAsync();
                 return Ok(new PostOutput(clientTerm));
             }
             catch (ApiException ex)
@@ -84,25 +84,29 @@ namespace AuthFoundation.Controllers.Client
             }
         }
 
-
         /// <summary>
-        /// Input class.
+        /// 入力クラス
         /// </summary>
-        private class PostInput
+        private sealed class PostInput
         {
-            /// <summary>
-            /// Gets or sets ClientName.
-            /// </summary>
             public string ClientId { get; set; } = string.Empty;
+
             public string TermSeqId { get; set; } = string.Empty;
+
             public string TermName { get; set; } = string.Empty;
-            public string TermVersion { get; set; } = string.Empty;
-            public string Required { get; set; } = string.Empty;
+
+            public string TermVersion { get; set; } = "1";
+
+            public string Required { get; set; } = "1";
+
             public string TermUrl { get; set; } = string.Empty;
+
             public long SeqIdLong { get; set; } = -1;
-            public byte byteRequired { get; set; } = 0;
+
+            public byte RequiredByte { get; set; } = Code.Status.ACTIVE;
+
             /// <summary>
-            /// Executes CreateAsync.
+            /// フォーム入力の作成
             /// </summary>
             public static async Task<PostInput> CreateAsync(HttpContext context)
             {
@@ -115,12 +119,14 @@ namespace AuthFoundation.Controllers.Client
                     ClientId = form[Code.HttpBodies.CLIENT_ID.Key].ToString(),
                     TermSeqId = form[Code.HttpBodies.TERM_SEQ_ID.Key].ToString(),
                     TermName = form[Code.HttpBodies.TERM_NAME.Key].ToString(),
+                    TermVersion = form["term_version"].ToString(),
+                    Required = form["required"].ToString(),
                     TermUrl = form[Code.HttpBodies.TERM_URL.Key].ToString()
                 };
             }
 
             /// <summary>
-            /// Executes Validate.
+            /// 入力値の検証
             /// </summary>
             public void Validate()
             {
@@ -128,38 +134,66 @@ namespace AuthFoundation.Controllers.Client
                 ValidateUtil.FormatParam(ClientId, Code.HttpBodies.CLIENT_ID.Key, Code.HttpBodies.CLIENT_ID.Regex);
 
                 ValidateUtil.FormatParam(TermSeqId, Code.HttpBodies.TERM_SEQ_ID.Key, Code.HttpBodies.TERM_SEQ_ID.Regex);
-                if (!string.IsNullOrWhiteSpace(TermSeqId) && !long.TryParse(TermSeqId, out long SeqIdLong))
+                if (!string.IsNullOrWhiteSpace(TermSeqId))
                 {
-                    throw new ApiException(Common.Code.REQUEST_PARAMETER_ERROR, $"{Code.HttpBodies.TERM_SEQ_ID.Key}の形式が不正です");
+                    if (!long.TryParse(TermSeqId, out long parsedSeqId))
+                    {
+                        throw new ApiException(Code.REQUEST_PARAMETER_ERROR, $"{Code.HttpBodies.TERM_SEQ_ID.Key} is invalid");
+                    }
+
+                    SeqIdLong = parsedSeqId;
                 }
+
                 ValidateUtil.IndispensableParam(TermName, Code.HttpBodies.TERM_NAME.Key);
                 ValidateUtil.FormatParam(TermName, Code.HttpBodies.TERM_NAME.Key, Code.HttpBodies.TERM_NAME.Regex);
 
-                ValidateUtil.IndispensableParam(TermUrl, Code.HttpBodies.TERM_URL.Key);
-                ValidateUtil.FormatParam(TermUrl, Code.HttpBodies.TERM_URL.Key, Code.HttpBodies.TERM_URL.Regex);
-
-                if (!Uri.TryCreate(TermUrl, UriKind.Absolute, out Uri? _))
+                if (string.IsNullOrWhiteSpace(TermVersion))
                 {
-                    throw new ApiException(Common.Code.REQUEST_PARAMETER_ERROR, $"{Code.HttpBodies.TERM_SEQ_ID.Key}の形式が不正です");
+                    TermVersion = "1";
                 }
 
+                if (string.IsNullOrWhiteSpace(Required))
+                {
+                    Required = Code.Status.ACTIVE.ToString();
+                }
+                if (!byte.TryParse(Required, out byte requiredValue) || (requiredValue != Code.Status.ACTIVE && requiredValue != Code.Status.INACTIVE))
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "required is invalid");
+                }
+                RequiredByte = requiredValue;
 
+                ValidateUtil.IndispensableParam(TermUrl, Code.HttpBodies.TERM_URL.Key);
+                ValidateUtil.FormatParam(TermUrl, Code.HttpBodies.TERM_URL.Key, Code.HttpBodies.TERM_URL.Regex);
+                if (!Uri.TryCreate(TermUrl, UriKind.Absolute, out _))
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, $"{Code.HttpBodies.TERM_URL.Key} is invalid");
+                }
             }
         }
 
         /// <summary>
-        /// Output class.
+        /// 出力クラス
         /// </summary>
-        private class PostOutput
+        private sealed class PostOutput
         {
             public string StatusCode { get; }
+
             public string Message { get; }
+
+            public long? SequenceId { get; }
+
             public string? ClientId { get; }
-            public string? ClientSecret { get; }
-            public string? ClientName { get; }
+
+            public string? TermId { get; }
+
+            public string? TermVersion { get; }
+
+            public string? TermUrl { get; }
+
+            public bool? Required { get; }
 
             /// <summary>
-            /// コンストラクタ(例外)
+            /// エラー応答
             /// </summary>
             public PostOutput(ApiException ex)
             {
@@ -168,20 +202,19 @@ namespace AuthFoundation.Controllers.Client
             }
 
             /// <summary>
-            /// コンストラクタ(正常)
+            /// 正常応答
             /// </summary>
             public PostOutput(client_term clientTerm)
             {
                 StatusCode = Code.SUCCESS.Code;
                 Message = Code.SUCCESS.ErrorMessage;
-
-                ClientId = clientId;
-                ClientSecret = clientSecret;
-                ClientName = clientName;
+                SequenceId = clientTerm.sequence_id;
+                ClientId = clientTerm.client_id;
+                TermId = clientTerm.term_id;
+                TermVersion = clientTerm.term_version;
+                TermUrl = clientTerm.term_url;
+                Required = clientTerm.required == Code.Status.ACTIVE;
             }
         }
-
-
-
     }
 }

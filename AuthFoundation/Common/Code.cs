@@ -90,7 +90,7 @@ namespace AuthFoundation.Common
             public static readonly RequestValidation LOGOUT_ALL = new("logout_all", @"^(true|false)$");
             public static readonly RequestValidation CLIENT_ID = new("client_id", @"^[0-9]{32}$");
             public static readonly RequestValidation TERM_SEQ_ID = new("term_seq_id", @"^[0-9]*$");
-            public static readonly RequestValidation TERM_NAME = new("term_name", @"^[0-9A-Za-z0-9._~-32}$");
+            public static readonly RequestValidation TERM_NAME = new("term_name", @"^[0-9A-Za-z._~-]{1,32}$");
             public static readonly RequestValidation TERM_URL = new("term_url", @"^(https://.+|http://(localhost|osolab-[A-Za-z0-9-]+-local)(:[0-9]+)?(/.*)?)$");
 
         }
