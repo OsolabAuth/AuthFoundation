@@ -41,16 +41,14 @@ namespace AuthFoundation.Controllers.Temp
                 input.Validate();
 
                 Models.client_master client = Helper.CertClient(_dbContext, input.ClientId);
-                client.client_secret = "*********************";
-                List<client_scope> clientScopes = _dbContext.client_scopes.Where(x => x.client_id == client.client_id).ToList();
-                List<client_redirect_uri> clientRedirectUris = _dbContext.client_redirect_uris.Where(x => x.client_id == client.client_id).ToList();
+                List<string> clientScopes = _dbContext.client_scopes.Where(x => x.client_id == client.client_id).Select(x=> x.scope).ToList();
+                List<string> clientRedirectUris = _dbContext.client_redirect_uris.Where(x => x.client_id == client.client_id).Select(x => x.redirect_uri).ToList();
 
                 return Ok(new
                 {
                     result = "redirect",
-                    client = JsonConvert.SerializeObject(client),
-                    client_scope = JsonConvert.SerializeObject(clientScopes),
-                    client_redirect_uri = JsonConvert.SerializeObject(clientRedirectUris),
+                    client_scope = clientScopes,
+                    client_redirect_uri = clientRedirectUris,
                     response_code = Code.SUCCESS.Code,
                     message = Code.SUCCESS.ErrorMessage
                 });
