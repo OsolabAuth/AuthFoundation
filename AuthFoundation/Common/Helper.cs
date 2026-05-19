@@ -1,7 +1,8 @@
-using System.Security.Cryptography;
-using System.Text;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
+using Konscious.Security.Cryptography;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace AuthFoundation.Common
 {
@@ -118,16 +119,22 @@ namespace AuthFoundation.Common
         /// <summary>
         /// パスワードハッシュを計算します。
         /// </summary>
-        /// <param name="passwordHashHex">パスワードハッシュ</param>
-        /// <param name="nonce">nonce</param>
+        /// <param name="password">パスワード</param>
+        /// <param name="saltString">ソルト</param>
         /// <returns>認証用ハッシュ</returns>
-        public static string GetPassHash(string passwordHashHex, string nonce)
+        public static string GetPassHash(string password, string saltString)
         {
-            string passNonce = passwordHashHex + nonce;
-            byte[] passNonceByte = Encoding.UTF8.GetBytes(passNonce);
-            byte[] keyByte = Encoding.UTF8.GetBytes(AppConfig.PasswordHashKey);
-            byte[] hashPass = HMACSHA256.HashData(keyByte, passNonceByte);
-            return Convert.ToHexString(hashPass);
+            byte[] salt = Encoding.UTF8.GetBytes(saltString);
+            using (var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password)))
+            {
+                argon2.Salt = salt;
+                argon2.DegreeOfParallelism = 1;
+                argon2.MemorySize = 65536;
+                argon2.Iterations = 3;
+
+                byte[] hash = argon2.GetBytes(32);
+                return Convert.ToHexString(hash);
+            }
         }
 
         /// <summary>
