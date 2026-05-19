@@ -1,0 +1,115 @@
+using AuthFoundation.Common;
+using AuthFoundation.Session;
+using AuthFoundationTest.TestSupport;
+using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
+
+namespace AuthFoundationTest;
+
+[TestClass]
+public sealed class SessionTests
+{
+    [TestInitialize]
+    public void Initialize()
+    {
+        AppConfigTestHelper.Initialize();
+    }
+
+    [TestMethod]
+    public async Task RegisterAuthorizationSession_GeneratesSessionIdAndWritesRedisValue()
+    {
+        var redis = new FakeRedisClient();
+        var session = new AuthorizationSession
+        {
+            ResponseType = "code",
+            ClientId = "12345678901234567890123456789012",
+            RedirectUri = "https://client.example.com/callback",
+            State = "state-1",
+            Scope = "openid email",
+            CodeChallengeMethod = "S256",
+            CodeChallenge = new string('a', 43),
+            Nonce = "nonce-1"
+        };
+
+        string sessionId = await AuthorizeExecutionService.RegisterAuthorizationSession(redis, session, "user-1");
+        string? raw = await redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
+
+        Assert.AreEqual(32, sessionId.Length);
+        Assert.IsNotNull(raw);
+
+        var saved = new AuthorizationSession();
+        Assert.IsTrue(saved.SetValue(raw));
+        Assert.AreEqual("user-1", saved.OsolabId);
+        Assert.AreEqual("openid email", saved.Scope);
+    }
+
+    [TestMethod]
+    public void AuthSession_SetValue_RestoresPropertiesAndMarksHasValue()
+    {
+        var source = new AuthSession("login-1", "user-1", "user@example.com", "client-1")
+        {
+            CreatedAt = "2026-01-01T00:00:00+09:00",
+            ExpiresAt = "2026-01-02T00:00:00+09:00",
+            LatestAuthAt = "2026-01-01T00:00:00+09:00"
+        };
+
+        var restored = new AuthSession();
+        Assert.IsTrue(restored.SetValue(JsonConvert.SerializeObject(source)));
+
+        Assert.IsTrue(restored.HasValue);
+        Assert.AreEqual("login-1", restored.SessionId);
+        Assert.AreEqual("user@example.com", restored.Email);
+    }
+
+    [TestMethod]
+    public void GetCookieSessionId_PrefersAuthSessionIdAndFallsBackToSessionId()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = "session_id=authz-1; AuthSessionId=login-1";
+
+        Assert.AreEqual("login-1", AuthSession.GetCookieSessionId(context.Request));
+
+        var fallbackContext = new DefaultHttpContext();
+        fallbackContext.Request.Headers.Cookie = "session_id=authz-1";
+
+        Assert.AreEqual("authz-1", AuthSession.GetCookieSessionId(fallbackContext.Request));
+    }
+
+    [TestMethod]
+    public void AppendCookie_WritesAuthSessionAndCompatibilityCookie()
+    {
+        var context = new DefaultHttpContext();
+        var session = new AuthSession("login-1", "user-1", "user@example.com", "client-1");
+
+        session.AppendCookie(context.Response);
+
+        string setCookie = string.Join("\n", context.Response.Headers.SetCookie.ToArray());
+        StringAssert.Contains(setCookie, "AuthSessionId=login-1");
+        StringAssert.Contains(setCookie, "session_id=login-1");
+    }
+
+    [TestMethod]
+    public void AuthCodeSession_SetValue_RestoresSerializedPayload()
+    {
+        var source = new AuthCodeSession
+        {
+            Code = "code-1",
+            OsolabId = "user-1",
+            Email = "user@example.com",
+            ClientId = "client-1",
+            RedirectUri = "https://client.example.com/callback",
+            Scope = "openid",
+            CodeChallenge = new string('a', 43),
+            CodeChallengeMethod = "S256",
+            Nonce = "nonce-1",
+            State = "state-1"
+        };
+
+        var restored = new AuthCodeSession();
+        Assert.IsTrue(restored.SetValue(JsonConvert.SerializeObject(source)));
+
+        Assert.AreEqual("code-1", restored.Code);
+        Assert.AreEqual("user-1", restored.OsolabId);
+        Assert.AreEqual("auth_code:code-1", AuthCodeSession.GetRedisKey("code-1"));
+    }
+}
