@@ -9,5 +9,5 @@
   "CLOUD_RUN_VPC_EGRESS": "private-ranges-only",
   "CLOUD_RUN_NETWORK": "default",
   "CLOUD_RUN_SUBNET": "default",
-  "CLOUD_RUN_UPDATE_SECRETS": "ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest"
+  "CLOUD_RUN_UPDATE_SECRETS": "ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,JwkPrivateKeyEncryptionKey=auth-jwk-encryption-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest"
 }

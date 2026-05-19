@@ -78,7 +78,7 @@ namespace AuthFoundation.Controllers.Auth
                 };
                 await refreshTokenSession.CreateSession(_redis);
 
-                string idToken = _oidcSigningService.CreateIdToken(codeSession, Helper.ParseScopes(codeSession.Scope));
+                string idToken = await _oidcSigningService.CreateIdTokenAsync(codeSession, Helper.ParseScopes(codeSession.Scope));
 
                 await _redis.DeleteAsync(AuthCodeSession.GetRedisKey(input.AuthorizationCode));
 

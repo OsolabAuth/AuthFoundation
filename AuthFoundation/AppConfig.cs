@@ -12,6 +12,10 @@ namespace AuthFoundation.Common
         /// </summary>
         public static string PasswordHashKey { get; private set; } = string.Empty;
         /// <summary>
+        /// Gets or sets JwkPrivateKeyEncryptionKey.
+        /// </summary>
+        public static string JwkPrivateKeyEncryptionKey { get; private set; } = string.Empty;
+        /// <summary>
         /// Gets or sets SessionExpireSec.
         /// </summary>
         public static int SessionExpireSec { get; private set; }
@@ -86,6 +90,7 @@ namespace AuthFoundation.Common
         public static void Initialize(IConfiguration config)
         {
             PasswordHashKey = GetRequiredString(config, "PasswordHashKey");
+            JwkPrivateKeyEncryptionKey = GetRequiredString(config, "JwkPrivateKeyEncryptionKey");
             SessionExpireSec = GetRequiredInt(config, "Session_ExpireSec");
             AccessTokenExpireSec = GetRequiredInt(config, "AccessToken_ExpireSec");
             RefreshTokenExpireSec = GetRequiredInt(config, "RefreshToken_ExpireSec");

@@ -215,7 +215,7 @@ CLOUD_RUN_VPC_EGRESS=private-ranges-only
 
 ## 4. Runtime secrets を Secret Manager に作る
 
-DB password、Redis 接続先、Brevo API key、`PasswordHashKey` は GitHub Secrets ではなく GCP Secret Manager に置きます。
+DB password、Redis 接続先、Brevo API key、`PasswordHashKey`、`JwkPrivateKeyEncryptionKey` は GitHub Secrets ではなく GCP Secret Manager に置きます。
 
 Cloud Shell で実行例:
 
@@ -224,6 +224,7 @@ PROJECT_ID=osolab
 DATA_SERVER_INTERNAL_IP=<data-server-internal-ip>
 MSSQL_PASSWORD='<sqlserver-password>'
 PASSWORD_HASH_KEY='<production-password-hash-key>'
+JWK_PRIVATE_KEY_ENCRYPTION_KEY='<production-jwk-encryption-key>'
 BREVO_API_KEY='<brevo-api-key>'
 BREVO_SENDER_EMAIL='<sender-email>'
 
@@ -243,6 +244,12 @@ printf '%s:6379' "${DATA_SERVER_INTERNAL_IP}" \
 
 printf '%s' "${PASSWORD_HASH_KEY}" \
   | gcloud secrets create auth-password-hash-key \
+    --project="${PROJECT_ID}" \
+    --replication-policy=automatic \
+    --data-file=-
+
+printf '%s' "${JWK_PRIVATE_KEY_ENCRYPTION_KEY}" \
+  | gcloud secrets create auth-jwk-encryption-key \
     --project="${PROJECT_ID}" \
     --replication-policy=automatic \
     --data-file=-
@@ -285,7 +292,7 @@ GitHub Variables に `CLOUD_RUN_UPDATE_SECRETS` を追加します。
 ここには secret の値ではなく、Secret Manager の secret 名を書きます。
 
 ```text
-CLOUD_RUN_UPDATE_SECRETS=ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest
+CLOUD_RUN_UPDATE_SECRETS=ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,JwkPrivateKeyEncryptionKey=auth-jwk-encryption-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest
 ```
 
 ## 5. Firewall

@@ -18,11 +18,11 @@ namespace AuthFoundation.Controllers.Auth
 
         [HttpGet]
         /// <summary>         /// Executes GetJwks.         /// </summary>
-        public IActionResult GetJwks()
+        public async Task<IActionResult> GetJwks()
         {
             try
             {
-                return Ok(_oidcSigningService.CreateJwks());
+                return Ok(await _oidcSigningService.CreateJwksAsync());
             }
             catch (Exception ex)
             {
