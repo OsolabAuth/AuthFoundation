@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -125,14 +125,42 @@ jobs:
             --coverage-output coverage.cobertura.xml \
             --coverage-output-format cobertura
 
+      - name: Install ReportGenerator
+        if: always()
+        shell: bash
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          echo "${HOME}/.dotnet/tools" >> "${GITHUB_PATH}"
+
+      - name: Generate coverage summary for Actions page
+        if: always()
+        shell: bash
+        run: |
+          coverage_file="$(find ./TestResults -type f -name 'coverage.cobertura.xml' | head -n 1)"
+          if [ -z "${coverage_file}" ]; then
+            echo "Coverage file was not found. Skipping summary generation." >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          reportgenerator \
+            -reports:"./TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"./TestResults/CoverageReport" \
+            -reporttypes:"HtmlInline;MarkdownSummaryGithub"
+
+          {
+            echo "## Coverage Summary"
+            cat ./TestResults/CoverageReport/SummaryGithub.md
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Upload test results and coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: auth-test-results-and-coverage
           path: |
             TestResults/**/*.trx
             TestResults/**/coverage.cobertura.xml
+            TestResults/CoverageReport/**
           if-no-files-found: error
           retention-days: 14
 
