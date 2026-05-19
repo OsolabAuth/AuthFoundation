@@ -1,0 +1,142 @@
+name: Auth Test Coverage
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-with-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DOTNET_VERSION: "10.0.x"
+      SQL_IMAGE: "mcr.microsoft.com/mssql/server:2022-latest"
+      REDIS_IMAGE: "redis:7-alpine"
+      SQL_CONTAINER: "auth-test-sql"
+      REDIS_CONTAINER: "auth-test-redis"
+      SA_PASSWORD: "AuthFoundation_test_123!"
+      TEST_DB: "OsolabAuth"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Pull SQL Server and Redis images
+        run: |
+          docker pull "${SQL_IMAGE}"
+          docker pull "${REDIS_IMAGE}"
+
+      - name: Start SQL Server and Redis
+        run: |
+          docker rm -f "${SQL_CONTAINER}" "${REDIS_CONTAINER}" || true
+
+          docker run -d \
+            --name "${SQL_CONTAINER}" \
+            -e ACCEPT_EULA=Y \
+            -e MSSQL_SA_PASSWORD="${SA_PASSWORD}" \
+            -p 1433:1433 \
+            "${SQL_IMAGE}"
+
+          docker run -d \
+            --name "${REDIS_CONTAINER}" \
+            -p 6379:6379 \
+            "${REDIS_IMAGE}" \
+            redis-server --save "" --appendonly no
+
+      - name: Wait for SQL Server and Redis
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            if docker exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${SA_PASSWORD}" -C -Q "SELECT 1" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for SQL Server... (${i}/60)"
+            sleep 5
+            if [ "${i}" -eq 60 ]; then
+              echo "SQL Server did not become ready in time." >&2
+              exit 1
+            fi
+          done
+
+          for i in {1..30}; do
+            if docker exec "${REDIS_CONTAINER}" redis-cli ping | grep -q PONG; then
+              break
+            fi
+            echo "Waiting for Redis... (${i}/30)"
+            sleep 2
+            if [ "${i}" -eq 30 ]; then
+              echo "Redis did not become ready in time." >&2
+              exit 1
+            fi
+          done
+
+      - name: Initialize database from SQL folder
+        shell: bash
+        run: |
+          docker exec "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "${SA_PASSWORD}" -C -Q "IF DB_ID('${TEST_DB}') IS NULL CREATE DATABASE [${TEST_DB}];"
+
+          for sql_file in $(find ./SQL -maxdepth 1 -type f -name "*.sql" | sort); do
+            echo "Applying ${sql_file}"
+            cat "${sql_file}" | docker exec -i "${SQL_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd \
+              -S localhost \
+              -U sa \
+              -P "${SA_PASSWORD}" \
+              -C \
+              -d "${TEST_DB}" \
+              -b
+          done
+
+      - name: Initialize Redis
+        run: |
+          docker exec "${REDIS_CONTAINER}" redis-cli FLUSHALL
+
+      - name: Restore
+        run: dotnet restore ./Auth.slnx
+
+      - name: Test with coverage
+        env:
+          ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=OsolabAuth;User ID=sa;Password=AuthFoundation_test_123!;TrustServerCertificate=True;"
+          ConnectionStrings__Redis: "localhost:6379"
+          PasswordHashKey: "AuthFoundation_Test_PasswordHashKey_0123456789abcdef"
+          JwkPrivateKeyEncryptionKey: "AuthFoundation_Test_JwkEncryptionKey_0123456789abcdef"
+          Session_ExpireSec: "900"
+          AccessToken_ExpireSec: "900"
+          RefreshToken_ExpireSec: "7776000"
+          IDToken_ExpireSec: "3600"
+        run: |
+          dotnet test \
+            --solution ./Auth.slnx \
+            --configuration Release \
+            --no-restore \
+            --results-directory ./TestResults \
+            --report-trx \
+            --report-trx-filename test-results.trx \
+            --coverage \
+            --coverage-output coverage.cobertura.xml \
+            --coverage-output-format cobertura
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-test-results-and-coverage
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Cleanup containers
+        if: always()
+        run: |
+          docker rm -f "${SQL_CONTAINER}" "${REDIS_CONTAINER}" || true
