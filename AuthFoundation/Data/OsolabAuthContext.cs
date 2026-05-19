@@ -26,6 +26,8 @@ public partial class OsolabAuthContext : DbContext
 
     public virtual DbSet<data_key_master> data_key_masters { get; set; }
 
+    public virtual DbSet<jwk_master> jwk_masters { get; set; }
+
     public virtual DbSet<osolab_user> osolab_users { get; set; }
 
     public virtual DbSet<scope_data_key> scope_data_keys { get; set; }
@@ -177,6 +179,40 @@ public partial class OsolabAuthContext : DbContext
                 .HasMaxLength(64)
                 .IsUnicode(false);
             entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+        });
+
+        modelBuilder.Entity<jwk_master>(entity =>
+        {
+            entity.HasKey(e => e.sequence_id);
+
+            entity.ToTable("jwk_master", "auth");
+
+            entity.HasIndex(e => new { e.status, e.update_datetime }, "IX_jwk_master_status_update_datetime");
+
+            entity.HasIndex(e => e.kid, "UQ_jwk_master_kid").IsUnique();
+
+            entity.Property(e => e.alg)
+                .HasMaxLength(16)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.key_use)
+                .HasMaxLength(16)
+                .IsUnicode(false);
+            entity.Property(e => e.kid)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.kty)
+                .HasMaxLength(16)
+                .IsUnicode(false);
+            entity.Property(e => e.private_key_iv).HasMaxLength(12);
+            entity.Property(e => e.private_key_tag).HasMaxLength(16);
+            entity.Property(e => e.public_e)
+                .HasMaxLength(16)
+                .IsUnicode(false);
+            entity.Property(e => e.public_n)
+                .HasMaxLength(512)
+                .IsUnicode(false);
             entity.Property(e => e.update_datetime).HasPrecision(0);
         });
 

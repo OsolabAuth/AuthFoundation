@@ -43,6 +43,10 @@
          "ObjectType": 0
       },
       {
+         "Name": "[auth].[jwk_master]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[auth].[osolab_user]",
          "ObjectType": 0
       },
