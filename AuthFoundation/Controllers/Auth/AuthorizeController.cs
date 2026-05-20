@@ -38,14 +38,11 @@ namespace AuthFoundation.Controllers.Auth
                 Input input = Input.Create(Request.HttpContext);
                 input.Validate();
 
-                Helper.CertClient(_dbContext, input.ClientId);
-                if (!Helper.IsRedirectUriFormatValid(input.RedirectUri))
-                {
-                    throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
-                }
+                Helper.CertAuthorizeClient(_dbContext, input.ClientId, input.RedirectUri);
 
                 AuthorizationSession session = input.ToAuthorizationSession();
                 string location = await _authorizeExecutionService.ExecuteAsync(session, AuthSession.GetCookieSessionId(Request));
+                AppendAuthorizationSessionCookieIfPresent(Response, location);
                 if (ShouldReturnBodySession(Request))
                 {
                     return Ok(new
@@ -83,6 +80,23 @@ namespace AuthFoundation.Controllers.Auth
                 request.Headers["x-auth-ui-session-mode"].ToString(),
                 "body",
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void AppendAuthorizationSessionCookieIfPresent(HttpResponse response, string location)
+        {
+            string sessionId = ExtractSessionId(location);
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                return;
+            }
+
+            response.Cookies.Append("session_id", sessionId, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = response.HttpContext.Request.IsHttps,
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromSeconds(Code.AuthCode.EXPIRE_SEC)
+            });
         }
 
         private static string ExtractSessionId(string location)
@@ -201,7 +215,6 @@ namespace AuthFoundation.Controllers.Auth
                 ValidateUtil.IndispensableParam(ClientId, Code.HttpQueries.CLIENT_ID.Key);
                 ValidateUtil.FormatParam(ClientId, Code.HttpQueries.CLIENT_ID.Key, Code.HttpQueries.CLIENT_ID.Regex);
                 ValidateUtil.IndispensableParam(RedirectUri, Code.HttpQueries.REDIRECT_URI.Key);
-                ValidateUtil.FormatParam(RedirectUri, Code.HttpQueries.REDIRECT_URI.Key, Code.HttpQueries.REDIRECT_URI.Regex);
                 ValidateUtil.IndispensableParam(State, Code.HttpQueries.STATE.Key);
                 ValidateUtil.FormatParam(State, Code.HttpQueries.STATE.Key, Code.HttpQueries.STATE.Regex);
                 ValidateUtil.IndispensableParam(Scope, Code.HttpQueries.SCOPE.Key);

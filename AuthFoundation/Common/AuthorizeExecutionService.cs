@@ -37,7 +37,8 @@ namespace AuthFoundation.Common
             string sessionId = string.Empty;
             List<string> requestedScopes = Helper.ParseScopes(session.Scope);
             // 要求Scopeの検証
-            await CertRequestScope(session.ClientId, requestedScopes);
+            HashSet<string> requiredScopeSet = await LoadRequiredScopesAsync(session.ClientId);
+            CertRequestScope(requiredScopeSet, requestedScopes);
 
             // ログイン検証
             AuthSession loginSession = new AuthSession();
@@ -47,7 +48,11 @@ namespace AuthFoundation.Common
             {
                 //ログイン済みの場合、同意状況の検証を行う
                 bool hasTermConsent = await HasRequiredConsentTerm(loginSession.OsolabId, session.ClientId);
-                bool hasScopeConsent = await HasRequiredConsentScope(loginSession.OsolabId, session.ClientId, requestedScopes);
+                bool hasScopeConsent = await HasRequiredConsentScope(
+                    loginSession.OsolabId,
+                    session.ClientId,
+                    requestedScopes,
+                    requiredScopeSet);
                 if (hasTermConsent && hasScopeConsent)
                 {
                     //同意済みの場合、認可コードの発行を行う
@@ -178,13 +183,12 @@ namespace AuthFoundation.Common
         /// <param name="clientId">クライアントID</param>
         /// <param name="requestedScopes">要求 Scope</param>
         /// <returns></returns>
-        private async Task<bool> HasRequiredConsentScope(string? osolabId, string? clientId, List<string> requestedScopes)
+        private async Task<bool> HasRequiredConsentScope(
+            string? osolabId,
+            string? clientId,
+            List<string> requestedScopes,
+            HashSet<string> requiredScopeSet)
         {
-            HashSet<string> requiredScopeSet = await _dbContext.client_scopes
-                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE && x.required == Code.Status.ACTIVE)
-                .Select(x => x.scope)
-                .ToHashSetAsync(StringComparer.Ordinal);
-
             if (!requiredScopeSet.IsSubsetOf(requestedScopes))
             {
                 return false;
@@ -203,15 +207,18 @@ namespace AuthFoundation.Common
         /// </summary>
         /// <param name="clientId">クライアントID</param>
         /// <param name="requestedScopes">要求 Scope</param>
-        private async Task CertRequestScope(string clientId, List<string> requestedScopes)
+        private async Task<HashSet<string>> LoadRequiredScopesAsync(string clientId)
         {
-            HashSet<string> requiredScopeSet = await _dbContext.client_scopes
+            return await _dbContext.client_scopes
                 .Where(x => x.client_id == clientId
                     && x.status == Code.Status.ACTIVE
                     && x.required == Code.Status.ACTIVE)
                 .Select(x => x.scope)
                 .ToHashSetAsync(StringComparer.Ordinal);
+        }
 
+        private static void CertRequestScope(HashSet<string> requiredScopeSet, List<string> requestedScopes)
+        {
             if (!requiredScopeSet.IsSubsetOf(requestedScopes))
             {
                 throw new ApiException(Code.INVALID_SCOPE, Code.INVALID_SCOPE.ErrorMessage);

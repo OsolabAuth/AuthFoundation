@@ -121,7 +121,7 @@ namespace AuthFoundation.Controllers.Auth
                 }
 
                 client_master client = Helper.CertClient(_dbContext, input.BasicClientId);
-                if (!FixedTimeEquals(client.client_secret, input.BasicClientSecret ?? string.Empty))
+                if (!Helper.IsSameValue(client.client_secret, input.BasicClientSecret ?? string.Empty))
                 {
                     throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
                 }
@@ -147,15 +147,7 @@ namespace AuthFoundation.Controllers.Auth
 
             byte[] bytes = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
             string calculated = Base64UrlEncode(bytes);
-            return FixedTimeEquals(calculated, challenge);
-        }
-
-        private static bool FixedTimeEquals(string expected, string actual)
-        {
-            byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
-            byte[] actualBytes = Encoding.UTF8.GetBytes(actual);
-            return expectedBytes.Length == actualBytes.Length
-                && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+            return Helper.IsSameValue(calculated, challenge);
         }
 
         private static string Base64UrlEncode(byte[] data)
@@ -187,12 +179,25 @@ namespace AuthFoundation.Controllers.Auth
                 if (authorization.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
                 {
                     string encoded = authorization["Basic ".Length..].Trim();
-                    string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+                    string decoded;
+                    try
+                    {
+                        decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+                    }
+                    catch
+                    {
+                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                    }
+
                     string[] parts = decoded.Split(':', 2);
                     if (parts.Length == 2)
                     {
                         basicClientId = parts[0];
                         basicClientSecret = parts[1];
+                    }
+                    else
+                    {
+                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
                     }
                 }
 

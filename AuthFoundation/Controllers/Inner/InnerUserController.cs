@@ -1,4 +1,3 @@
-﻿using System.Security.Cryptography;
 using System.Text;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
@@ -174,6 +173,14 @@ namespace AuthFoundation.Controllers.Inner
                     .Select(x => x.data_key)
                     .ToHashSetAsync(StringComparer.Ordinal);
 
+                List<string> requestedKeys = input.Claims.Keys.ToList();
+                List<user_info> existingRows = await _dbContext.user_infos
+                    .Where(x => x.osolab_id == osolabId
+                        && x.client_id == input.ClientId
+                        && requestedKeys.Contains(x.data_key))
+                    .ToListAsync();
+                Dictionary<string, user_info> existingByKey = existingRows.ToDictionary(x => x.data_key, StringComparer.Ordinal);
+
                 DateTime now = DateTime.UtcNow;
                 foreach ((string dataKey, string dataValue) in input.Claims)
                 {
@@ -182,12 +189,7 @@ namespace AuthFoundation.Controllers.Inner
                         throw new ApiException(Code.REQUEST_PARAMETER_ERROR, $"unsupported data_key: {dataKey}");
                     }
 
-                    user_info? row = await _dbContext.user_infos.SingleOrDefaultAsync(x =>
-                        x.osolab_id == osolabId
-                        && x.client_id == input.ClientId
-                        && x.data_key == dataKey);
-
-                    if (row == null)
+                    if (!existingByKey.TryGetValue(dataKey, out user_info? row))
                     {
                         row = new user_info
                         {
@@ -265,21 +267,10 @@ namespace AuthFoundation.Controllers.Inner
             }
 
             client_master client = Helper.CertClient(_dbContext, clientId);
-            if (!FixedTimeEquals(client.client_secret, secret))
+            if (!Helper.IsSameValue(client.client_secret, secret))
             {
                 throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
             }
-        }
-
-        /// <summary>
-        /// Executes FixedTimeEquals.
-        /// </summary>
-        private static bool FixedTimeEquals(string expected, string actual)
-        {
-            byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
-            byte[] actualBytes = Encoding.UTF8.GetBytes(actual);
-            return expectedBytes.Length == actualBytes.Length
-                && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
         }
 
         /// <summary>

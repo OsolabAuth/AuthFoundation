@@ -134,18 +134,10 @@ namespace AuthFoundation.Controllers.Auth
                 IFormCollection form = await request.ReadFormAsync();
                 return new Input
                 {
-                    SessionId = GetSessionId(request, form),
+                    SessionId = Helper.GetSessionId(request, form),
                     Email = form["email"].ToString(),
                     Password = form["password"].ToString()
                 };
-            }
-
-            private static string GetSessionId(HttpRequest request, IFormCollection form)
-            {
-                string bodySessionId = form["session_id"].ToString();
-                return string.IsNullOrWhiteSpace(bodySessionId)
-                    ? request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString()
-                    : bodySessionId;
             }
 
             /// <summary>

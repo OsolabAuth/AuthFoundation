@@ -65,26 +65,7 @@ namespace AuthFoundation.Controllers.Auth
                 ValidateUtil.IndispensableParam(sessionId, Code.HttpHeaders.X_SESSION_ID.Key);
                 ValidateUtil.FormatParam(sessionId, Code.HttpHeaders.X_SESSION_ID.Key, Code.HttpHeaders.X_SESSION_ID.Regex);
 
-                AuthorizationSession session = await GetAuthorizationSessionRequiredAsync(sessionId);
-
-                List<client_term> terms = await _dbContext.client_terms
-                    .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE)
-                    .OrderBy(x => x.term_id)
-                    .ToListAsync();
-
-                return Ok(new
-                {
-                    client_id = session.ClientId,
-                    terms = terms.Select(x => new
-                    {
-                        term_id = x.term_id,
-                        title = x.term_id,
-                        version = x.term_version,
-                        term_url = x.term_url,
-                        required = x.required == Code.Status.ACTIVE
-                    }),
-                    scopes = Helper.ParseScopes(session.Scope)
-                });
+                return await BuildTermsResponseAsync(sessionId);
             }
             catch (ApiException ex)
             {
@@ -240,17 +221,26 @@ namespace AuthFoundation.Controllers.Auth
                 throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
             }
 
+            var existingTerms = await _dbContext.user_term_consents
+                .Where(x => x.osolab_id == session.OsolabId
+                    && x.client_id == session.ClientId
+                    && x.consent_result == Code.Status.ACTIVE)
+                .Select(x => new { x.term_id, x.term_version })
+                .ToListAsync();
+            HashSet<string> existingTermKeys = existingTerms
+                .Select(x => TermConsentKey(x.term_id, x.term_version))
+                .ToHashSet(StringComparer.Ordinal);
+
+            List<string> requestedScopes = Helper.ParseScopes(session.Scope);
+            HashSet<string> existingScopes = await _dbContext.user_client_scope_consents
+                .Where(x => x.osolab_id == session.OsolabId && x.client_id == session.ClientId && x.status == Code.Status.ACTIVE)
+                .Select(x => x.scope)
+                .ToHashSetAsync(StringComparer.Ordinal);
+
             DateTime now = DateTime.UtcNow;
             foreach (client_term term in requiredTerms)
             {
-                bool exists = await _dbContext.user_term_consents.AnyAsync(x =>
-                    x.osolab_id == session.OsolabId
-                    && x.client_id == session.ClientId
-                    && x.term_id == term.term_id
-                    && x.term_version == term.term_version
-                    && x.consent_result == Code.Status.ACTIVE);
-
-                if (!exists)
+                if (!existingTermKeys.Contains(TermConsentKey(term.term_id, term.term_version)))
                 {
                     _dbContext.user_term_consents.Add(new user_term_consent
                     {
@@ -265,15 +255,9 @@ namespace AuthFoundation.Controllers.Auth
                 }
             }
 
-            foreach (string scope in Helper.ParseScopes(session.Scope))
+            foreach (string scope in requestedScopes)
             {
-                bool exists = await _dbContext.user_client_scope_consents.AnyAsync(x =>
-                    x.osolab_id == session.OsolabId
-                    && x.client_id == session.ClientId
-                    && x.scope == scope
-                    && x.status == Code.Status.ACTIVE);
-
-                if (!exists)
+                if (!existingScopes.Contains(scope))
                 {
                     _dbContext.user_client_scope_consents.Add(new user_client_scope_consent
                     {
@@ -289,6 +273,11 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             await _dbContext.SaveChangesAsync();
+        }
+
+        private static string TermConsentKey(string termId, string termVersion)
+        {
+            return $"{termId}\u001F{termVersion}";
         }
 
         /// <summary>
@@ -328,20 +317,12 @@ namespace AuthFoundation.Controllers.Auth
 
                 return new Input
                 {
-                    SessionId = GetSessionId(request, form),
+                    SessionId = Helper.GetSessionId(request, form),
                     AcceptedRaw = form["accepted"].ToString(),
                     Accepted = string.Equals(form["accepted"].ToString(), "true", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(form["accepted"].ToString(), "on", StringComparison.OrdinalIgnoreCase),
                     TermIds = termIds
                 };
-            }
-
-            private static string GetSessionId(HttpRequest request, IFormCollection form)
-            {
-                string bodySessionId = form["session_id"].ToString();
-                return string.IsNullOrWhiteSpace(bodySessionId)
-                    ? request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString()
-                    : bodySessionId;
             }
 
             /// <summary>
@@ -387,7 +368,7 @@ namespace AuthFoundation.Controllers.Auth
                 IFormCollection form = await request.ReadFormAsync();
                 return new FormSessionInput
                 {
-                    SessionId = form["session_id"].ToString()
+                    SessionId = Helper.GetSessionId(request, form)
                 };
             }
 

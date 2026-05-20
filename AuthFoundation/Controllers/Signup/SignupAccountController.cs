@@ -55,11 +55,7 @@ namespace AuthFoundation.Controllers.Signup
                 input.ValidationCheck();
 
                 AuthorizationSession authz = await GetAuthorizationSessionAsync(input.SessionId);
-                client_master client = Helper.CertClient(_dbContext, authz.ClientId);
-                if (client.status != Code.Status.ACTIVE)
-                {
-                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
-                }
+                Helper.CertClient(_dbContext, authz.ClientId);
 
                 osolab_user user;
                 osolab_user? currentUser = _dbContext.osolab_users.FirstOrDefault(x =>
@@ -136,12 +132,12 @@ namespace AuthFoundation.Controllers.Signup
             string? raw = await session.ReadValueFromRedisAsync(_redis, sessionId);
             if (string.IsNullOrWhiteSpace(raw))
             {
-                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is not found");
+                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
             }
 
             if (!session.SetValue(raw))
             {
-                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
+                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
             }
 
             return session;
@@ -178,21 +174,13 @@ namespace AuthFoundation.Controllers.Signup
                 IFormCollection form = await request.ReadFormAsync();
                 return new Input
                 {
-                    SessionId = GetSessionId(request, form),
+                    SessionId = Helper.GetSessionId(request, form),
                     Body = new JsonBody
                     {
                         Email = form["email"].ToString(),
                         Password = form["password"].ToString()
                     }
                 };
-            }
-
-            private static string GetSessionId(HttpRequest request, IFormCollection form)
-            {
-                string bodySessionId = form["session_id"].ToString();
-                return string.IsNullOrWhiteSpace(bodySessionId)
-                    ? request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString()
-                    : bodySessionId;
             }
 
             /// <summary>

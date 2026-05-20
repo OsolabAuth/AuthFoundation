@@ -1,6 +1,7 @@
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using Konscious.Security.Cryptography;
+using Microsoft.AspNetCore.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -30,6 +31,61 @@ namespace AuthFoundation.Common
             }
 
             return client;
+        }
+
+        /// <summary>
+        /// 認可リクエストのクライアントとリダイレクトURIを検証します。
+        /// </summary>
+        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="clientId">クライアントID</param>
+        /// <param name="redirectUri">リダイレクトURI</param>
+        /// <returns>クライアント情報</returns>
+        /// <exception cref="ApiException">00002:クライアントが不正、00005:リダイレクトURIが不正</exception>
+        public static client_master CertAuthorizeClient(OsolabAuthContext dbContext, string clientId, string redirectUri)
+        {
+            var clientWithRedirect = dbContext.client_masters
+                .Where(x => x.client_id == clientId && x.status == Code.Status.ACTIVE)
+                .Select(x => new
+                {
+                    Client = x,
+                    HasRedirectUri = dbContext.client_redirect_uris.Any(r =>
+                        r.client_id == x.client_id
+                        && r.redirect_uri == redirectUri
+                        && r.status == Code.Status.ACTIVE)
+                })
+                .SingleOrDefault();
+            if (clientWithRedirect == null)
+            {
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+            }
+
+            if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out Uri? uri))
+            {
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+            }
+
+            if (!string.IsNullOrEmpty(uri.Fragment))
+            {
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+            }
+
+            bool isHttps = uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(uri.Host);
+            bool isAllowedLocalHttp = uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                    || (uri.Host.StartsWith("osolab-", StringComparison.OrdinalIgnoreCase)
+                        && uri.Host.EndsWith("-local", StringComparison.OrdinalIgnoreCase)));
+            if (!isHttps && !isAllowedLocalHttp)
+            {
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+            }
+
+            if (!clientWithRedirect.HasRedirectUri)
+            {
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+            }
+
+            return clientWithRedirect.Client;
         }
 
         /// <summary>
@@ -171,34 +227,26 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// RedirectUri の形式を検証します。
+        /// フォーム、ヘッダー、Cookieの順に認可セッションIDを取得します。
         /// </summary>
-        /// <param name="redirectUri">RedirectUri</param>
-        /// <returns>許可された形式の場合は true</returns>
-        public static bool IsRedirectUriFormatValid(string redirectUri)
+        /// <param name="request">HTTPリクエスト</param>
+        /// <param name="form">フォーム入力</param>
+        /// <returns>認可セッションID。見つからない場合は空文字列</returns>
+        public static string GetSessionId(HttpRequest request, IFormCollection form)
         {
-            if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out Uri? uri))
+            string bodySessionId = form[Code.HttpBodies.SESSION_ID.Key].ToString();
+            if (!string.IsNullOrWhiteSpace(bodySessionId))
             {
-                return false;
+                return bodySessionId;
             }
 
-            if (uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            string headerSessionId = request.Headers[Code.HttpHeaders.X_SESSION_ID.Key].ToString();
+            if (!string.IsNullOrWhiteSpace(headerSessionId))
             {
-                return true;
+                return headerSessionId;
             }
 
-            if (!uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return uri.Host.StartsWith("osolab-", StringComparison.OrdinalIgnoreCase)
-                && uri.Host.EndsWith("-local", StringComparison.OrdinalIgnoreCase);
+            return request.Cookies["session_id"] ?? string.Empty;
         }
 
         /// <summary>

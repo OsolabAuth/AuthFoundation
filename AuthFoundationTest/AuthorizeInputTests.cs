@@ -1,4 +1,3 @@
-using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Http;
@@ -8,6 +7,9 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class AuthorizeInputTests
 {
+    /// <summary>
+    /// 検証項目: 認可リクエストQueryをInputへ読み込み、AuthorizationSessionへ正しく変換できること。
+    /// </summary>
     [TestMethod]
     public void Create_ReadsAuthorizeQueryAndBuildsAuthorizationSession()
     {
@@ -35,8 +37,11 @@ public sealed class AuthorizeInputTests
         Assert.AreEqual("S256", session.CodeChallengeMethod);
     }
 
+    /// <summary>
+    /// 検証項目: redirect_uriの形式検証はHelperへ集約し、Input.Validateでは必須チェックのみ行うこと。
+    /// </summary>
     [TestMethod]
-    public void Validate_ThrowsApiExceptionForIllegalRedirectUri()
+    public void Validate_DoesNotDuplicateRedirectUriFormatValidation()
     {
         var input = new AuthorizeController.Input
         {
@@ -50,7 +55,6 @@ public sealed class AuthorizeInputTests
             Nonce = "nonce-1"
         };
 
-        ApiException ex = Assert.ThrowsExactly<ApiException>(input.Validate);
-        Assert.AreEqual(Code.REQUEST_PARAMETER_ERROR.Code, ex.Code);
+        input.Validate();
     }
 }

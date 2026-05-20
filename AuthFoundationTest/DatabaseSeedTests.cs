@@ -7,6 +7,9 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class DatabaseSeedTests
 {
+    /// <summary>
+    /// 検証項目: SQLフォルダ初期化後のDBへ接続でき、デフォルト内部クライアントと標準scopeが存在すること。
+    /// </summary>
     [TestMethod]
     public async Task InitializedSqlFolderData_ContainsDefaultClientAndScopes()
     {

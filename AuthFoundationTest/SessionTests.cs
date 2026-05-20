@@ -15,6 +15,9 @@ public sealed class SessionTests
         AppConfigTestHelper.Initialize();
     }
 
+    /// <summary>
+    /// 検証項目: 認可セッション登録時に32桁session_idを生成し、Redis保存値へユーザーIDとscopeを保持すること。
+    /// </summary>
     [TestMethod]
     public async Task RegisterAuthorizationSession_GeneratesSessionIdAndWritesRedisValue()
     {
@@ -43,6 +46,9 @@ public sealed class SessionTests
         Assert.AreEqual("openid email", saved.Scope);
     }
 
+    /// <summary>
+    /// 検証項目: AuthSessionのJSON復元で主要プロパティとHasValueが復元されること。
+    /// </summary>
     [TestMethod]
     public void AuthSession_SetValue_RestoresPropertiesAndMarksHasValue()
     {
@@ -61,6 +67,9 @@ public sealed class SessionTests
         Assert.AreEqual("user@example.com", restored.Email);
     }
 
+    /// <summary>
+    /// 検証項目: CookieからAuthSessionIdを優先取得し、互換session_idへフォールバックすること。
+    /// </summary>
     [TestMethod]
     public void GetCookieSessionId_PrefersAuthSessionIdAndFallsBackToSessionId()
     {
@@ -75,6 +84,9 @@ public sealed class SessionTests
         Assert.AreEqual("authz-1", AuthSession.GetCookieSessionId(fallbackContext.Request));
     }
 
+    /// <summary>
+    /// 検証項目: AuthSession Cookieと互換session_id Cookieがレスポンスへ設定されること。
+    /// </summary>
     [TestMethod]
     public void AppendCookie_WritesAuthSessionAndCompatibilityCookie()
     {
@@ -88,6 +100,9 @@ public sealed class SessionTests
         StringAssert.Contains(setCookie, "session_id=login-1");
     }
 
+    /// <summary>
+    /// 検証項目: AuthCodeSessionのJSON復元とRedisキー生成が設計どおりであること。
+    /// </summary>
     [TestMethod]
     public void AuthCodeSession_SetValue_RestoresSerializedPayload()
     {

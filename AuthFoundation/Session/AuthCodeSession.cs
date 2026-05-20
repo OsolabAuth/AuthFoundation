@@ -116,7 +116,7 @@ namespace AuthFoundation.Session
         /// <returns></returns>
         public async Task DeleteSessionAsync(IRedisClient redis)
         {
-            await redis.DeleteAsync(AuthSession.GetRedisKey(Code), Common.Code.RedisDbNo.AUTHORIZATION_CODE);
+            await redis.DeleteAsync(GetRedisKey(Code), Common.Code.RedisDbNo.AUTHORIZATION_CODE);
         }
 
         /// <summary>

@@ -25,10 +25,11 @@ namespace AuthFoundation.Controllers.Auth
                 grant_types_supported = new[] { "authorization_code" },
                 subject_types_supported = new[] { "public" },
                 id_token_signing_alg_values_supported = new[] { "RS256" },
-                token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post" },
+                token_endpoint_auth_methods_supported = new[] { "none", "client_secret_basic" },
                 scopes_supported = new[] { Code.Scope.OPENID, Code.Scope.EMAIL, Code.Scope.PROFILE },
-                claims_supported = new[] { "sub", "email" },
-                service_documentation = AppConfig.ServiceDocumentationUrl
+                claims_supported = new[] { "sub", "name", "email", "iss", "aud", "exp", "iat", "picture" },
+                service_documentation = AppConfig.ServiceDocumentationUrl,
+                code_challenge_methods_supported = new[] { "S256" }
             });
         }
     }

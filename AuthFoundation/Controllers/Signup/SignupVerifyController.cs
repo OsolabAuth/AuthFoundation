@@ -59,6 +59,11 @@ namespace AuthFoundation.Controllers.Signup
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification session is invalid");
                 }
 
+                if (!string.Equals(verify.Code, code, StringComparison.Ordinal))
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification code is invalid");
+                }
+
                 osolab_user? user = _dbContext.osolab_users.SingleOrDefault(x => x.osolab_id == verify.OsolabId && x.status == Code.Status.TENTATIVE);
                 if (user == null)
                 {
@@ -78,7 +83,7 @@ namespace AuthFoundation.Controllers.Signup
                 string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.SessionId, loginSessionId);
                 if (string.IsNullOrWhiteSpace(location))
                 {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
+                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
                 }
 
                 return Redirect(location);
