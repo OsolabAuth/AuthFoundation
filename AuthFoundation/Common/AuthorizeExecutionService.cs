@@ -54,7 +54,7 @@ namespace AuthFoundation.Common
                     AuthCodeSession codeSession = CreateAuthCodeSession(session, loginSession);
                     await codeSession.WriteToRedisAsync(_redis);
                     // 認可セッションは削除する
-                    await _redis.DeleteAsync(session.SessionId);
+                    await _redis.DeleteAsync(session.SessionId, Code.RedisDbNo.AUTH_CODE_SESSION);
                     // リクエストのリダイレクトURIにクエリを付与して、リダイレクトURIを生成
                     Dictionary<string, string> queries = new Dictionary<string, string>
                     {

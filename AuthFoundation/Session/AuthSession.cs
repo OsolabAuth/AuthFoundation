@@ -105,7 +105,7 @@ namespace AuthFoundation.Session
                 return null;
             }
 
-            return await redis.GetStringAsync(GetRedisKey(sessionId));
+            return await redis.GetStringAsync(GetRedisKey(sessionId), Common.Code.RedisDbNo.AUTH_SESSION);
         }
 
         /// <summary>
@@ -148,7 +148,7 @@ namespace AuthFoundation.Session
             {
                 return;
             }
-            string? jsonString = await redis.GetStringAsync(GetRedisKey(sessionId));
+            string? jsonString = await redis.GetStringAsync(GetRedisKey(sessionId), Common.Code.RedisDbNo.AUTH_SESSION);
 
             if (string.IsNullOrWhiteSpace(jsonString))
             {
@@ -188,16 +188,17 @@ namespace AuthFoundation.Session
             LatestAuthAt = DateTimeHelper.ToJstString(now);
             ExpiresAt = DateTimeHelper.ToJstString(now.AddSeconds(sessionExpireSeconds));
 
-            await redis.SetStringAsync(GetRedisKey(SessionId), JsonConvert.SerializeObject(this), sessionExpire);
+            await redis.SetStringAsync(GetRedisKey(SessionId), JsonConvert.SerializeObject(this), sessionExpire, Common.Code.RedisDbNo.AUTH_SESSION);
         }
 
         /// <summary>
-        /// Redis にログインセッションを書き込みます。
+        /// セッション削除
         /// </summary>
-        /// <param name="redis">Redis クライアント</param>
-        public async Task CreateSession(IRedisClient redis)
+        /// <param name="redis">Redisクライアント</param>
+        /// <returns></returns>
+        public async Task DeleteSessionAsync (IRedisClient redis)
         {
-            await WriteToRedisAsync(redis);
+            await redis.DeleteAsync(AuthSession.GetRedisKey(SessionId), Code.RedisDbNo.AUTH_SESSION);
         }
 
         /// <summary>

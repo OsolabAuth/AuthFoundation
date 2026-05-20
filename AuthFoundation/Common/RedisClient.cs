@@ -9,19 +9,19 @@ namespace AuthFoundation.Common
     /// </summary>
     public interface IRedisClient
     {
-        Task<bool> SetStringAsync(string key, string value, TimeSpan? expiry = null, int db = -1);
+        Task<bool> SetStringAsync(string key, string value, TimeSpan? expiry , int db);
 
-        Task<string?> GetStringAsync(string key, int db = -1);
+        Task<string?> GetStringAsync(string key, int db);
 
-        Task<bool> DeleteAsync(string key, int db = -1);
+        Task<bool> DeleteAsync(string key, int db);
 
-        Task<bool> ExistsAsync(string key, int db = -1);
+        Task<bool> ExistsAsync(string key, int db);
 
-        Task<bool> ExpireAsync(string key, TimeSpan expiry, int db = -1);
+        Task<bool> ExpireAsync(string key, TimeSpan expiry, int db);
 
-        Task<bool> SetJsonAsync<T>(string key, T value, TimeSpan? expiry = null, int db = -1);
+        Task<bool> SetJsonAsync<T>(string key, T value, TimeSpan? expiry, int db);
 
-        Task<T?> GetJsonAsync<T>(string key, int db = -1);
+        Task<T?> GetJsonAsync<T>(string key, int db);
     }
 
     /// <summary>

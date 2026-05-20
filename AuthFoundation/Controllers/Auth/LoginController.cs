@@ -41,25 +41,6 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// ログイン画面を返します。
-        /// </summary>
-        /// <returns>ログイン画面</returns>
-        [HttpGet]
-        [HttpGet("view")]
-        public IActionResult GetLogin()
-        {
-            string sessionId = Request.Query["session_id"].ToString();
-            if (AuthUiUrl.IsConfigured)
-            {
-                return Redirect(AuthUiUrl.Build("/login", sessionId));
-            }
-
-            string safeSessionId = System.Net.WebUtility.HtmlEncode(sessionId);
-            string html = LoadTemplate("login.html").Replace("__SESSION_ID__", safeSessionId, StringComparison.Ordinal);
-            return Content(html, "text/html; charset=utf-8");
-        }
-
-        /// <summary>
         /// ログインを実行します。
         /// </summary>
         /// <returns>ログイン結果</returns>
@@ -128,17 +109,6 @@ namespace AuthFoundation.Controllers.Auth
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new Output(apiEx)) { StatusCode = (int)apiEx.Status };
             }
-        }
-
-        /// <summary>
-        /// HTML テンプレートを読み込みます。
-        /// </summary>
-        /// <param name="fileName">ファイル名</param>
-        /// <returns>HTML 文字列</returns>
-        private string LoadTemplate(string fileName)
-        {
-            string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Auth", fileName);
-            return System.IO.File.ReadAllText(path);
         }
 
         /// <summary>

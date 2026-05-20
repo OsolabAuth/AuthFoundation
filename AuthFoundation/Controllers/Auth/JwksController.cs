@@ -5,19 +5,16 @@ namespace AuthFoundation.Controllers.Auth
 {
     [ApiController]
     [Route("jwks")]
-    /// <summary>     /// JwksController class.     /// </summary>
     public class JwksController : ControllerBase
     {
         private readonly OidcSigningService _oidcSigningService;
 
-        /// <summary>         /// Initializes a new instance of JwksController.         /// </summary>
         public JwksController(OidcSigningService oidcSigningService)
         {
             _oidcSigningService = oidcSigningService;
         }
 
         [HttpGet]
-        /// <summary>         /// Executes GetJwks.         /// </summary>
         public async Task<IActionResult> GetJwks()
         {
             try

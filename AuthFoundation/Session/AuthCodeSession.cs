@@ -1,5 +1,6 @@
 ﻿using AuthFoundation.Common;
 using Newtonsoft.Json;
+using static AuthFoundation.Common.Code;
 
 namespace AuthFoundation.Session
 {
@@ -61,7 +62,7 @@ namespace AuthFoundation.Session
                 return null;
             }
 
-            return await redis.GetStringAsync(GetRedisKey(code));
+            return await redis.GetStringAsync(GetRedisKey(code), Common.Code.RedisDbNo.AUTHORIZATION_CODE);
         }
 
         /// <summary>
@@ -105,16 +106,17 @@ namespace AuthFoundation.Session
             TimeSpan ttl = TimeSpan.FromSeconds(Common.Code.AuthCode.EXPIRE_SEC);
             ExpireAt = DateTimeHelper.ToJstString(DateTimeHelper.GetJstNow().AddSeconds(Common.Code.AuthCode.EXPIRE_SEC));
             string value = JsonConvert.SerializeObject(this);
-            await redis.SetStringAsync(GetRedisKey(Code), value, ttl);
+            await redis.SetStringAsync(GetRedisKey(Code), value, ttl, Common.Code.RedisDbNo.AUTHORIZATION_CODE);
         }
 
         /// <summary>
-        /// Redis に認可コードセッションを書き込みます。
+        /// セッション削除
         /// </summary>
-        /// <param name="redis">Redis クライアント</param>
-        public async Task CreateSession(IRedisClient redis)
+        /// <param name="redis">Redisクライアント</param>
+        /// <returns></returns>
+        public async Task DeleteSessionAsync(IRedisClient redis)
         {
-            await WriteToRedisAsync(redis);
+            await redis.DeleteAsync(AuthSession.GetRedisKey(Code), Common.Code.RedisDbNo.AUTHORIZATION_CODE);
         }
 
         /// <summary>

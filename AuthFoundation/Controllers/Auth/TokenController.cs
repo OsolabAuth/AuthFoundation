@@ -80,7 +80,7 @@ namespace AuthFoundation.Controllers.Auth
 
                 string idToken = await _oidcSigningService.CreateIdTokenAsync(codeSession, Helper.ParseScopes(codeSession.Scope));
 
-                await _redis.DeleteAsync(AuthCodeSession.GetRedisKey(input.AuthorizationCode));
+                await codeSession.DeleteSessionAsync(_redis);
 
                 return Ok(new
                 {

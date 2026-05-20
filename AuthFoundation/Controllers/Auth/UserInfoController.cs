@@ -39,7 +39,7 @@ namespace AuthFoundation.Controllers.Auth
                 string accessToken = authorization.Substring("Bearer ".Length).Trim();
                 ValidateUtil.IndispensableParam(accessToken, "access_token");
 
-                string? raw = await _redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken));
+                string? raw = await _redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN);
                 if (string.IsNullOrWhiteSpace(raw))
                 {
                     throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorMessage);

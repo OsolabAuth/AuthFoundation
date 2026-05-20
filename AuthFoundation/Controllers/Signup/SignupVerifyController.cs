@@ -66,7 +66,7 @@ namespace AuthFoundation.Controllers.Signup
                 user.status = Code.Status.ACTIVE;
                 user.update_datetime = DateTime.UtcNow;
                 _dbContext.SaveChanges();
-                await _redis.DeleteAsync(MailVerificationSession.GetRedisKey(token));
+                await _redis.DeleteAsync(MailVerificationSession.GetRedisKey(token),Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
 
                 string loginSessionId = Helper.GenerateRandomCode(Code.Session.LENGTH, Code.Session.CHARACTORS);
                 AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);

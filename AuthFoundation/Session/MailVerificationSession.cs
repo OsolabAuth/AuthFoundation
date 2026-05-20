@@ -43,7 +43,7 @@ namespace AuthFoundation.Session
                 return null;
             }
 
-            return await redis.GetStringAsync(GetRedisKey(token));
+            return await redis.GetStringAsync(GetRedisKey(token), Common.Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace AuthFoundation.Session
             DateTime now = DateTimeHelper.GetJstNow();
             CreatedAt = DateTimeHelper.ToJstString(now);
             ExpiresAt = DateTimeHelper.ToJstString(now.AddSeconds(expireSec));
-            await redis.SetStringAsync(GetRedisKey(VerificationToken), JsonConvert.SerializeObject(this), TimeSpan.FromSeconds(expireSec));
+            await redis.SetStringAsync(GetRedisKey(VerificationToken), JsonConvert.SerializeObject(this), TimeSpan.FromSeconds(expireSec), Common.Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
         }
 
         /// <summary>

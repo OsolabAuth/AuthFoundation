@@ -43,7 +43,7 @@ namespace AuthFoundation.Session
                 return null;
             }
 
-            return await redis.GetStringAsync(GetRedisKey(refreshToken));
+            return await redis.GetStringAsync(GetRedisKey(refreshToken), Common.Code.RedisDbNo.REFRESH_TOKEN);
         }
 
         /// <summary>
@@ -87,7 +87,7 @@ namespace AuthFoundation.Session
             TimeSpan ttl = TimeSpan.FromSeconds(expireSec);
             ExpireAt = DateTimeHelper.ToJstString(DateTimeHelper.GetJstNow().AddSeconds(expireSec));
             string value = JsonConvert.SerializeObject(this);
-            await redis.SetStringAsync(GetRedisKey(RefreshToken), value, ttl);
+            await redis.SetStringAsync(GetRedisKey(RefreshToken), value, ttl, Common.Code.RedisDbNo.REFRESH_TOKEN);
         }
 
         /// <summary>

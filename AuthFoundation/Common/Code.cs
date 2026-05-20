@@ -201,5 +201,15 @@ namespace AuthFoundation.Common
             public const string OSOLAB_CLIENT_ID = "00000000000000000000000000000000";
         }
 
+        public static class RedisDbNo
+        {
+            public const int AUTH_SESSION = 1;
+            public const int AUTHORIZATION_CODE = 2;
+            public const int ACCESS_TOKEN = 3;
+            public const int REFRESH_TOKEN = 4;
+            public const int AUTH_CODE_SESSION = 5;
+            public const int MAIL_VERIFICATION_SESSION = 6;
+        }
+
     }
 }
