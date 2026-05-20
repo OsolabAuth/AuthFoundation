@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using AuthFoundation.Common;
 
 /// <summary>
 /// BrevoMail class.
@@ -7,6 +8,7 @@ using System.Text.Json;
 public class BrevoMail
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<BrevoMail> _logger;
     private readonly string _apiKey;
     private readonly string _senderEmail;
     private readonly string _senderName;
@@ -14,9 +16,10 @@ public class BrevoMail
     /// <summary>
     /// Initializes a new instance of BrevoMail.
     /// </summary>
-    public BrevoMail(HttpClient httpClient, IConfiguration config)
+    public BrevoMail(HttpClient httpClient, IConfiguration config, ILogger<BrevoMail> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
 
         _apiKey = config["Brevo:ApiKey"]
                   ?? throw new InvalidOperationException("ApiKey missing");
@@ -57,6 +60,28 @@ public class BrevoMail
             "application/json");
 
         var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string responseBody = await response.Content.ReadAsStringAsync();
+        string summary = string.IsNullOrWhiteSpace(responseBody)
+            ? "<empty>"
+            : responseBody.Trim();
+        if (summary.Length > 512)
+        {
+            summary = summary[..512];
+        }
+
+        StructuredLog.LogInfo(_logger, "BrevoMail.SendMailFailed", new
+        {
+            StatusCode = (int)response.StatusCode,
+            response.ReasonPhrase,
+            Body = summary
+        });
+
+        throw new HttpRequestException(
+            $"Brevo API error: {(int)response.StatusCode} ({response.ReasonPhrase}). Body: {summary}");
     }
 }

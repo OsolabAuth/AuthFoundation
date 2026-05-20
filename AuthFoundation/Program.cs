@@ -6,6 +6,9 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
+
 AppConfig.Initialize(builder.Configuration);
 string[] allowedCorsOrigins = ResolveCorsAllowedOrigins(builder.Configuration);
 

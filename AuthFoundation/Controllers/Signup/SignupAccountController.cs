@@ -19,6 +19,7 @@ namespace AuthFoundation.Controllers.Signup
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
         private readonly BrevoMail _brevoMail;
+        private readonly ILogger<SignupAccountController> _logger;
 
         /// <summary>
         /// SignupAccountController を初期化します。
@@ -27,12 +28,18 @@ namespace AuthFoundation.Controllers.Signup
         /// <param name="redis">Redis クライアント</param>
         /// <param name="environment">ホスティング環境</param>
         /// <param name="brevoMail">メールクライアント</param>
-        public SignupAccountController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment, BrevoMail brevoMail)
+        public SignupAccountController(
+            OsolabAuthContext dbContext,
+            IRedisClient redis,
+            IWebHostEnvironment environment,
+            BrevoMail brevoMail,
+            ILogger<SignupAccountController> logger)
         {
             _dbContext = dbContext;
             _redis = redis;
             _environment = environment;
             _brevoMail = brevoMail;
+            _logger = logger;
         }
 
         /// <summary>
@@ -99,10 +106,17 @@ namespace AuthFoundation.Controllers.Signup
             }
             catch (ApiException aex)
             {
+                StructuredLog.LogInfo(_logger, "SignupAccount.ApiException", new
+                {
+                    aex.Code,
+                    Status = (int)aex.Status,
+                    aex.ErrorMessage
+                });
                 return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.Status };
             }
             catch (Exception ex)
             {
+                StructuredLog.LogException(_logger, "SignupAccount.UnhandledException", ex);
                 return new ObjectResult(new Output(new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message)))
                 {
                     StatusCode = (int)Code.INTERNAL_SERVER_ERROR.Status
