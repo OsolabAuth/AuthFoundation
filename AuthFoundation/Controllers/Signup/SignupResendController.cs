@@ -10,42 +10,37 @@ namespace AuthFoundation.Controllers.Signup
     /// メール確認後の有効化を処理します。
     /// </summary>
     [ApiController]
-    [Route("Signup/Verify")]
-    public class SignupVerifyController : ControllerBase
+    [Route("Signup/Resend")]
+    public class SignupResendController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
-        private readonly AuthorizeExecutionService _authorizeExecutionService;
+        private readonly BrevoMail _brevoMail;
 
         /// <summary>
-        /// SignupVerifyController を初期化します。
+        /// SignupResendController を初期化します。
         /// </summary>
         /// <param name="dbContext">DBコンテキスト</param>
         /// <param name="redis">Redis クライアント</param>
-        /// <param name="authorizeExecutionService">認可実行サービス</param>
-        public SignupVerifyController(
-            OsolabAuthContext dbContext,
-            IRedisClient redis,
-            AuthorizeExecutionService authorizeExecutionService)
+        /// <param name="brevoMail">メールクライアント</param>
+        public SignupResendController(OsolabAuthContext dbContext, IRedisClient redis, BrevoMail brevoMail)
         {
             _dbContext = dbContext;
             _redis = redis;
-            _authorizeExecutionService = authorizeExecutionService;
+            _brevoMail = brevoMail;
         }
 
         /// <summary>
         /// メール確認を完了します。
         /// </summary>
         /// <returns>遷移結果</returns>
-        [HttpGet]
-        public async Task<IActionResult> Verify()
+        [HttpPost]
+        public async Task<IActionResult> Resend()
         {
             try
             {
                 string token = Request.Query[Code.HttpQueries.TOKEN.Key].ToString();
                 ValidateUtil.IndispensableParam(token, "token");
-                string code = Request.Query[Code.HttpQueries.CODE.Key].ToString();
-                ValidateUtil.IndispensableParam(code, "code");
 
                 MailVerificationSession verify = new MailVerificationSession();
                 string? raw = await verify.ReadValueFromRedisAsync(_redis, token);
@@ -65,27 +60,51 @@ namespace AuthFoundation.Controllers.Signup
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "tentative user is not found");
                 }
 
-                user.status = Code.Status.ACTIVE;
-                user.update_datetime = DateTime.UtcNow;
-                _dbContext.SaveChanges();
-                await _redis.DeleteAsync(MailVerificationSession.GetRedisKey(token),Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
+                string code = await Helper.SendMailAsync(_brevoMail, user.email);
+                verify.Code = code;
+                await verify.CreateSession(_redis);
 
-                string loginSessionId = Helper.GenerateRandomCode(Code.Session.LENGTH, Code.Session.CHARACTORS);
-                AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);
-                await loginSession.WriteToRedisAsync(_redis);
-                loginSession.AppendCookie(Response);
-
-                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.SessionId, loginSessionId);
-                if (string.IsNullOrWhiteSpace(location))
-                {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "authorization session is invalid");
-                }
-
-                return Redirect(location);
+                return Ok(new Output());
             }
             catch (ApiException aex)
             {
-                return new ObjectResult(new { StatusCode = aex.Code, Message = aex.ErrorMessage }) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.Status };
+            }
+            catch (Exception ex)
+            {
+                return new ObjectResult(new Output(new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message)))
+                {
+                    StatusCode = (int)Code.INTERNAL_SERVER_ERROR.Status
+                };
+            }
+        }
+
+        /// <summary>
+        /// サインアップ応答を表します。
+        /// </summary>
+        private class Output
+        {
+            public string StatusCode { get; }
+
+            public string Message { get; }
+
+            /// <summary>
+            /// エラー応答を初期化します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            public Output(ApiException ex)
+            {
+                StatusCode = ex.Code;
+                Message = ex.ErrorMessage;
+            }
+
+            /// <summary>
+            /// 正常応答を初期化します。
+            /// </summary>
+            public Output()
+            {
+                StatusCode = Code.SUCCESS.Code;
+                Message = Code.SUCCESS.ErrorMessage;
             }
         }
     }

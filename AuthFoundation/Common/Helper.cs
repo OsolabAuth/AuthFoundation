@@ -3,6 +3,7 @@ using AuthFoundation.Models;
 using Konscious.Security.Cryptography;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AuthFoundation.Common
 {
@@ -228,5 +229,48 @@ namespace AuthFoundation.Common
 
             return builder.ToString();
         }
+
+        /// <summary>
+        /// 認証メール送信
+        /// </summary>
+        /// <param name="mailaddress">メールアドレス</param>
+        /// <returns></returns>
+        public static async Task<string> SendMailAsync(BrevoMail brevo, string mailaddress)
+        {
+            // ダミーアドレス
+            if (Regex.IsMatch(mailaddress, Code.HttpBodies.DUMMY_EMAIL.Regex))
+            {
+                return "00000";
+            }
+
+            // 認証コード生成
+            string code = Helper.GenerateRandomCode(5, "0123456789");
+
+            string subject = "メール認証コード";
+
+            string html = $@"
+<html>
+<body>
+    <p>サインアップ認証コードをお送りします。</p>
+
+    <p style='font-size:24px;font-weight:bold;letter-spacing:4px;'>
+        {code}
+    </p>
+
+    <p>このコードを画面へ入力してください。</p>
+
+    <hr />
+
+    <p style='color:#888;font-size:12px;'>
+        このメールに心当たりがない場合は破棄してください。
+    </p>
+</body>
+</html>";
+
+            await brevo.SendMailAsync(mailaddress, string.Empty, subject, html);
+
+            return code;
+        }
+
     }
 }

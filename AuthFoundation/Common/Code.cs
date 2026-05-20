@@ -73,6 +73,7 @@ namespace AuthFoundation.Common
             public static readonly RequestValidation CODE_CHALLENGE = new("code_challenge", @"^[A-Za-z0-9._~-]{43,128}$");
             public static readonly RequestValidation NONCE = new("nonce", @"^.{1,255}$");
             public static readonly RequestValidation TOKEN = new("token", @"^[A-Za-z0-9_-]{20,}$");
+            public static readonly RequestValidation CODE = new("code", @"^[0-9]{5}$");
         }
 
         /// <summary>
