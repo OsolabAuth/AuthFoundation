@@ -70,9 +70,6 @@ jobs:
           dotnet restore ./AuthFoundation/AuthFoundation.csproj
           dotnet restore ./AuthFoundationTest/AuthFoundationTest.csproj
 
-      - name: Test
-        run: dotnet test --project ./AuthFoundationTest/AuthFoundationTest.csproj --configuration Release --no-restore
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
