@@ -32,6 +32,7 @@ jobs:
       CLOUD_RUN_INGRESS: ${{ vars.CLOUD_RUN_INGRESS || 'all' }}
       CLOUD_RUN_NETWORK: ${{ vars.CLOUD_RUN_NETWORK }}
       CLOUD_RUN_SUBNET: ${{ vars.CLOUD_RUN_SUBNET }}
+      CLOUD_RUN_VPC_CONNECTOR: ${{ vars.CLOUD_RUN_VPC_CONNECTOR }}
       CLOUD_RUN_NETWORK_TAGS: ${{ vars.CLOUD_RUN_NETWORK_TAGS }}
       CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
       CLOUD_RUN_UPDATE_ENV_VARS: ${{ vars.CLOUD_RUN_UPDATE_ENV_VARS }}
@@ -155,16 +156,21 @@ jobs:
             deploy_args+=(--service-account "${CLOUD_RUN_SERVICE_ACCOUNT}")
           fi
 
-          if [ -n "${CLOUD_RUN_NETWORK}" ]; then
-            deploy_args+=(--network "${CLOUD_RUN_NETWORK}")
-          fi
-
-          if [ -n "${CLOUD_RUN_SUBNET}" ]; then
-            deploy_args+=(--subnet "${CLOUD_RUN_SUBNET}")
-          fi
-
-          if [ -n "${CLOUD_RUN_NETWORK}" ] || [ -n "${CLOUD_RUN_SUBNET}" ]; then
+          if [ -n "${CLOUD_RUN_VPC_CONNECTOR}" ]; then
+            deploy_args+=(--vpc-connector "${CLOUD_RUN_VPC_CONNECTOR}")
             deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
+          else
+            if [ -n "${CLOUD_RUN_NETWORK}" ]; then
+              deploy_args+=(--network "${CLOUD_RUN_NETWORK}")
+            fi
+
+            if [ -n "${CLOUD_RUN_SUBNET}" ]; then
+              deploy_args+=(--subnet "${CLOUD_RUN_SUBNET}")
+            fi
+
+            if [ -n "${CLOUD_RUN_NETWORK}" ] || [ -n "${CLOUD_RUN_SUBNET}" ]; then
+              deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
+            fi
           fi
 
           if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
