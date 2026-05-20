@@ -43,9 +43,8 @@ namespace AuthFoundation.Common
         /// <summary>
         /// Executes SetStringAsync.
         /// </summary>
-        public async Task<bool> SetStringAsync(string key, string value, TimeSpan? expiry = null, int db = -1)
+        public async Task<bool> SetStringAsync(string key, string value, TimeSpan? expiry, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
             return await database.StringSetAsync(key, value, expiry);
         }
@@ -53,9 +52,8 @@ namespace AuthFoundation.Common
         /// <summary>
         /// Executes GetStringAsync.
         /// </summary>
-        public async Task<string?> GetStringAsync(string key, int db = -1)
+        public async Task<string?> GetStringAsync(string key, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
 
             RedisValue value = await database.StringGetAsync(key);
@@ -65,9 +63,8 @@ namespace AuthFoundation.Common
         /// <summary>
         /// Executes DeleteAsync.
         /// </summary>
-        public async Task<bool> DeleteAsync(string key, int db = -1)
+        public async Task<bool> DeleteAsync(string key, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
             return await database.KeyDeleteAsync(key);
         }
@@ -75,9 +72,8 @@ namespace AuthFoundation.Common
         /// <summary>
         /// Executes ExistsAsync.
         /// </summary>
-        public async Task<bool> ExistsAsync(string key, int db = -1)
+        public async Task<bool> ExistsAsync(string key, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
             return await database.KeyExistsAsync(key);
         }
@@ -85,25 +81,22 @@ namespace AuthFoundation.Common
         /// <summary>
         /// Executes ExpireAsync.
         /// </summary>
-        public async Task<bool> ExpireAsync(string key, TimeSpan expiry, int db = -1)
+        public async Task<bool> ExpireAsync(string key, TimeSpan expiry, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
             return await database.KeyExpireAsync(key, expiry);
         }
 
-        public async Task<bool> SetJsonAsync<T>(string key, T value, TimeSpan? expiry = null, int db = -1)
+        public async Task<bool> SetJsonAsync<T>(string key, T value, TimeSpan? expiry, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
 
             string json = JsonSerializer.Serialize(value, JsonOptions);
             return await database.StringSetAsync(key, json, expiry);
         }
 
-        public async Task<T?> GetJsonAsync<T>(string key, int db = -1)
+        public async Task<T?> GetJsonAsync<T>(string key, int db)
         {
-            ValidateKey(key);
             IDatabase database = GetDatabaseForKey(key, db);
 
             RedisValue value = await database.StringGetAsync(key);
@@ -183,17 +176,6 @@ namespace AuthFoundation.Common
         private IDatabase GetDatabase(int db)
         {
             return _connectionMultiplexer.GetDatabase(db);
-        }
-
-        /// <summary>
-        /// Executes ValidateKey.
-        /// </summary>
-        private static void ValidateKey(string key)
-        {
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                throw new ArgumentException("Redis key must not be empty.", nameof(key));
-            }
         }
     }
 }
