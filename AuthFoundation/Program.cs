@@ -47,6 +47,8 @@ builder.Services.AddSingleton<IRedisClient, RedisClient>();
 builder.Services.AddSingleton<OidcSigningService>();
 builder.Services.AddScoped<AuthorizeExecutionService>();
 
+builder.Services.AddHttpClient<BrevoMail>();
+
 var app = builder.Build();
 
 var disableHttpsRedirection = builder.Configuration.GetValue<bool>("DisableHttpsRedirection");

@@ -18,6 +18,8 @@ namespace AuthFoundation.Session
         public string Email { get; set; } = string.Empty;
         [JsonProperty("session_id")]
         public string SessionId { get; set; } = string.Empty;
+        [JsonProperty("code")]
+        public string Code { get; set; } = string.Empty;
         [JsonProperty("created_at")]
         public string CreatedAt { get; set; } = string.Empty;
         [JsonProperty("expires_at")]
@@ -68,6 +70,7 @@ namespace AuthFoundation.Session
             OsolabId = session.OsolabId;
             Email = session.Email;
             SessionId = session.SessionId;
+            Code = session.Code;
             CreatedAt = session.CreatedAt;
             ExpiresAt = session.ExpiresAt;
             return true;

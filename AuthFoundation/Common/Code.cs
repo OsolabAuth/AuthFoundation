@@ -81,7 +81,8 @@ namespace AuthFoundation.Common
         public static class HttpBodies
         {
             public static readonly RequestValidation EMAIL = new("email", @"^.+@.+$");
-            public static readonly RequestValidation PASSWORD = new("password", @"^[A-Fa-f0-9]{64}$");
+            public static readonly RequestValidation DUMMY_EMAIL = new("dummy_email", @"^[A-Za-z0-9._%+-]+@example\.(com|org|net)$");
+            public static readonly RequestValidation PASSWORD = new("password", @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,64}$");
             public static readonly RequestValidation GRANT_TYPE = new("grant_type", @"^authorization_code$");
             public static readonly RequestValidation CODE_VERIFIER = new("code_verifier", @"^[A-Za-z0-9._~-]{43,128}$");
             public static readonly RequestValidation AUTH_CODE = new("code", @"^[A-Za-z0-9._~-]{20,}$");
@@ -92,7 +93,6 @@ namespace AuthFoundation.Common
             public static readonly RequestValidation TERM_SEQ_ID = new("term_seq_id", @"^[0-9]*$");
             public static readonly RequestValidation TERM_NAME = new("term_name", @"^[0-9A-Za-z._~-]{1,32}$");
             public static readonly RequestValidation TERM_URL = new("term_url", @"^(https://.+|http://(localhost|osolab-[A-Za-z0-9-]+-local)(:[0-9]+)?(/.*)?)$");
-
         }
 
         /// <summary>

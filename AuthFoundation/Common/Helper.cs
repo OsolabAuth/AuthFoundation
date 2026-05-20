@@ -138,6 +138,20 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
+        /// 文字列を固定時間比較します。
+        /// </summary>
+        /// <param name="expected">期待値</param>
+        /// <param name="actual">比較値</param>
+        /// <returns>一致する場合は true</returns>
+        public static bool IsSameValue(string expected, string actual)
+        {
+            byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
+            byte[] actualBytes = Encoding.UTF8.GetBytes(actual);
+            return expectedBytes.Length == actualBytes.Length
+                && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+        }
+
+        /// <summary>
         /// Scope をリストへ分解します。
         /// </summary>
         /// <param name="scope">Scope 文字列</param>

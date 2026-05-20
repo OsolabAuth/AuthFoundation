@@ -3,6 +3,8 @@ using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Mail;
+using System.Text.RegularExpressions;
 
 namespace AuthFoundation.Controllers.Signup
 {
@@ -16,6 +18,7 @@ namespace AuthFoundation.Controllers.Signup
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
         private readonly IWebHostEnvironment _environment;
+        private readonly BrevoMail _brevoMail;
 
         /// <summary>
         /// SignupAccountController を初期化します。
@@ -23,29 +26,13 @@ namespace AuthFoundation.Controllers.Signup
         /// <param name="dbContext">DBコンテキスト</param>
         /// <param name="redis">Redis クライアント</param>
         /// <param name="environment">ホスティング環境</param>
-        public SignupAccountController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment)
+        /// <param name="brevoMail">メールクライアント</param>
+        public SignupAccountController(OsolabAuthContext dbContext, IRedisClient redis, IWebHostEnvironment environment, BrevoMail brevoMail)
         {
             _dbContext = dbContext;
             _redis = redis;
             _environment = environment;
-        }
-
-        /// <summary>
-        /// サインアップ画面を返します。
-        /// </summary>
-        /// <returns>サインアップ画面</returns>
-        [HttpGet("view")]
-        public IActionResult GetSignupView()
-        {
-            string sessionId = Request.Query["session_id"].ToString();
-            if (AuthUiUrl.IsConfigured)
-            {
-                return Redirect(AuthUiUrl.Build("/signup", sessionId));
-            }
-
-            string safeSessionId = System.Net.WebUtility.HtmlEncode(sessionId);
-            string html = LoadTemplate("signup-account.html").Replace("__SID__", safeSessionId, StringComparison.Ordinal);
-            return Content(html, "text/html; charset=utf-8");
+            _brevoMail = brevoMail;
         }
 
         /// <summary>
@@ -67,24 +54,42 @@ namespace AuthFoundation.Controllers.Signup
                     throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
                 }
 
-                bool exists = _dbContext.osolab_users.Any(x =>
-                    x.email == input.Body.Email
-                    && (x.status == Code.Status.TENTATIVE || x.status == Code.Status.ACTIVE));
-                if (exists)
+                osolab_user user;
+                osolab_user? currentUser = _dbContext.osolab_users.FirstOrDefault(x =>
+                    x.email == input.Body.Email &&
+                    x.status != Code.Status.INACTIVE);
+                if (currentUser is not null && currentUser.status == Code.Status.ACTIVE)
                 {
+                    // 有効な正規メンバーが存在する場合エラー
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
                 }
 
-                osolab_user user = TableHelper.CreateNewOsolabUser(_dbContext, input.Body.Email, input.Body.Password);
-                user.status = Code.Status.TENTATIVE;
-                _dbContext.Add(user);
-                _dbContext.SaveChanges();
+                if (currentUser is not null && currentUser.status == Code.Status.TENTATIVE)
+                {
+                    // 有効な仮メンバーが存在する場合は、パスワードの一致を確認、不一致の場合エラー
+                    string inputPassHash = Helper.GetPassHash(input.Body.Password, currentUser.nonce);
+                    if (!Helper.IsSameValue(currentUser.password, inputPassHash))
+                    {
+                        throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
+                    }
+                    user = currentUser;
+                }
+                else
+                {
+                    // 有効なメンバーが存在しない場合は、新規で仮会員登録
+                    user = TableHelper.CreateNewOsolabUser(_dbContext, input.Body.Email, input.Body.Password);
+                    user.status = Code.Status.TENTATIVE;
+                    _dbContext.Add(user);
+                    _dbContext.SaveChanges();
+                }
+                string code = await SendMailAsync(user.email);
 
                 MailVerificationSession verify = new MailVerificationSession
                 {
                     VerificationToken = Helper.GenerateRandomCode(48, Code.AuthCode.CHARACTORS),
                     OsolabId = user.osolab_id,
                     Email = user.email,
+                    Code = code,
                     SessionId = input.SessionId
                 };
                 await verify.CreateSession(_redis);
@@ -106,15 +111,47 @@ namespace AuthFoundation.Controllers.Signup
         }
 
         /// <summary>
-        /// HTML テンプレートを読み込みます。
+        /// メール送信
         /// </summary>
-        /// <param name="fileName">ファイル名</param>
-        /// <returns>HTML 文字列</returns>
-        private string LoadTemplate(string fileName)
+        /// <param name="mailaddress">メールアドレス</param>
+        /// <returns></returns>
+        private async Task<string> SendMailAsync(string mailaddress)
         {
-            string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Signup", fileName);
-            return System.IO.File.ReadAllText(path);
+            // ダミーアドレス
+            if (Regex.IsMatch(mailaddress, Code.HttpBodies.DUMMY_EMAIL.Regex))
+            {
+                return "00000";
+            }
+
+            // 認証コード生成
+            string code = Helper.GenerateRandomCode(5, "0123456789");
+
+            string subject = "メール認証コード";
+
+            string html = $@"
+<html>
+<body>
+    <p>サインアップ認証コードをお送りします。</p>
+
+    <p style='font-size:24px;font-weight:bold;letter-spacing:4px;'>
+        {code}
+    </p>
+
+    <p>このコードを画面へ入力してください。</p>
+
+    <hr />
+
+    <p style='color:#888;font-size:12px;'>
+        このメールに心当たりがない場合は破棄してください。
+    </p>
+</body>
+</html>";
+
+            await _brevoMail.SendMailAsync(mailaddress, string.Empty, subject, html);
+
+            return code;
         }
+
 
         /// <summary>
         /// 認可セッションを取得します。

@@ -59,9 +59,8 @@ namespace AuthFoundation.Controllers.Auth
                     throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
                 }
 
-                string passwordHashHex = NormalizePasswordHash(input.Password);
-                string inputPassHash = Helper.GetPassHash(passwordHashHex, user.nonce);
-                if (!IsSameValue(user.password, inputPassHash))
+                string inputPassHash = Helper.GetPassHash(input.Password, user.nonce);
+                if (!Helper.IsSameValue(user.password, inputPassHash))
                 {
                     throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
                 }
@@ -109,37 +108,6 @@ namespace AuthFoundation.Controllers.Auth
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new Output(apiEx)) { StatusCode = (int)apiEx.Status };
             }
-        }
-
-        /// <summary>
-        /// パスワード入力値をハッシュ文字列へ正規化します。
-        /// </summary>
-        /// <param name="passwordInput">入力値</param>
-        /// <returns>SHA-256 ハッシュ文字列</returns>
-        private static string NormalizePasswordHash(string passwordInput)
-        {
-            if (Regex.IsMatch(passwordInput, Code.HttpBodies.PASSWORD.Regex))
-            {
-                return passwordInput.ToUpperInvariant();
-            }
-
-            byte[] plainBytes = Encoding.UTF8.GetBytes(passwordInput);
-            byte[] sha = SHA256.HashData(plainBytes);
-            return Convert.ToHexString(sha);
-        }
-
-        /// <summary>
-        /// 文字列を固定時間比較します。
-        /// </summary>
-        /// <param name="expected">期待値</param>
-        /// <param name="actual">比較値</param>
-        /// <returns>一致する場合は true</returns>
-        private static bool IsSameValue(string expected, string actual)
-        {
-            byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
-            byte[] actualBytes = Encoding.UTF8.GetBytes(actual);
-            return expectedBytes.Length == actualBytes.Length
-                && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
         }
 
         /// <summary>
@@ -193,10 +161,7 @@ namespace AuthFoundation.Controllers.Auth
                 ValidateUtil.IndispensableParam(Email, Code.HttpBodies.EMAIL.Key);
                 ValidateUtil.FormatParam(Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
                 ValidateUtil.IndispensableParam(Password, Code.HttpBodies.PASSWORD.Key);
-                if (!Regex.IsMatch(Password, Code.HttpBodies.PASSWORD.Regex))
-                {
-                    ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, @"^.{1,256}$");
-                }
+                ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
             }
         }
 
