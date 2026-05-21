@@ -3,6 +3,7 @@ using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthFoundationTest;
@@ -14,6 +15,22 @@ public sealed class LogoutApiTests
     public void Initialize()
     {
         AppConfigTestHelper.Initialize();
+    }
+
+    /// <summary>
+    /// 検証項目: LogoutController のクラスルートは 1 つ（logout）で曖昧マッチの原因となる重複定義を持たないこと。
+    /// </summary>
+    [TestMethod]
+    public void LogoutController_ClassRoute_IsSingleLogoutTemplate()
+    {
+        var routeAttributes = typeof(LogoutController)
+            .GetCustomAttributes(typeof(IRouteTemplateProvider), inherit: false)
+            .Cast<IRouteTemplateProvider>()
+            .Where(x => !string.IsNullOrWhiteSpace(x.Template))
+            .ToList();
+
+        Assert.AreEqual(1, routeAttributes.Count);
+        Assert.AreEqual("logout", routeAttributes[0].Template);
     }
 
     /// <summary>

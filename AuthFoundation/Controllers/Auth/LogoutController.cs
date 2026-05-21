@@ -9,7 +9,6 @@ namespace AuthFoundation.Controllers.Auth
     /// </summary>
     [ApiController]
     [Route("logout")]
-    [Route("Logout")]
     public class LogoutController : ControllerBase
     {
         private readonly IRedisClient _redis;
