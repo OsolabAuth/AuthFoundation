@@ -80,13 +80,7 @@ namespace AuthFoundation.Session
         /// <param name="response">HTTPレスポンス</param>
         public void AppendCookie(HttpResponse response)
         {
-            CookieOptions options = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = false,
-                SameSite = SameSiteMode.Lax,
-                MaxAge = TimeSpan.FromSeconds(AppConfig.SessionExpireSec)
-            };
+            CookieOptions options = Helper.BuildSessionCookieOptions(response.HttpContext.Request, AppConfig.SessionExpireSec);
 
             response.Cookies.Append(Code.AUTH_SESSION_COOKIE_KEY, SessionId, options);
             response.Cookies.Append("session_id", SessionId, options);

@@ -90,13 +90,7 @@ namespace AuthFoundation.Controllers.Auth
                 return;
             }
 
-            CookieOptions options = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = response.HttpContext.Request.IsHttps,
-                SameSite = SameSiteMode.Lax,
-                MaxAge = TimeSpan.FromSeconds(Code.AuthCode.EXPIRE_SEC)
-            };
+            CookieOptions options = Helper.BuildSessionCookieOptions(response.HttpContext.Request, Code.AuthCode.EXPIRE_SEC);
 
             response.Cookies.Append(Code.AUTH_REQUEST_SESSION_COOKIE_KEY, sessionId, options);
             response.Cookies.Append("session_id", sessionId, options);

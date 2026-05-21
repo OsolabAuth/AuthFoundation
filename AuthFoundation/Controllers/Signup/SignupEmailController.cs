@@ -92,13 +92,8 @@ namespace AuthFoundation.Controllers.Signup
 
         private static void AppendSignupSessionCookie(HttpResponse response, string signupSessionId)
         {
-            response.Cookies.Append("signup_session_id", signupSessionId, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = response.HttpContext.Request.IsHttps,
-                SameSite = SameSiteMode.Lax,
-                MaxAge = TimeSpan.FromSeconds(SignupSession.ExpireSeconds)
-            });
+            CookieOptions options = Helper.BuildSessionCookieOptions(response.HttpContext.Request, SignupSession.ExpireSeconds);
+            response.Cookies.Append("signup_session_id", signupSessionId, options);
         }
 
         private async Task<AuthRequestSession> GetAuthRequestSessionAsync(string sessionId)

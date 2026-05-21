@@ -136,6 +136,65 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
+        /// セッション系Cookieの既定オプションを生成します。
+        /// </summary>
+        /// <param name="request">HTTPリクエスト</param>
+        /// <param name="maxAgeSeconds">有効秒数</param>
+        /// <returns>Cookieオプション</returns>
+        public static CookieOptions BuildSessionCookieOptions(HttpRequest request, int maxAgeSeconds)
+        {
+            bool isHttps = IsHttpsRequest(request);
+            bool crossOrigin = IsCrossOriginRequest(request);
+
+            return new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = isHttps,
+                SameSite = crossOrigin && isHttps ? SameSiteMode.None : SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromSeconds(maxAgeSeconds)
+            };
+        }
+
+        private static bool IsHttpsRequest(HttpRequest request)
+        {
+            if (request.IsHttps)
+            {
+                return true;
+            }
+
+            string forwardedProto = request.Headers["X-Forwarded-Proto"].ToString();
+            if (string.IsNullOrWhiteSpace(forwardedProto))
+            {
+                return false;
+            }
+
+            string firstProto = forwardedProto.Split(',', 2)[0].Trim();
+            return string.Equals(firstProto, "https", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCrossOriginRequest(HttpRequest request)
+        {
+            string origin = request.Headers.Origin.ToString();
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri? originUri))
+            {
+                return false;
+            }
+
+            string requestHost = request.Host.Host;
+            if (string.IsNullOrWhiteSpace(requestHost))
+            {
+                return false;
+            }
+
+            return !string.Equals(originUri.Host, requestHost, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// ランダム文字列を生成します。
         /// </summary>
         /// <param name="length">文字数</param>

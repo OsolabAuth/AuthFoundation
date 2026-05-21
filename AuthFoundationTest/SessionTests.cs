@@ -118,6 +118,36 @@ public sealed class SessionTests
         Assert.AreEqual("authz-legacy", Helper.GetSessionId(fallbackContext.Request, emptyForm));
     }
 
+    [TestMethod]
+    public void BuildSessionCookieOptions_CrossOriginHttps_UsesSameSiteNoneAndSecure()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Host = new HostString("auth.osolab-auth.jp");
+        context.Request.Headers.Origin = "https://portal.osolab-auth.jp";
+        context.Request.Headers["X-Forwarded-Proto"] = "https";
+
+        CookieOptions options = Helper.BuildSessionCookieOptions(context.Request, 300);
+
+        Assert.AreEqual(SameSiteMode.None, options.SameSite);
+        Assert.IsTrue(options.Secure);
+        Assert.IsTrue(options.HttpOnly);
+    }
+
+    [TestMethod]
+    public void BuildSessionCookieOptions_SameOrigin_UsesSameSiteLax()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Host = new HostString("auth.osolab-auth.jp");
+        context.Request.Headers.Origin = "https://auth.osolab-auth.jp";
+        context.Request.Headers["X-Forwarded-Proto"] = "https";
+
+        CookieOptions options = Helper.BuildSessionCookieOptions(context.Request, 300);
+
+        Assert.AreEqual(SameSiteMode.Lax, options.SameSite);
+        Assert.IsTrue(options.Secure);
+        Assert.IsTrue(options.HttpOnly);
+    }
+
     /// <summary>
     /// 検証項目: AuthCodeSessionのJSON復元とRedisキー生成が設計どおりであること。
     /// </summary>
