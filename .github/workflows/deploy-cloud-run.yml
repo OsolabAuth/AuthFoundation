@@ -161,6 +161,9 @@ jobs:
             deploy_args+=(--clear-network-tags)
             deploy_args+=(--vpc-connector "${CLOUD_RUN_VPC_CONNECTOR}")
             deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
+            if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
+              echo "CLOUD_RUN_NETWORK_TAGS is ignored when CLOUD_RUN_VPC_CONNECTOR is set." >&2
+            fi
           else
             deploy_args+=(--clear-vpc-connector)
             if [ -n "${CLOUD_RUN_NETWORK}" ]; then
@@ -174,10 +177,9 @@ jobs:
             if [ -n "${CLOUD_RUN_NETWORK}" ] || [ -n "${CLOUD_RUN_SUBNET}" ]; then
               deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
             fi
-          fi
-
-          if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
-            deploy_args+=(--network-tags "${CLOUD_RUN_NETWORK_TAGS}")
+            if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
+              deploy_args+=(--network-tags "${CLOUD_RUN_NETWORK_TAGS}")
+            fi
           fi
 
           gcloud "${deploy_args[@]}"
