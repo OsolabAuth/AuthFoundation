@@ -57,6 +57,7 @@ namespace AuthFoundation.Controllers.Auth
                 }
 
                 Response.Cookies.Delete(Code.AUTH_SESSION_COOKIE_KEY);
+                Response.Cookies.Delete(Code.AUTH_REQUEST_SESSION_COOKIE_KEY);
                 Response.Cookies.Delete("session_id");
 
                 return Ok(new

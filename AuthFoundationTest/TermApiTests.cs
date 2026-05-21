@@ -18,7 +18,7 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /terms/list がCookieのsession_idから認可セッションを取得し、対象クライアントの規約とscopeを返すこと。
+    /// 検証項目: POST /terms/list がCookieの認可セッションIDから認可セッションを取得し、対象クライアントの規約とscopeを返すこと。
     /// </summary>
     [TestMethod]
     public async Task PostTermsList_ValidCookieSession_ReturnsTermsAndScopes()
@@ -39,7 +39,7 @@ public sealed class TermApiTests
 
         var controller = CreateController(context, redis);
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>());
-        ControllerTestHelper.SetCookie(httpContext, "session_id", sessionId);
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_REQUEST_SESSION_COOKIE_KEY, sessionId);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         IActionResult result = await controller.PostTermsList();
@@ -49,6 +49,40 @@ public sealed class TermApiTests
         Assert.AreEqual(clientId, body.Value<string>("client_id"));
         Assert.AreEqual(termId, body["terms"]!.First!.Value<string>("term_id"));
         CollectionAssert.AreEqual(new[] { "openid", "email" }, body["scopes"]!.Values<string>().ToArray());
+    }
+
+    /// <summary>
+    /// 検証項目: POST /terms/list がAuthRequestSessionId Cookieを優先し、互換session_idがログインセッションIDでも画面期限切れにならないこと。
+    /// </summary>
+    [TestMethod]
+    public async Task PostTermsList_PrefersAuthRequestCookieOverCompatibilitySessionId()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string clientId = ApiTestData.NewClientId();
+        string termId = $"term-{Guid.NewGuid():N}"[..32];
+        await ApiTestData.CreateClientAsync(context, clientId);
+        await ApiTestData.CreateRequiredTermAsync(context, clientId, termId);
+
+        var redis = new FakeRedisClient();
+        string authRequestSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
+        await ApiTestData.WriteAuthRequestSessionAsync(
+            redis,
+            ApiTestData.CreateAuthRequestSession(authRequestSessionId, clientId, "https://portal.osolab-auth.jp/callback", "openid email"));
+
+        var controller = CreateController(context, redis);
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>());
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_REQUEST_SESSION_COOKIE_KEY, authRequestSessionId);
+        ControllerTestHelper.SetCookie(httpContext, "session_id", Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant());
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostTermsList();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        JObject body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(clientId, body.Value<string>("client_id"));
+        Assert.AreEqual(termId, body["terms"]!.First!.Value<string>("term_id"));
     }
 
     /// <summary>
@@ -62,7 +96,7 @@ public sealed class TermApiTests
 
         var controller = CreateController(context, new FakeRedisClient());
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>());
-        ControllerTestHelper.SetCookie(httpContext, "session_id", Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant());
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_REQUEST_SESSION_COOKIE_KEY, Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant());
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         IActionResult result = await controller.PostTermsList();
@@ -94,7 +128,7 @@ public sealed class TermApiTests
         {
             ["accepted"] = "false"
         });
-        ControllerTestHelper.SetCookie(httpContext, "session_id", sessionId);
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_REQUEST_SESSION_COOKIE_KEY, sessionId);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         IActionResult result = await controller.PostTerms();
@@ -137,7 +171,7 @@ public sealed class TermApiTests
             ["accepted"] = new[] { "true" },
             ["term_ids"] = new[] { termId }
         });
-        ControllerTestHelper.SetCookie(httpContext, "session_id", authzSessionId);
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_REQUEST_SESSION_COOKIE_KEY, authzSessionId);
         ControllerTestHelper.SetCookie(httpContext, Code.AUTH_SESSION_COOKIE_KEY, loginSessionId);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
@@ -173,7 +207,7 @@ public sealed class TermApiTests
 
         var controller = CreateController(context, new FakeRedisClient());
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>());
-        ControllerTestHelper.SetCookie(httpContext, "session_id", Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant());
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_REQUEST_SESSION_COOKIE_KEY, Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant());
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         IActionResult result = await controller.PostTerms();

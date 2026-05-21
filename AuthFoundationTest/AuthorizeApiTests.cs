@@ -52,6 +52,7 @@ public sealed class AuthorizeApiTests
         Assert.AreEqual(Code.Session.LENGTH, sessionId.Length);
         StringAssert.StartsWith(body.Value<string>("redirect_url"), $"{AppConfig.AuthUiBaseUrl}/login");
         Assert.IsFalse(body.Value<string>("redirect_url")!.Contains("session_id=", StringComparison.OrdinalIgnoreCase));
+        Assert.AreEqual(sessionId, ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, Code.AUTH_REQUEST_SESSION_COOKIE_KEY));
         Assert.AreEqual(sessionId, ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, "session_id"));
 
         string? stored = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(sessionId));

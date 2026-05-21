@@ -77,4 +77,29 @@ public sealed class GmailSmtpMailTests
 
         Assert.AreEqual("gmail-from@example.com", senderEmail);
     }
+
+    /// <summary>
+    /// 検証項目: Mail:FromEmail に前後空白や改行が含まれてもtrimされること。
+    /// </summary>
+    [TestMethod]
+    public void Ctor_FromEmail_WithWhitespace_IsTrimmed()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Mail:FromEmail"] = "  from@example.com\r\n",
+                ["GmailSmtp:Host"] = "smtp.gmail.com",
+                ["GmailSmtp:Port"] = "587",
+                ["GmailSmtp:Username"] = "user@example.com",
+                ["GmailSmtp:AppPassword"] = "dummy"
+            })
+            .Build();
+        var mail = new GmailSmtpMail(config, NullLogger<GmailSmtpMail>.Instance);
+
+        string senderEmail = (string)typeof(GmailSmtpMail)
+            .GetField("_senderEmail", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(mail)!;
+
+        Assert.AreEqual("from@example.com", senderEmail);
+    }
 }

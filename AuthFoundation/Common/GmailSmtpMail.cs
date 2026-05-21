@@ -50,7 +50,7 @@ public sealed class GmailSmtpMail
         {
             if (!string.IsNullOrWhiteSpace(value))
             {
-                return value;
+                return value.Trim();
             }
         }
 
@@ -62,6 +62,9 @@ public sealed class GmailSmtpMail
     /// </summary>
     public async Task SendMailAsync(string toEmail, string toName, string subject, string html)
     {
+        string normalizedToEmail = toEmail.Trim();
+        string normalizedToName = toName.Trim();
+
         if (string.IsNullOrWhiteSpace(_smtpHost) ||
             string.IsNullOrWhiteSpace(_smtpUsername) ||
             string.IsNullOrWhiteSpace(_smtpPassword) ||
@@ -77,7 +80,7 @@ public sealed class GmailSmtpMail
             Body = html,
             IsBodyHtml = true
         };
-        message.To.Add(new MailAddress(toEmail, toName));
+        message.To.Add(new MailAddress(normalizedToEmail, normalizedToName));
 
         using var client = new SmtpClient(_smtpHost, _smtpPort)
         {

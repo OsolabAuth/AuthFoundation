@@ -2,6 +2,7 @@
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
 
 namespace AuthFoundationTest;
@@ -98,6 +99,23 @@ public sealed class SessionTests
         string setCookie = string.Join("\n", context.Response.Headers.SetCookie.ToArray());
         StringAssert.Contains(setCookie, "AuthSessionId=login-1");
         StringAssert.Contains(setCookie, "session_id=login-1");
+    }
+
+    /// <summary>
+    /// 検証項目: GetSessionIdがCookie読み取り時にAuthRequestSessionIdを優先し、互換session_idへフォールバックすること。
+    /// </summary>
+    [TestMethod]
+    public void GetSessionId_PrefersAuthRequestCookieAndFallsBackToSessionId()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = "session_id=authz-legacy; AuthRequestSessionId=authz-new";
+        var emptyForm = new FormCollection(new Dictionary<string, StringValues>());
+
+        Assert.AreEqual("authz-new", Helper.GetSessionId(context.Request, emptyForm));
+
+        var fallbackContext = new DefaultHttpContext();
+        fallbackContext.Request.Headers.Cookie = "session_id=authz-legacy";
+        Assert.AreEqual("authz-legacy", Helper.GetSessionId(fallbackContext.Request, emptyForm));
     }
 
     /// <summary>

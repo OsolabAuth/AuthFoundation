@@ -246,7 +246,10 @@ namespace AuthFoundation.Common
                 return headerSessionId;
             }
 
-            return request.Cookies["session_id"] ?? string.Empty;
+            string cookieSessionId = request.Cookies[Code.AUTH_REQUEST_SESSION_COOKIE_KEY]
+                ?? request.Cookies["session_id"]
+                ?? string.Empty;
+            return cookieSessionId;
         }
 
         /// <summary>

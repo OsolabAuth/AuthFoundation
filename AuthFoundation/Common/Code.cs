@@ -21,6 +21,7 @@ namespace AuthFoundation.Common
         public static readonly ApiException ID_GENERATION_ERROR = new("90001", HttpStatusCode.InternalServerError, "ID generation failed");
 
         public const string AUTH_SESSION_COOKIE_KEY = "AuthSessionId";
+        public const string AUTH_REQUEST_SESSION_COOKIE_KEY = "AuthRequestSessionId";
 
         /// <summary>
         /// RequestValidation class.
