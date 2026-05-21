@@ -254,3 +254,37 @@ jobs:
 
       - name: Show image URI
         run: echo "Built image ${{ steps.image.outputs.image_uri }}"
+
+      - name: Show Cloud Run service status
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          gcloud run services describe "${CLOUD_RUN_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format="table(status.url,status.latestReadyRevisionName,status.latestCreatedRevisionName,status.conditions[0].status,status.conditions[0].reason)"
+
+      - name: Validate latest Cloud Run revision is ready
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          service_info=$(gcloud run services describe "${CLOUD_RUN_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format="value(status.latestReadyRevisionName,status.latestCreatedRevisionName,status.conditions[0].status,status.conditions[0].reason)")
+
+          read -r ready_revision created_revision ready_status ready_reason <<< "${service_info}"
+
+          if [ -z "${ready_revision}" ] || [ -z "${created_revision}" ]; then
+            echo "Unable to resolve Cloud Run revision status." >&2
+            exit 1
+          fi
+
+          if [ "${ready_status}" != "True" ] || [ "${ready_revision}" != "${created_revision}" ]; then
+            echo "Latest Cloud Run revision is not ready." >&2
+            echo "latestReadyRevisionName=${ready_revision}" >&2
+            echo "latestCreatedRevisionName=${created_revision}" >&2
+            echo "condition.status=${ready_status}" >&2
+            echo "condition.reason=${ready_reason}" >&2
+            exit 1
+          fi
