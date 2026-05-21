@@ -158,7 +158,6 @@ jobs:
 
           if [ -n "${CLOUD_RUN_VPC_CONNECTOR}" ]; then
             deploy_args+=(--clear-network)
-            deploy_args+=(--clear-network-tags)
             deploy_args+=(--vpc-connector "${CLOUD_RUN_VPC_CONNECTOR}")
             deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
             if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
