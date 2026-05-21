@@ -62,6 +62,8 @@ public sealed class UserInfoApiTests
         IActionResult result = await controller.GetUserInfo();
 
         Assert.IsInstanceOfType<OkObjectResult>(result);
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         JObject body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(osolabId, body.Value<string>("sub"));
         Assert.AreEqual(email, body.Value<string>("email"));
@@ -83,7 +85,11 @@ public sealed class UserInfoApiTests
 
         IActionResult result = await controller.GetUserInfo();
 
-        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        JObject body = ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        StringAssert.Contains(body.Value<string>("error_description"), "Authorization");
+        Assert.AreEqual("no-store", controller.HttpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", controller.HttpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -103,7 +109,12 @@ public sealed class UserInfoApiTests
 
         IActionResult result = await controller.GetUserInfo();
 
-        ControllerTestHelper.AssertError(result, (int)Code.UNAUTHORIZED.Status, Code.UNAUTHORIZED.Code);
+        JObject body = ControllerTestHelper.AssertError(result, (int)Code.UNAUTHORIZED.Status, Code.UNAUTHORIZED.Code);
+        Assert.AreEqual("invalid_token", body.Value<string>("error"));
+        Assert.AreEqual(Code.UNAUTHORIZED.ErrorMessage, body.Value<string>("error_description"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+        StringAssert.Contains(httpContext.Response.Headers["WWW-Authenticate"].ToString(), "Bearer error=\"invalid_token\"");
     }
 
     /// <summary>
@@ -137,6 +148,11 @@ public sealed class UserInfoApiTests
 
         IActionResult result = await controller.GetUserInfo();
 
-        ControllerTestHelper.AssertError(result, (int)Code.UNAUTHORIZED.Status, Code.UNAUTHORIZED.Code);
+        JObject body = ControllerTestHelper.AssertError(result, (int)Code.UNAUTHORIZED.Status, Code.UNAUTHORIZED.Code);
+        Assert.AreEqual("invalid_token", body.Value<string>("error"));
+        Assert.AreEqual(Code.UNAUTHORIZED.ErrorMessage, body.Value<string>("error_description"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+        StringAssert.Contains(httpContext.Response.Headers["WWW-Authenticate"].ToString(), "Bearer error=\"invalid_token\"");
     }
 }

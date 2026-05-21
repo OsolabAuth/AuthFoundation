@@ -3,8 +3,8 @@ using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace AuthFoundationTest;
 
@@ -17,9 +17,6 @@ public sealed class LogoutApiTests
         AppConfigTestHelper.Initialize();
     }
 
-    /// <summary>
-    /// 検証項目: LogoutController のクラスルートは 1 つ（logout）で曖昧マッチの原因となる重複定義を持たないこと。
-    /// </summary>
     [TestMethod]
     public void LogoutController_ClassRoute_IsSingleLogoutTemplate()
     {
@@ -33,9 +30,6 @@ public sealed class LogoutApiTests
         Assert.AreEqual("logout", routeAttributes[0].Template);
     }
 
-    /// <summary>
-    /// 検証項目: POST /logout 正常系でAuthSession CookieとRedisセッションを削除し、指定Bearer Access Tokenを失効すること。
-    /// </summary>
     [TestMethod]
     public async Task PostLogout_LoggedInSession_DeletesCookiesAndRedisSessions()
     {
@@ -67,6 +61,8 @@ public sealed class LogoutApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual("logged_out", body.Value<string>("result"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsNull(await redis.GetStringAsync(AuthSession.GetRedisKey(loginSessionId)));
         Assert.IsNull(await redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN));
         string setCookie = string.Join("\n", httpContext.Response.Headers.SetCookie.ToArray());
@@ -74,9 +70,6 @@ public sealed class LogoutApiTests
         StringAssert.Contains(setCookie, "session_id=");
     }
 
-    /// <summary>
-    /// 検証項目: ログインセッションが存在しない場合も200でalready_logged_outを返すこと。
-    /// </summary>
     [TestMethod]
     public async Task PostLogout_NoLoginSession_ReturnsAlreadyLoggedOut()
     {
@@ -94,28 +87,28 @@ public sealed class LogoutApiTests
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual("already_logged_out", body.Value<string>("result"));
         Assert.AreEqual(true, body.Value<bool>("logout_all"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
-    /// <summary>
-    /// 検証項目: Content-Type不正時に設計書どおり00001を返すこと。
-    /// </summary>
     [TestMethod]
     public async Task PostLogout_InvalidContentType_ReturnsRequestParameterError()
     {
         var controller = new LogoutController(new FakeRedisClient());
         var httpContext = new DefaultHttpContext();
+        httpContext.Request.ContentType = "application/json";
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
         IActionResult result = await controller.PostLogout();
 
-        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
-    /// <summary>
-    /// 検証項目: logout_all未指定時に設計書どおり00001を返すこと。
-    /// </summary>
     [TestMethod]
-    public async Task PostLogout_MissingLogoutAll_ReturnsRequestParameterError()
+    public async Task PostLogout_MissingLogoutAll_DefaultsToFalse()
     {
         var controller = new LogoutController(new FakeRedisClient());
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>());
@@ -123,6 +116,46 @@ public sealed class LogoutApiTests
 
         IActionResult result = await controller.PostLogout();
 
-        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual("already_logged_out", body.Value<string>("result"));
+        Assert.AreEqual(false, body.Value<bool>("logout_all"));
+    }
+
+    [TestMethod]
+    public async Task PostLogout_NoContentType_DefaultsToFalse()
+    {
+        var controller = new LogoutController(new FakeRedisClient());
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Method = "POST";
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostLogout();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual("already_logged_out", body.Value<string>("result"));
+        Assert.AreEqual(false, body.Value<bool>("logout_all"));
+    }
+
+    [TestMethod]
+    public async Task PostLogout_InvalidBearerFormat_IgnoredAndSucceeds()
+    {
+        var controller = new LogoutController(new FakeRedisClient());
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["logout_all"] = "false"
+        });
+        httpContext.Request.Headers.Authorization = "Bearer invalid token format";
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostLogout();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual("already_logged_out", body.Value<string>("result"));
     }
 }

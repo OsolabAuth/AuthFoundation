@@ -81,10 +81,17 @@ namespace AuthFoundation.Controllers.Auth
                     claims[info.data_key] = info.data_value;
                 }
 
+                SetNoStoreHeaders(Response);
                 return Ok(claims);
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
+                if (ex.Status == Code.UNAUTHORIZED.Status)
+                {
+                    SetBearerErrorHeader(Response, "invalid_token", ex.ErrorMessage);
+                }
+
                 return new ObjectResult(new ErrorOutput(ex))
                 {
                     StatusCode = (int)ex.Status
@@ -93,11 +100,24 @@ namespace AuthFoundation.Controllers.Auth
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
                     StatusCode = (int)apiEx.Status
                 };
             }
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
+        }
+
+        private static void SetBearerErrorHeader(HttpResponse response, string error, string description)
+        {
+            string safeDescription = description.Replace("\"", "'", StringComparison.Ordinal);
+            response.Headers["WWW-Authenticate"] = $"Bearer error=\"{error}\", error_description=\"{safeDescription}\"";
         }
 
         /// <summary>         /// ErrorOutput class.         /// </summary>
@@ -107,12 +127,36 @@ namespace AuthFoundation.Controllers.Auth
             public string response_code { get; }
             /// <summary>             /// Gets or sets message.             /// </summary>
             public string message { get; }
+            public string error { get; }
+            public string error_description { get; }
 
             /// <summary>             /// Initializes a new instance of ErrorOutput.             /// </summary>
             public ErrorOutput(ApiException ex)
             {
                 response_code = ex.Code;
                 message = ex.ErrorMessage;
+                error = ToOAuthError(ex);
+                error_description = ex.ErrorMessage;
+            }
+
+            private static string ToOAuthError(ApiException ex)
+            {
+                if (string.Equals(ex.Code, Code.UNAUTHORIZED.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_token";
+                }
+
+                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_request";
+                }
+
+                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "server_error";
+                }
+
+                return "invalid_request";
             }
         }
     }

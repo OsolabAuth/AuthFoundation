@@ -53,6 +53,8 @@ public sealed class RevokeApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual("revoked", body.Value<string>("result"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsNull(await redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN));
     }
 
@@ -94,6 +96,8 @@ public sealed class RevokeApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual("revoked", body.Value<string>("result"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsNull(await redis.GetStringAsync(RefreshTokenSession.GetRedisKey(refreshToken), Code.RedisDbNo.REFRESH_TOKEN));
     }
 
@@ -131,6 +135,8 @@ public sealed class RevokeApiTests
         IActionResult result = await controller.PostRevoke();
 
         Assert.IsInstanceOfType<OkObjectResult>(result);
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsNull(await redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN));
     }
 
@@ -170,6 +176,8 @@ public sealed class RevokeApiTests
         IActionResult result = await controller.PostRevoke();
 
         Assert.IsInstanceOfType<OkObjectResult>(result);
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsNotNull(await redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN));
     }
 
@@ -196,7 +204,11 @@ public sealed class RevokeApiTests
 
         IActionResult result = await controller.PostRevoke();
 
-        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        StringAssert.Contains(body.Value<string>("error_description"), "token_type");
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     private static string BuildToken(string clientId)
@@ -204,4 +216,3 @@ public sealed class RevokeApiTests
         return $"{ApiTestData.NewOsolabId()}_{Helper.GenerateHex(32).ToLowerInvariant()}_{clientId}";
     }
 }
-

@@ -1,6 +1,7 @@
 using AuthFoundation.Common;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace AuthFoundation.Controllers.Auth
 {
@@ -50,14 +51,17 @@ namespace AuthFoundation.Controllers.Auth
                 string authorization = Request.Headers.Authorization.ToString();
                 if (!string.IsNullOrWhiteSpace(authorization))
                 {
-                    ValidateUtil.FormatParam(authorization, Code.HttpHeaders.AUTHORIZATION_BEARER.Key, Code.HttpHeaders.AUTHORIZATION_BEARER.Regex);
-                    string accessToken = authorization["Bearer ".Length..].Trim();
-                    await _redis.DeleteAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN);
+                    string accessToken = ExtractBearerToken(authorization);
+                    if (!string.IsNullOrWhiteSpace(accessToken))
+                    {
+                        await _redis.DeleteAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN);
+                    }
                 }
 
                 Response.Cookies.Delete(Code.AUTH_SESSION_COOKIE_KEY);
                 Response.Cookies.Delete(Code.AUTH_REQUEST_SESSION_COOKIE_KEY);
                 Response.Cookies.Delete("session_id");
+                SetNoStoreHeaders(Response);
 
                 return Ok(new
                 {
@@ -68,13 +72,34 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException aex)
             {
-                return new ObjectResult(new { response_code = aex.Code, message = aex.ErrorMessage }) { StatusCode = (int)aex.Status };
+                SetNoStoreHeaders(Response);
+                return new ObjectResult(new ErrorOutput(aex)) { StatusCode = (int)aex.Status };
             }
             catch (Exception ex)
             {
                 ApiException aex = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new { response_code = aex.Code, message = aex.ErrorMessage }) { StatusCode = (int)aex.Status };
+                SetNoStoreHeaders(Response);
+                return new ObjectResult(new ErrorOutput(aex)) { StatusCode = (int)aex.Status };
             }
+        }
+
+        private static string ExtractBearerToken(string authorization)
+        {
+            if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            string token = authorization["Bearer ".Length..].Trim();
+            return Regex.IsMatch(token, @"^[A-Za-z0-9._~-]{20,}$")
+                ? token
+                : string.Empty;
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
         }
 
         private sealed class Input
@@ -86,9 +111,19 @@ namespace AuthFoundation.Controllers.Auth
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
-                Helper.ValidateTypeFormUrlEncoded(request.ContentType);
-                IFormCollection form = await request.ReadFormAsync();
-                string logoutAll = form[Code.HttpBodies.LOGOUT_ALL.Key].ToString();
+                if (!string.IsNullOrWhiteSpace(request.ContentType)
+                    && !Helper.HasContentType(request.ContentType, Code.Content.TYPE_X_WWW_FORM))
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+                }
+
+                string logoutAll = string.Empty;
+                if (request.HasFormContentType)
+                {
+                    IFormCollection form = await request.ReadFormAsync();
+                    logoutAll = form[Code.HttpBodies.LOGOUT_ALL.Key].ToString();
+                }
+
                 return new Input
                 {
                     LogoutAllRaw = logoutAll,
@@ -98,8 +133,44 @@ namespace AuthFoundation.Controllers.Auth
 
             public void Validate()
             {
-                ValidateUtil.IndispensableParam(LogoutAllRaw, Code.HttpBodies.LOGOUT_ALL.Key);
+                if (string.IsNullOrWhiteSpace(LogoutAllRaw))
+                {
+                    LogoutAll = false;
+                    return;
+                }
+
                 ValidateUtil.FormatParam(LogoutAllRaw, Code.HttpBodies.LOGOUT_ALL.Key, Code.HttpBodies.LOGOUT_ALL.Regex);
+            }
+        }
+
+        private sealed class ErrorOutput
+        {
+            public string response_code { get; }
+            public string message { get; }
+            public string error { get; }
+            public string error_description { get; }
+
+            public ErrorOutput(ApiException ex)
+            {
+                response_code = ex.Code;
+                message = ex.ErrorMessage;
+                error = ToOAuthError(ex);
+                error_description = ex.ErrorMessage;
+            }
+
+            private static string ToOAuthError(ApiException ex)
+            {
+                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_request";
+                }
+
+                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "server_error";
+                }
+
+                return "invalid_request";
             }
         }
     }

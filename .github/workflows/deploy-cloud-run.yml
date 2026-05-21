@@ -114,12 +114,70 @@ jobs:
         if: ${{ inputs.deploy }}
         shell: bash
         run: |
+          trim_value() {
+            local value="${1:-}"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "${value}"
+          }
+
+          CLOUD_RUN_NETWORK="$(trim_value "${CLOUD_RUN_NETWORK}")"
+          CLOUD_RUN_SUBNET="$(trim_value "${CLOUD_RUN_SUBNET}")"
+          CLOUD_RUN_VPC_CONNECTOR="$(trim_value "${CLOUD_RUN_VPC_CONNECTOR}")"
+          CLOUD_RUN_NETWORK_TAGS="$(trim_value "${CLOUD_RUN_NETWORK_TAGS}")"
+
           env_updates="ASPNETCORE_ENVIRONMENT=Production,DisableHttpsRedirection=true"
           if [ -n "${AUTH_ISSUER}" ]; then
             env_updates="${env_updates},Issuer=${AUTH_ISSUER}"
           fi
           if [ -n "${CLOUD_RUN_UPDATE_ENV_VARS}" ]; then
             env_updates="${env_updates},${CLOUD_RUN_UPDATE_ENV_VARS}"
+          fi
+
+          if [ -n "${CLOUD_RUN_UPDATE_SECRETS}" ]; then
+            missing_secret_refs=()
+            IFS=',' read -r -a secret_mappings <<< "${CLOUD_RUN_UPDATE_SECRETS}"
+            for mapping in "${secret_mappings[@]}"; do
+              mapping="$(trim_value "${mapping}")"
+              [ -z "${mapping}" ] && continue
+
+              secret_reference="${mapping#*=}"
+              if [ -z "${secret_reference}" ] || [ "${secret_reference}" = "${mapping}" ]; then
+                continue
+              fi
+
+              secret_name_ref="${secret_reference%:*}"
+              secret_version="${secret_reference##*:}"
+              if [ -z "${secret_name_ref}" ]; then
+                continue
+              fi
+              if [ -z "${secret_version}" ] || [ "${secret_version}" = "${secret_name_ref}" ]; then
+                secret_version="latest"
+              fi
+
+              secret_project="${GCP_PROJECT_ID}"
+              secret_name="${secret_name_ref}"
+              if [[ "${secret_name_ref}" =~ ^projects/([^/]+)/secrets/([^/]+)/versions/([^/]+)$ ]]; then
+                secret_project="${BASH_REMATCH[1]}"
+                secret_name="${BASH_REMATCH[2]}"
+                secret_version="${BASH_REMATCH[3]}"
+              elif [[ "${secret_name_ref}" =~ ^projects/([^/]+)/secrets/([^/]+)$ ]]; then
+                secret_project="${BASH_REMATCH[1]}"
+                secret_name="${BASH_REMATCH[2]}"
+              fi
+
+              if ! gcloud secrets versions describe "${secret_version}" \
+                --secret "${secret_name}" \
+                --project "${secret_project}" >/dev/null 2>&1; then
+                missing_secret_refs+=("${secret_project}/${secret_name}:${secret_version}")
+              fi
+            done
+
+            if [ "${#missing_secret_refs[@]}" -gt 0 ]; then
+              echo "Required Cloud Run runtime secrets are missing:" >&2
+              printf '  - %s\n' "${missing_secret_refs[@]}" >&2
+              exit 1
+            fi
           fi
 
           deploy_args=(
@@ -157,27 +215,38 @@ jobs:
           fi
 
           if [ -n "${CLOUD_RUN_VPC_CONNECTOR}" ]; then
-            deploy_args+=(--clear-network)
+            deploy_args+=(--clear-network-tags)
             deploy_args+=(--vpc-connector "${CLOUD_RUN_VPC_CONNECTOR}")
             deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
-            if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
-              echo "CLOUD_RUN_NETWORK_TAGS is ignored when CLOUD_RUN_VPC_CONNECTOR is set." >&2
+            if [ -n "${CLOUD_RUN_NETWORK}" ] || [ -n "${CLOUD_RUN_SUBNET}" ]; then
+              echo "CLOUD_RUN_NETWORK and CLOUD_RUN_SUBNET are ignored when CLOUD_RUN_VPC_CONNECTOR is set." >&2
             fi
           else
             deploy_args+=(--clear-vpc-connector)
-            if [ -n "${CLOUD_RUN_NETWORK}" ]; then
+
+            if [ -n "${CLOUD_RUN_NETWORK}" ] && [ -z "${CLOUD_RUN_SUBNET}" ]; then
+              echo "CLOUD_RUN_SUBNET must be set when CLOUD_RUN_NETWORK is set." >&2
+              exit 1
+            fi
+
+            if [ -n "${CLOUD_RUN_SUBNET}" ] && [ -z "${CLOUD_RUN_NETWORK}" ]; then
+              echo "CLOUD_RUN_NETWORK must be set when CLOUD_RUN_SUBNET is set." >&2
+              exit 1
+            fi
+
+            if [ -n "${CLOUD_RUN_NETWORK}" ] && [ -n "${CLOUD_RUN_SUBNET}" ]; then
               deploy_args+=(--network "${CLOUD_RUN_NETWORK}")
-            fi
-
-            if [ -n "${CLOUD_RUN_SUBNET}" ]; then
               deploy_args+=(--subnet "${CLOUD_RUN_SUBNET}")
-            fi
-
-            if [ -n "${CLOUD_RUN_NETWORK}" ] || [ -n "${CLOUD_RUN_SUBNET}" ]; then
               deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
-            fi
-            if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
+              if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
+                deploy_args+=(--network-tags "${CLOUD_RUN_NETWORK_TAGS}")
+              else
+                deploy_args+=(--clear-network-tags)
+              fi
+            elif [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
               deploy_args+=(--network-tags "${CLOUD_RUN_NETWORK_TAGS}")
+            else
+              deploy_args+=(--clear-network)
             fi
           fi
 
