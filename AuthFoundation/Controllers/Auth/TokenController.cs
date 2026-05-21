@@ -81,6 +81,7 @@ namespace AuthFoundation.Controllers.Auth
                 string idToken = await _oidcSigningService.CreateIdTokenAsync(codeSession, Helper.ParseScopes(codeSession.Scope));
 
                 await codeSession.DeleteSessionAsync(_redis);
+                SetNoStoreHeaders(Response);
 
                 return Ok(new
                 {
@@ -96,6 +97,7 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex))
                 {
                     StatusCode = (int)ex.Status
@@ -104,11 +106,18 @@ namespace AuthFoundation.Controllers.Auth
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
                     StatusCode = (int)apiEx.Status
                 };
             }
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
         }
 
         private string ValidateClient(Input input)
@@ -240,11 +249,41 @@ namespace AuthFoundation.Controllers.Auth
         {
             public string response_code { get; }
             public string message { get; }
+            public string error { get; }
+            public string error_description { get; }
 
             public ErrorOutput(ApiException ex)
             {
                 response_code = ex.Code;
                 message = ex.ErrorMessage;
+                error = ToOAuthError(ex);
+                error_description = ex.ErrorMessage;
+            }
+
+            private static string ToOAuthError(ApiException ex)
+            {
+                if (string.Equals(ex.Code, Code.ILLEGAL_CLIENT.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_client";
+                }
+
+                if (string.Equals(ex.Code, Code.INVALID_AUTH_CODE.Code, StringComparison.Ordinal)
+                    || string.Equals(ex.Code, Code.ILLEGAL_REDIRECT_URI.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_grant";
+                }
+
+                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_request";
+                }
+
+                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "server_error";
+                }
+
+                return "invalid_request";
             }
         }
     }

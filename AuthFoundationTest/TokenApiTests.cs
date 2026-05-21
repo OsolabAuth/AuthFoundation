@@ -67,6 +67,8 @@ public sealed class TokenApiTests
         Assert.IsTrue(Regex.IsMatch(body.Value<string>("access_token")!, @"^[A-Fa-f0-9]{16}_[A-Fa-f0-9]{32}_[0-9]{32}$"));
         Assert.IsTrue(Regex.IsMatch(body.Value<string>("refresh_token")!, @"^[A-Fa-f0-9]{16}_[A-Fa-f0-9]{32}_[0-9]{32}$"));
         Assert.AreEqual(3, body.Value<string>("id_token")!.Split('.').Length);
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsNull(await redis.GetStringAsync(AuthCodeSession.GetRedisKey(codeSession.Code), Code.RedisDbNo.AUTHORIZATION_CODE));
         Assert.IsFalse(string.IsNullOrWhiteSpace(await redis.GetStringAsync(AccessTokenSession.GetRedisKey(body.Value<string>("access_token")!), Code.RedisDbNo.ACCESS_TOKEN)));
         Assert.IsFalse(string.IsNullOrWhiteSpace(await redis.GetStringAsync(RefreshTokenSession.GetRedisKey(body.Value<string>("refresh_token")!), Code.RedisDbNo.REFRESH_TOKEN)));
@@ -243,6 +245,9 @@ public sealed class TokenApiTests
 
         IActionResult result = await controller.PostToken();
 
-        ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_CLIENT.Status, Code.ILLEGAL_CLIENT.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_CLIENT.Status, Code.ILLEGAL_CLIENT.Code);
+        Assert.AreEqual("invalid_client", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 }

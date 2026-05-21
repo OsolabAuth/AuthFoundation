@@ -111,6 +111,60 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
+        /// ログイン状態を返します。
+        /// </summary>
+        /// <returns>ログイン状態</returns>
+        [HttpGet("status")]
+        public async Task<IActionResult> GetStatus()
+        {
+            try
+            {
+                string? loginSessionId = AuthSession.GetCookieSessionId(Request);
+                if (string.IsNullOrWhiteSpace(loginSessionId))
+                {
+                    return Ok(new
+                    {
+                        response_code = Code.SUCCESS.Code,
+                        logged_in = false
+                    });
+                }
+
+                AuthSession session = new AuthSession();
+                string? raw = await session.ReadValueFromRedisAsync(_redis, loginSessionId);
+                bool loggedIn = !string.IsNullOrWhiteSpace(raw) && session.SetValue(raw);
+
+                return Ok(new
+                {
+                    response_code = Code.SUCCESS.Code,
+                    logged_in = loggedIn
+                });
+            }
+            catch (ApiException ex)
+            {
+                return new ObjectResult(new
+                {
+                    response_code = ex.Code,
+                    message = ex.ErrorMessage
+                })
+                {
+                    StatusCode = (int)ex.Status
+                };
+            }
+            catch (Exception ex)
+            {
+                ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                return new ObjectResult(new
+                {
+                    response_code = apiEx.Code,
+                    message = apiEx.ErrorMessage
+                })
+                {
+                    StatusCode = (int)apiEx.Status
+                };
+            }
+        }
+
+        /// <summary>
         /// ログイン入力を表します。
         /// </summary>
         public sealed class Input

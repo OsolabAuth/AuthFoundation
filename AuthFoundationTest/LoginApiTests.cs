@@ -219,5 +219,89 @@ public sealed class LoginApiTests
 
         ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
     }
+
+    /// <summary>
+    /// 検証項目: GET /login/status が有効なAuthSession Cookie時に logged_in=true を返すこと。
+    /// </summary>
+    [TestMethod]
+    public async Task GetStatus_WithValidSession_ReturnsLoggedInTrue()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        string loginSessionId = await ApiTestData.WriteLoginSessionAsync(
+            redis,
+            ApiTestData.NewOsolabId(),
+            $"status-{Guid.NewGuid():N}@example.com");
+
+        var controller = new LoginController(
+            context,
+            redis,
+            new TestWebHostEnvironment(),
+            new AuthorizeExecutionService(context, redis));
+        var httpContext = new DefaultHttpContext();
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_SESSION_COOKIE_KEY, loginSessionId);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.GetStatus();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual(true, body.Value<bool>("logged_in"));
+    }
+
+    /// <summary>
+    /// 検証項目: GET /login/status がセッション未指定時に logged_in=false を返すこと。
+    /// </summary>
+    [TestMethod]
+    public async Task GetStatus_WithoutSession_ReturnsLoggedInFalse()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        var controller = new LoginController(
+            context,
+            redis,
+            new TestWebHostEnvironment(),
+            new AuthorizeExecutionService(context, redis));
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        IActionResult result = await controller.GetStatus();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual(false, body.Value<bool>("logged_in"));
+    }
+
+    /// <summary>
+    /// 検証項目: GET /login/status が不正セッション時に logged_in=false を返すこと。
+    /// </summary>
+    [TestMethod]
+    public async Task GetStatus_InvalidSession_ReturnsLoggedInFalse()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        var controller = new LoginController(
+            context,
+            redis,
+            new TestWebHostEnvironment(),
+            new AuthorizeExecutionService(context, redis));
+        var httpContext = new DefaultHttpContext();
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_SESSION_COOKIE_KEY, "missing-session");
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.GetStatus();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual(false, body.Value<bool>("logged_in"));
+    }
 }
 
