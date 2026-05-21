@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
@@ -21,7 +21,7 @@ public sealed class AuthorizeApiTests
     /// 検証項目: GET /authorize 未ログイン正常系で認可セッションをRedisへ保存し、body modeではredirect_urlからsession_idを除去しCookieへ設定すること。
     /// </summary>
     [TestMethod]
-    public async Task GetAuthorize_AnonymousUser_ReturnsLoginRedirectBodyAndStoresAuthorizationSession()
+    public async Task GetAuthorize_AnonymousUser_ReturnsLoginRedirectBodyAndStoresAuthRequestSession()
     {
         await using var context = TestDbContextFactory.Create();
         await ApiTestData.AssertDatabaseAvailableAsync(context);
@@ -54,10 +54,10 @@ public sealed class AuthorizeApiTests
         Assert.IsFalse(body.Value<string>("redirect_url")!.Contains("session_id=", StringComparison.OrdinalIgnoreCase));
         Assert.AreEqual(sessionId, ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, "session_id"));
 
-        string? stored = await redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
+        string? stored = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(sessionId));
         Assert.IsFalse(string.IsNullOrWhiteSpace(stored));
 
-        var saved = new AuthorizationSession();
+        var saved = new AuthRequestSession();
         Assert.IsTrue(saved.SetValue(stored!));
         Assert.AreEqual(Code.InnerClient.OSOLAB_CLIENT_ID, saved.ClientId);
         Assert.AreEqual("openid email profile", saved.Scope);
@@ -252,3 +252,4 @@ public sealed class AuthorizeApiTests
         return string.Empty;
     }
 }
+

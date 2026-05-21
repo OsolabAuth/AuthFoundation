@@ -10,5 +10,5 @@
   "CLOUD_RUN_NETWORK": "",
   "CLOUD_RUN_SUBNET": "",
   "CLOUD_RUN_VPC_CONNECTOR": "auth-svpc-connector",
-  "CLOUD_RUN_UPDATE_SECRETS": "ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,JwkPrivateKeyEncryptionKey=auth-jwk-encryption-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest"
+  "CLOUD_RUN_UPDATE_SECRETS": "ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,JwkPrivateKeyEncryptionKey=auth-jwk-encryption-key:latest,Mail__FromEmail=auth-mail-from-email:latest,GmailSmtp__Username=auth-gmail-smtp-username:latest,GmailSmtp__AppPassword=auth-gmail-smtp-app-password:latest"
 }

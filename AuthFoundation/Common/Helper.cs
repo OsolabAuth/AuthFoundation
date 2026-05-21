@@ -1,4 +1,4 @@
-using AuthFoundation.Data;
+﻿using AuthFoundation.Data;
 using AuthFoundation.Models;
 using Konscious.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
@@ -283,7 +283,7 @@ namespace AuthFoundation.Common
         /// </summary>
         /// <param name="mailaddress">メールアドレス</param>
         /// <returns></returns>
-        public static async Task<string> SendMailAsync(BrevoMail brevo, string mailaddress)
+        public static async Task<string> SendMailAsync(GmailSmtpMail mailSender, string mailaddress)
         {
             // ダミーアドレス
             if (Regex.IsMatch(mailaddress, Code.HttpBodies.DUMMY_EMAIL.Regex))
@@ -315,10 +315,11 @@ namespace AuthFoundation.Common
 </body>
 </html>";
 
-            await brevo.SendMailAsync(mailaddress, string.Empty, subject, html);
+            await mailSender.SendMailAsync(mailaddress, string.Empty, subject, html);
 
             return code;
         }
 
     }
 }
+

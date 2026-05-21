@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
@@ -77,7 +77,7 @@ public sealed class LoginApiTests
     /// 検証項目: POST /login でCookieのsession_idを認可セッションとして使用し、ログイン後に同意画面へのLocationを返すこと。
     /// </summary>
     [TestMethod]
-    public async Task PostLogin_WithAuthorizationSessionCookie_ReturnsRedirectResult()
+    public async Task PostLogin_WithAuthRequestSessionCookie_ReturnsRedirectResult()
     {
         await using var context = TestDbContextFactory.Create();
         await ApiTestData.AssertDatabaseAvailableAsync(context);
@@ -89,9 +89,9 @@ public sealed class LoginApiTests
 
         var redis = new FakeRedisClient();
         string authzSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
-        await ApiTestData.WriteAuthorizationSessionAsync(
+        await ApiTestData.WriteAuthRequestSessionAsync(
             redis,
-            ApiTestData.CreateAuthorizationSession(authzSessionId, Code.InnerClient.OSOLAB_CLIENT_ID, "https://portal.osolab-auth.jp/callback", "openid"));
+            ApiTestData.CreateAuthRequestSession(authzSessionId, Code.InnerClient.OSOLAB_CLIENT_ID, "https://portal.osolab-auth.jp/callback", "openid"));
 
         try
         {
@@ -116,8 +116,8 @@ public sealed class LoginApiTests
             Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
             StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{AppConfig.AuthUiBaseUrl}/terms?session_id=");
 
-            string? storedAuthz = await redis.GetStringAsync(AuthorizationSession.GetRedisKey(authzSessionId));
-            var authz = new AuthorizationSession();
+            string? storedAuthz = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(authzSessionId));
+            var authz = new AuthRequestSession();
             Assert.IsTrue(authz.SetValue(storedAuthz!));
             Assert.AreEqual(osolabId, authz.OsolabId);
         }
@@ -220,3 +220,4 @@ public sealed class LoginApiTests
         ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
     }
 }
+

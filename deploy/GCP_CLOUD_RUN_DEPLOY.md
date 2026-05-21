@@ -215,7 +215,7 @@ CLOUD_RUN_VPC_EGRESS=private-ranges-only
 
 ## 4. Runtime secrets を Secret Manager に作る
 
-DB password、Redis 接続先、Brevo API key、`PasswordHashKey`、`JwkPrivateKeyEncryptionKey` は GitHub Secrets ではなく GCP Secret Manager に置きます。
+DB password、Redis 接続先、Gmail SMTP 設定、`PasswordHashKey`、`JwkPrivateKeyEncryptionKey` は GitHub Secrets ではなく GCP Secret Manager に置きます。
 
 Cloud Shell で実行例:
 
@@ -225,8 +225,9 @@ DATA_SERVER_INTERNAL_IP=<data-server-internal-ip>
 MSSQL_PASSWORD='<sqlserver-password>'
 PASSWORD_HASH_KEY='<production-password-hash-key>'
 JWK_PRIVATE_KEY_ENCRYPTION_KEY='<production-jwk-encryption-key>'
-BREVO_API_KEY='<brevo-api-key>'
-BREVO_SENDER_EMAIL='<sender-email>'
+MAIL_FROM_EMAIL='<sender-email>'
+GMAIL_SMTP_USERNAME='<smtp-username>'
+GMAIL_SMTP_APP_PASSWORD='<gmail-app-password>'
 
 printf 'Server=%s,1433;Database=OsolabAuth;User ID=sa;Password=%s;TrustServerCertificate=True' \
   "${DATA_SERVER_INTERNAL_IP}" \
@@ -254,14 +255,20 @@ printf '%s' "${JWK_PRIVATE_KEY_ENCRYPTION_KEY}" \
     --replication-policy=automatic \
     --data-file=-
 
-printf '%s' "${BREVO_API_KEY}" \
-  | gcloud secrets create brevo-api-key \
+printf '%s' "${MAIL_FROM_EMAIL}" \
+  | gcloud secrets create auth-mail-from-email \
     --project="${PROJECT_ID}" \
     --replication-policy=automatic \
     --data-file=-
 
-printf '%s' "${BREVO_SENDER_EMAIL}" \
-  | gcloud secrets create brevo-sender-email \
+printf '%s' "${GMAIL_SMTP_USERNAME}" \
+  | gcloud secrets create auth-gmail-smtp-username \
+    --project="${PROJECT_ID}" \
+    --replication-policy=automatic \
+    --data-file=-
+
+printf '%s' "${GMAIL_SMTP_APP_PASSWORD}" \
+  | gcloud secrets create auth-gmail-smtp-app-password \
     --project="${PROJECT_ID}" \
     --replication-policy=automatic \
     --data-file=-
@@ -292,7 +299,7 @@ GitHub Variables に `CLOUD_RUN_UPDATE_SECRETS` を追加します。
 ここには secret の値ではなく、Secret Manager の secret 名を書きます。
 
 ```text
-CLOUD_RUN_UPDATE_SECRETS=ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,JwkPrivateKeyEncryptionKey=auth-jwk-encryption-key:latest,Brevo__ApiKey=brevo-api-key:latest,Brevo__SenderEmail=brevo-sender-email:latest
+CLOUD_RUN_UPDATE_SECRETS=ConnectionStrings__DefaultConnection=auth-db-connection:latest,ConnectionStrings__Redis=auth-redis-connection:latest,PasswordHashKey=auth-password-hash-key:latest,JwkPrivateKeyEncryptionKey=auth-jwk-encryption-key:latest,Mail__FromEmail=auth-mail-from-email:latest,GmailSmtp__Username=auth-gmail-smtp-username:latest,GmailSmtp__AppPassword=auth-gmail-smtp-app-password:latest
 ```
 
 ## 5. Firewall

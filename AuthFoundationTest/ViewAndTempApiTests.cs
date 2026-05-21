@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Http;
@@ -54,9 +54,9 @@ public sealed class ViewAndTempApiTests
 
         var redis = new FakeRedisClient();
         string sessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
-        await ApiTestData.WriteAuthorizationSessionAsync(
+        await ApiTestData.WriteAuthRequestSessionAsync(
             redis,
-            ApiTestData.CreateAuthorizationSession(sessionId, clientId, "https://portal.osolab-auth.jp/callback", "openid"));
+            ApiTestData.CreateAuthRequestSession(sessionId, clientId, "https://portal.osolab-auth.jp/callback", "openid"));
 
         var controller = new TermController(
             context,
@@ -100,3 +100,4 @@ public sealed class ViewAndTempApiTests
         CollectionAssert.Contains(body["client_scope"]!.Values<string>().ToArray(), Code.Scope.OPENID);
     }
 }
+

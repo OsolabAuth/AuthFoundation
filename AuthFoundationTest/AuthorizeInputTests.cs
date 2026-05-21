@@ -1,4 +1,4 @@
-using AuthFoundation.Controllers.Auth;
+﻿using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Http;
 
@@ -8,10 +8,10 @@ namespace AuthFoundationTest;
 public sealed class AuthorizeInputTests
 {
     /// <summary>
-    /// 検証項目: 認可リクエストQueryをInputへ読み込み、AuthorizationSessionへ正しく変換できること。
+    /// 検証項目: 認可リクエストQueryをInputへ読み込み、AuthRequestSessionへ正しく変換できること。
     /// </summary>
     [TestMethod]
-    public void Create_ReadsAuthorizeQueryAndBuildsAuthorizationSession()
+    public void Create_ReadsAuthorizeQueryAndBuildsAuthRequestSession()
     {
         var context = new DefaultHttpContext();
         context.Request.QueryString = QueryString.Create(new Dictionary<string, string?>
@@ -28,7 +28,7 @@ public sealed class AuthorizeInputTests
 
         AuthorizeController.Input input = AuthorizeController.Input.Create(context);
         input.Validate();
-        AuthorizationSession session = input.ToAuthorizationSession();
+        AuthRequestSession session = input.ToAuthRequestSession();
 
         Assert.AreEqual("code", session.ResponseType);
         Assert.AreEqual("12345678901234567890123456789012", session.ClientId);
@@ -58,3 +58,4 @@ public sealed class AuthorizeInputTests
         input.Validate();
     }
 }
+

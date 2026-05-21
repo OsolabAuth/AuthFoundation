@@ -147,14 +147,14 @@ namespace AuthFoundation.Common
                 return AppConfig.RedisDbRefreshToken;
             }
 
-            if (key.StartsWith(AuthorizationSession.RedisKeyPrefix, StringComparison.Ordinal))
+            if (key.StartsWith(AuthRequestSession.RedisKeyPrefix, StringComparison.Ordinal))
             {
-                return AppConfig.RedisDbAuthorizationSession;
+                return AppConfig.RedisDbAuthRequestSession;
             }
 
-            if (key.StartsWith(MailVerificationSession.RedisKeyPrefix, StringComparison.Ordinal))
+            if (key.StartsWith(SignupSession.RedisKeyPrefix, StringComparison.Ordinal))
             {
-                return AppConfig.RedisDbMailVerification;
+                return AppConfig.RedisDbSignupSession;
             }
 
             if (key.StartsWith(Code.Revocation.ID_TOKEN_PREFIX, StringComparison.Ordinal))
@@ -179,3 +179,4 @@ namespace AuthFoundation.Common
         }
     }
 }
+

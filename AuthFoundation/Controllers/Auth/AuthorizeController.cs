@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
@@ -40,9 +40,9 @@ namespace AuthFoundation.Controllers.Auth
 
                 Helper.CertAuthorizeClient(_dbContext, input.ClientId, input.RedirectUri);
 
-                AuthorizationSession session = input.ToAuthorizationSession();
+                AuthRequestSession session = input.ToAuthRequestSession();
                 string location = await _authorizeExecutionService.ExecuteAsync(session, AuthSession.GetCookieSessionId(Request));
-                AppendAuthorizationSessionCookieIfPresent(Response, location);
+                AppendAuthRequestSessionCookieIfPresent(Response, location);
                 if (ShouldReturnBodySession(Request))
                 {
                     return Ok(new
@@ -82,7 +82,7 @@ namespace AuthFoundation.Controllers.Auth
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void AppendAuthorizationSessionCookieIfPresent(HttpResponse response, string location)
+        private static void AppendAuthRequestSessionCookieIfPresent(HttpResponse response, string location)
         {
             string sessionId = ExtractSessionId(location);
             if (string.IsNullOrWhiteSpace(sessionId))
@@ -190,9 +190,9 @@ namespace AuthFoundation.Controllers.Auth
             /// 認可セッションへ変換します。
             /// </summary>
             /// <returns>認可セッション</returns>
-            public AuthorizationSession ToAuthorizationSession()
+            public AuthRequestSession ToAuthRequestSession()
             {
-                return new AuthorizationSession
+                return new AuthRequestSession
                 {
                     ResponseType = ResponseType,
                     ClientId = ClientId,
@@ -229,3 +229,4 @@ namespace AuthFoundation.Controllers.Auth
         }
     }
 }
+

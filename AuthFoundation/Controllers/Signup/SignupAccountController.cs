@@ -1,51 +1,41 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
-using System.Net.Mail;
-using System.Text.RegularExpressions;
 
 namespace AuthFoundation.Controllers.Signup
 {
     /// <summary>
-    /// サインアップ仮登録を処理します。
+    /// サインアップ本登録を処理します。
     /// </summary>
     [ApiController]
-    [Route("Signup/Account")]
+    [Route("signup/account")]
     public class SignupAccountController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
-        private readonly IWebHostEnvironment _environment;
-        private readonly BrevoMail _brevoMail;
+        private readonly AuthorizeExecutionService _authorizeExecutionService;
         private readonly ILogger<SignupAccountController> _logger;
 
         /// <summary>
         /// SignupAccountController を初期化します。
         /// </summary>
-        /// <param name="dbContext">DBコンテキスト</param>
-        /// <param name="redis">Redis クライアント</param>
-        /// <param name="environment">ホスティング環境</param>
-        /// <param name="brevoMail">メールクライアント</param>
         public SignupAccountController(
             OsolabAuthContext dbContext,
             IRedisClient redis,
-            IWebHostEnvironment environment,
-            BrevoMail brevoMail,
+            AuthorizeExecutionService authorizeExecutionService,
             ILogger<SignupAccountController> logger)
         {
             _dbContext = dbContext;
             _redis = redis;
-            _environment = environment;
-            _brevoMail = brevoMail;
+            _authorizeExecutionService = authorizeExecutionService;
             _logger = logger;
         }
 
         /// <summary>
-        /// 仮登録を作成します。
+        /// 本登録を作成します。
         /// </summary>
-        /// <returns>確認メール用 URL</returns>
         [HttpPost(Name = "PostSignupAccount")]
         public async Task<IActionResult> PostAccount()
         {
@@ -54,51 +44,33 @@ namespace AuthFoundation.Controllers.Signup
                 Input input = await Input.CreateAsync(Request.HttpContext);
                 input.ValidationCheck();
 
-                AuthorizationSession authz = await GetAuthorizationSessionAsync(input.SessionId);
-                Helper.CertClient(_dbContext, authz.ClientId);
-
-                osolab_user user;
-                osolab_user? currentUser = _dbContext.osolab_users.FirstOrDefault(x =>
-                    x.email == input.Body.Email &&
-                    x.status != Code.Status.INACTIVE);
-                if (currentUser is not null && currentUser.status == Code.Status.ACTIVE)
+                SignupSession verify = await GetSignupSessionAsync(input.SignupSessionId);
+                if (!verify.Verified)
                 {
-                    // 有効な正規メンバーが存在する場合エラー
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification is not completed");
                 }
 
-                if (currentUser is not null && currentUser.status == Code.Status.TENTATIVE)
-                {
-                    // 有効な仮メンバーが存在する場合は、パスワードの一致を確認、不一致の場合エラー
-                    string inputPassHash = Helper.GetPassHash(input.Body.Password, currentUser.nonce);
-                    if (!Helper.IsSameValue(currentUser.password, inputPassHash))
-                    {
-                        throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
-                    }
-                    user = currentUser;
-                }
-                else
-                {
-                    // 有効なメンバーが存在しない場合は、新規で仮会員登録
-                    user = TableHelper.CreateNewOsolabUser(_dbContext, input.Body.Email, input.Body.Password);
-                    user.status = Code.Status.TENTATIVE;
-                    _dbContext.Add(user);
-                    _dbContext.SaveChanges();
-                }
-                string code = await Helper.SendMailAsync(_brevoMail, user.email);
+                osolab_user user = RegisterOrUpdateUser(verify.Email, input.Password);
+                await _redis.DeleteAsync(SignupSession.GetRedisKey(verify.SignupSessionId), Code.RedisDbNo.SIGNUP_SESSION);
 
-                MailVerificationSession verify = new MailVerificationSession
-                {
-                    VerificationToken = Helper.GenerateRandomCode(48, Code.AuthCode.CHARACTORS),
-                    OsolabId = user.osolab_id,
-                    Email = user.email,
-                    Code = code,
-                    SessionId = input.SessionId
-                };
-                await verify.CreateSession(_redis);
+                string loginSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
+                AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);
+                await loginSession.WriteToRedisAsync(_redis);
+                loginSession.AppendCookie(Response);
 
-                string verifyUrl = $"/Signup/Verify?token={Uri.EscapeDataString(verify.VerificationToken)}";
-                return Ok(new Output(verifyUrl));
+                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.AuthRequestSessionId, loginSessionId);
+                if (string.IsNullOrWhiteSpace(location))
+                {
+                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                }
+
+                Response.Headers.Location = location;
+                return Ok(new Output
+                {
+                    result = "redirect",
+                    response_code = Code.SUCCESS.Code,
+                    message = Code.SUCCESS.ErrorMessage
+                });
             }
             catch (ApiException aex)
             {
@@ -120,53 +92,56 @@ namespace AuthFoundation.Controllers.Signup
             }
         }
 
-        /// <summary>
-        /// 認可セッションを取得します。
-        /// </summary>
-        /// <param name="sessionId">認可セッションID</param>
-        /// <returns>認可セッション</returns>
-        /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
-        private async Task<AuthorizationSession> GetAuthorizationSessionAsync(string sessionId)
+        private osolab_user RegisterOrUpdateUser(string email, string password)
         {
-            AuthorizationSession session = new AuthorizationSession();
-            string? raw = await session.ReadValueFromRedisAsync(_redis, sessionId);
-            if (string.IsNullOrWhiteSpace(raw))
+            osolab_user? currentUser = _dbContext.osolab_users.FirstOrDefault(x =>
+                x.email == email &&
+                x.status != Code.Status.INACTIVE);
+            if (currentUser is not null && currentUser.status == Code.Status.ACTIVE)
             {
-                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "email is already in use");
             }
 
-            if (!session.SetValue(raw))
+            osolab_user user = currentUser ?? TableHelper.CreateNewOsolabUser(_dbContext, email, password);
+            if (currentUser is null)
             {
-                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                _dbContext.Add(user);
             }
 
-            return session;
+            string nonce = Helper.GenerateRandomCode(Code.Nonce.LENGTH, Code.Nonce.CHARACTORS);
+            user.nonce = nonce;
+            user.password = Helper.GetPassHash(password, nonce);
+            user.status = Code.Status.ACTIVE;
+            user.update_datetime = DateTime.UtcNow;
+
+            _dbContext.SaveChanges();
+            return user;
+        }
+
+        private async Task<SignupSession> GetSignupSessionAsync(string signupSessionId)
+        {
+            SignupSession verify = new SignupSession();
+            string? raw = await verify.ReadValueFromRedisAsync(_redis, signupSessionId);
+            if (string.IsNullOrWhiteSpace(raw) || !verify.SetValue(raw))
+            {
+                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification session is invalid");
+            }
+
+            return verify;
         }
 
         /// <summary>
         /// サインアップ入力を表します。
         /// </summary>
-        public class Input
+        public sealed class Input
         {
-            public string SessionId { get; set; } = string.Empty;
+            public string SignupSessionId { get; set; } = string.Empty;
 
-            public JsonBody Body { get; set; } = new JsonBody();
-
-            /// <summary>
-            /// 入力ボディを表します。
-            /// </summary>
-            public class JsonBody
-            {
-                public string Email { get; set; } = string.Empty;
-
-                public string Password { get; set; } = string.Empty;
-            }
+            public string Password { get; set; } = string.Empty;
 
             /// <summary>
             /// HTTP リクエストから入力を生成します。
             /// </summary>
-            /// <param name="context">HTTP コンテキスト</param>
-            /// <returns>サインアップ入力</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -174,12 +149,8 @@ namespace AuthFoundation.Controllers.Signup
                 IFormCollection form = await request.ReadFormAsync();
                 return new Input
                 {
-                    SessionId = Helper.GetSessionId(request, form),
-                    Body = new JsonBody
-                    {
-                        Email = form["email"].ToString(),
-                        Password = form["password"].ToString()
-                    }
+                    SignupSessionId = GetSignupSessionId(request, form),
+                    Password = form["password"].ToString()
                 };
             }
 
@@ -188,46 +159,53 @@ namespace AuthFoundation.Controllers.Signup
             /// </summary>
             public void ValidationCheck()
             {
-                ValidateUtil.IndispensableParam(SessionId, Code.HttpBodies.SESSION_ID.Key);
-                ValidateUtil.FormatParam(SessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
-                ValidateUtil.IndispensableParam(Body.Email, Code.HttpBodies.EMAIL.Key);
-                ValidateUtil.FormatParam(Body.Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
-                ValidateUtil.IndispensableParam(Body.Password, Code.HttpBodies.PASSWORD.Key);
-                ValidateUtil.FormatParam(Body.Password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
+                ValidateUtil.IndispensableParam(SignupSessionId, "signup_session_id");
+                ValidateUtil.FormatParam(SignupSessionId, "signup_session_id", Code.HttpBodies.SESSION_ID.Regex);
+                ValidateUtil.IndispensableParam(Password, Code.HttpBodies.PASSWORD.Key);
+                ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
+            }
+
+            private static string GetSignupSessionId(HttpRequest request, IFormCollection form)
+            {
+                string sessionId = form["signup_session_id"].ToString();
+                if (!string.IsNullOrWhiteSpace(sessionId))
+                {
+                    return sessionId;
+                }
+
+                sessionId = request.Headers["x-signup-session-id"].ToString();
+                if (!string.IsNullOrWhiteSpace(sessionId))
+                {
+                    return sessionId;
+                }
+
+                return request.Cookies["signup_session_id"] ?? string.Empty;
             }
         }
 
         /// <summary>
         /// サインアップ応答を表します。
         /// </summary>
-        private class Output
+        private sealed class Output
         {
-            public string StatusCode { get; }
+            public string? result { get; set; }
 
-            public string Message { get; }
+            public string? response_code { get; set; }
 
-            public string? VerifyUrl { get; }
+            public string? message { get; set; }
 
-            /// <summary>
-            /// エラー応答を初期化します。
-            /// </summary>
-            /// <param name="ex">API 例外</param>
-            public Output(ApiException ex)
+            public Output()
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
             }
 
-            /// <summary>
-            /// 正常応答を初期化します。
-            /// </summary>
-            /// <param name="verifyUrl">確認 URL</param>
-            public Output(string verifyUrl)
+            public Output(ApiException ex)
             {
-                StatusCode = Code.SUCCESS.Code;
-                Message = Code.SUCCESS.ErrorMessage;
-                VerifyUrl = verifyUrl;
+                result = "error";
+                response_code = ex.Code;
+                message = ex.ErrorMessage;
             }
         }
     }
 }
+
+

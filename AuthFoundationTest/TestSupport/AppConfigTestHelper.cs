@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using Microsoft.Extensions.Configuration;
 
 namespace AuthFoundationTest.TestSupport;
@@ -20,8 +20,8 @@ internal static class AppConfigTestHelper
             ["RedisDb_AuthCode"] = "2",
             ["RedisDb_AccessToken"] = "3",
             ["RedisDb_RefreshToken"] = "4",
-            ["RedisDb_AuthorizationSession"] = "6",
-            ["RedisDb_MailVerification"] = "7",
+            ["RedisDb_AuthRequestSession"] = "6",
+            ["RedisDb_SignupSession"] = "7",
             ["RedisDb_IdTokenRevocation"] = "8",
             ["RedisDb_LogoutAllRevocation"] = "9"
         };
@@ -33,3 +33,4 @@ internal static class AppConfigTestHelper
         AppConfig.Initialize(config);
     }
 }
+

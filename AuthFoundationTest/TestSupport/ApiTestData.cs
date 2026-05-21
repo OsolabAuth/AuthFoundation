@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
@@ -166,14 +166,14 @@ internal static class ApiTestData
         return term;
     }
 
-    public static AuthorizationSession CreateAuthorizationSession(
+    public static AuthRequestSession CreateAuthRequestSession(
         string sessionId,
         string clientId,
         string redirectUri,
         string scope = "openid email",
         string osolabId = "")
     {
-        return new AuthorizationSession
+        return new AuthRequestSession
         {
             SessionId = sessionId,
             ResponseType = "code",
@@ -188,9 +188,9 @@ internal static class ApiTestData
         };
     }
 
-    public static async Task<string> WriteAuthorizationSessionAsync(
+    public static async Task<string> WriteAuthRequestSessionAsync(
         FakeRedisClient redis,
-        AuthorizationSession session)
+        AuthRequestSession session)
     {
         await session.WriteToRedisAsync(redis);
         return session.SessionId;
@@ -208,3 +208,4 @@ internal static class ApiTestData
         return sessionId;
     }
 }
+

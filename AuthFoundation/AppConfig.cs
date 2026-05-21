@@ -68,13 +68,13 @@ namespace AuthFoundation.Common
         /// </summary>
         public static int RedisDbRefreshToken { get; private set; } = 4;
         /// <summary>
-        /// Gets or sets RedisDbAuthorizationSession.
+        /// Gets or sets RedisDbAuthRequestSession.
         /// </summary>
-        public static int RedisDbAuthorizationSession { get; private set; } = 6;
+        public static int RedisDbAuthRequestSession { get; private set; } = 6;
         /// <summary>
-        /// Gets or sets RedisDbMailVerification.
+        /// Gets or sets RedisDbSignupSession.
         /// </summary>
-        public static int RedisDbMailVerification { get; private set; } = 7;
+        public static int RedisDbSignupSession { get; private set; } = 7;
         /// <summary>
         /// Gets or sets RedisDbIdTokenRevocation.
         /// </summary>
@@ -100,8 +100,8 @@ namespace AuthFoundation.Common
             RedisDbAuthCode = GetIntOrDefault(config, "RedisDb_AuthCode", 2);
             RedisDbAccessToken = GetIntOrDefault(config, "RedisDb_AccessToken", 3);
             RedisDbRefreshToken = GetIntOrDefault(config, "RedisDb_RefreshToken", 4);
-            RedisDbAuthorizationSession = GetIntOrDefault(config, "RedisDb_AuthorizationSession", 6);
-            RedisDbMailVerification = GetIntOrDefault(config, "RedisDb_MailVerification", 7);
+            RedisDbAuthRequestSession = GetIntOrDefaultWithFallback(config, "RedisDb_AuthRequestSession", "RedisDb_AuthorizationSession", 6);
+            RedisDbSignupSession = GetIntOrDefaultWithFallback(config, "RedisDb_SignupSession", "RedisDb_MailVerification", 7);
             RedisDbIdTokenRevocation = GetIntOrDefault(config, "RedisDb_IdTokenRevocation", 8);
             RedisDbLogoutAllRevocation = GetIntOrDefault(config, "RedisDb_LogoutAllRevocation", 9);
 
@@ -178,6 +178,30 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
+        /// Executes GetIntOrDefaultWithFallback.
+        /// </summary>
+        private static int GetIntOrDefaultWithFallback(IConfiguration config, string key, string fallbackKey, int defaultValue)
+        {
+            string? value = config[key];
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                value = config[fallbackKey];
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return defaultValue;
+            }
+
+            if (!int.TryParse(value, out int result))
+            {
+                throw new ApiException(Common.Code.INTERNAL_SERVER_ERROR, "環境設定値エラー");
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Executes NormalizeBaseUrl.
         /// </summary>
         private static string NormalizeBaseUrl(string value)
@@ -192,3 +216,4 @@ namespace AuthFoundation.Common
         }
     }
 }
+

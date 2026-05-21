@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using Newtonsoft.Json;
 
 namespace AuthFoundation.Session
@@ -6,14 +6,14 @@ namespace AuthFoundation.Session
     /// <summary>
     /// 認可セッションを表します。
     /// </summary>
-    public class AuthorizationSession
+    public class AuthRequestSession
     {
         /// <summary>
         /// Redis キープレフィックスを表します。
         /// </summary>
-        public const string RedisKeyPrefix = "authz_session:";
+        public const string RedisKeyPrefix = "auth_request_session:";
 
-        [JsonProperty("session_id")]
+        [JsonProperty("auth_request_session_id")]
         public string SessionId { get; set; } = string.Empty;
 
         [JsonProperty("response_type")]
@@ -49,7 +49,7 @@ namespace AuthFoundation.Session
         /// <summary>
         /// 認可セッションを初期化します。
         /// </summary>
-        public AuthorizationSession()
+        public AuthRequestSession()
         {
         }
 
@@ -66,7 +66,7 @@ namespace AuthFoundation.Session
                 return null;
             }
 
-            return await redis.GetStringAsync(GetRedisKey(sessionId), Common.Code.RedisDbNo.AUTHORIZATION_CODE);
+            return await redis.GetStringAsync(GetRedisKey(sessionId), Common.Code.RedisDbNo.AUTH_REQUEST_SESSION);
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace AuthFoundation.Session
                 return false;
             }
 
-            AuthorizationSession? session = JsonConvert.DeserializeObject<AuthorizationSession>(value);
+            AuthRequestSession? session = JsonConvert.DeserializeObject<AuthRequestSession>(value);
             if (session == null)
             {
                 return false;
@@ -109,7 +109,7 @@ namespace AuthFoundation.Session
         {
             TimeSpan ttl = TimeSpan.FromSeconds(Code.AuthCode.EXPIRE_SEC);
             ExpiresAt = DateTimeHelper.ToJstString(DateTimeHelper.GetJstNow().AddSeconds(Code.AuthCode.EXPIRE_SEC));
-            await redis.SetStringAsync(GetRedisKey(SessionId), JsonConvert.SerializeObject(this), ttl, Common.Code.RedisDbNo.AUTHORIZATION_CODE);
+            await redis.SetStringAsync(GetRedisKey(SessionId), JsonConvert.SerializeObject(this), ttl, Common.Code.RedisDbNo.AUTH_REQUEST_SESSION);
         }
 
         /// <summary>
@@ -132,3 +132,4 @@ namespace AuthFoundation.Session
         }
     }
 }
+

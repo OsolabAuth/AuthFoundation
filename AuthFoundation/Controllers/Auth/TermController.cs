@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
@@ -110,7 +110,7 @@ namespace AuthFoundation.Controllers.Auth
                 Input input = await Input.CreateAsync(Request.HttpContext);
                 input.Validate();
 
-                AuthorizationSession session = await GetAuthorizationSessionRequiredAsync(input.SessionId);
+                AuthRequestSession session = await GetAuthRequestSessionRequiredAsync(input.SessionId);
                 if (!input.Accepted)
                 {
                     string denyLocation = Helper.BuildRedirectUri(session.RedirectUri, new Dictionary<string, string>
@@ -163,9 +163,9 @@ namespace AuthFoundation.Controllers.Auth
         /// <param name="sessionId">認可セッションID</param>
         /// <returns>認可セッション</returns>
         /// <exception cref="ApiException">00006:画面の有効期限切れ</exception>
-        private async Task<AuthorizationSession> GetAuthorizationSessionRequiredAsync(string sessionId)
+        private async Task<AuthRequestSession> GetAuthRequestSessionRequiredAsync(string sessionId)
         {
-            AuthorizationSession session = await _authorizeExecutionService.LoadAuthorizationSessionAsync(sessionId);
+            AuthRequestSession session = await _authorizeExecutionService.LoadAuthRequestSessionAsync(sessionId);
             if (string.IsNullOrWhiteSpace(session.SessionId))
             {
                 throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
@@ -176,7 +176,7 @@ namespace AuthFoundation.Controllers.Auth
 
         private async Task<IActionResult> BuildTermsResponseAsync(string sessionId)
         {
-            AuthorizationSession session = await GetAuthorizationSessionRequiredAsync(sessionId);
+            AuthRequestSession session = await GetAuthRequestSessionRequiredAsync(sessionId);
 
             List<client_term> terms = await _dbContext.client_terms
                 .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE)
@@ -204,7 +204,7 @@ namespace AuthFoundation.Controllers.Auth
         /// <param name="session">認可セッション</param>
         /// <param name="acceptedTermIds">同意した規約ID</param>
         /// <exception cref="ApiException">00001:リクエストパラメータエラー</exception>
-        private async Task SaveConsentAsync(AuthorizationSession session, IReadOnlyCollection<string> acceptedTermIds)
+        private async Task SaveConsentAsync(AuthRequestSession session, IReadOnlyCollection<string> acceptedTermIds)
         {
             if (string.IsNullOrWhiteSpace(session.OsolabId))
             {
@@ -380,3 +380,4 @@ namespace AuthFoundation.Controllers.Auth
         }
     }
 }
+

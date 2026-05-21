@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Mvc;
@@ -33,9 +33,9 @@ public sealed class TermApiTests
 
         var redis = new FakeRedisClient();
         string sessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
-        await ApiTestData.WriteAuthorizationSessionAsync(
+        await ApiTestData.WriteAuthRequestSessionAsync(
             redis,
-            ApiTestData.CreateAuthorizationSession(sessionId, clientId, "https://portal.osolab-auth.jp/callback", "openid email"));
+            ApiTestData.CreateAuthRequestSession(sessionId, clientId, "https://portal.osolab-auth.jp/callback", "openid email"));
 
         var controller = CreateController(context, redis);
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>());
@@ -85,9 +85,9 @@ public sealed class TermApiTests
 
         var redis = new FakeRedisClient();
         string sessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
-        await ApiTestData.WriteAuthorizationSessionAsync(
+        await ApiTestData.WriteAuthRequestSessionAsync(
             redis,
-            ApiTestData.CreateAuthorizationSession(sessionId, clientId, redirectUri, "openid", ApiTestData.NewOsolabId()));
+            ApiTestData.CreateAuthRequestSession(sessionId, clientId, redirectUri, "openid", ApiTestData.NewOsolabId()));
 
         var controller = CreateController(context, redis);
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
@@ -126,9 +126,9 @@ public sealed class TermApiTests
 
         var redis = new FakeRedisClient();
         string authzSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
-        await ApiTestData.WriteAuthorizationSessionAsync(
+        await ApiTestData.WriteAuthRequestSessionAsync(
             redis,
-            ApiTestData.CreateAuthorizationSession(authzSessionId, clientId, redirectUri, "openid email", osolabId));
+            ApiTestData.CreateAuthRequestSession(authzSessionId, clientId, redirectUri, "openid email", osolabId));
         string loginSessionId = await ApiTestData.WriteLoginSessionAsync(redis, osolabId, email, clientId);
 
         var controller = CreateController(context, redis);
@@ -157,6 +157,9 @@ public sealed class TermApiTests
             && x.client_id == clientId
             && x.scope == "openid"
             && x.status == Code.Status.ACTIVE));
+
+        string? authRequestSession = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(authzSessionId));
+        Assert.IsTrue(string.IsNullOrWhiteSpace(authRequestSession));
     }
 
     /// <summary>
@@ -186,3 +189,4 @@ public sealed class TermApiTests
             new AuthorizeExecutionService(context, redis));
     }
 }
+

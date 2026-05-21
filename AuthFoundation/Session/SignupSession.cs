@@ -4,48 +4,48 @@ using Newtonsoft.Json;
 namespace AuthFoundation.Session
 {
     /// <summary>
-    /// メール確認セッションを表します。
+    /// サインアップ時のメール認証セッションを表します。
     /// </summary>
-    public class MailVerificationSession
+    public class SignupSession
     {
-        public const string RedisKeyPrefix = "mail_verify:";
+        public const string RedisKeyPrefix = "signup_session:";
+        public const int ExpireSeconds = 1800;
 
-        [JsonProperty("verification_token")]
-        public string VerificationToken { get; set; } = string.Empty;
-        [JsonProperty("osolab_id")]
-        public string OsolabId { get; set; } = string.Empty;
+        [JsonProperty("signup_session_id")]
+        public string SignupSessionId { get; set; } = string.Empty;
+
+        [JsonProperty("auth_request_session_id")]
+        public string AuthRequestSessionId { get; set; } = string.Empty;
+
         [JsonProperty("email")]
         public string Email { get; set; } = string.Empty;
-        [JsonProperty("session_id")]
-        public string SessionId { get; set; } = string.Empty;
+
         [JsonProperty("code")]
         public string Code { get; set; } = string.Empty;
+
+        [JsonProperty("verified")]
+        public bool Verified { get; set; }
+
         [JsonProperty("created_at")]
         public string CreatedAt { get; set; } = string.Empty;
+
         [JsonProperty("expires_at")]
         public string ExpiresAt { get; set; } = string.Empty;
-
-        /// <summary>
-        /// メール確認セッションを初期化します。
-        /// </summary>
-        public MailVerificationSession()
-        {
-        }
 
         /// <summary>
         /// Redis からメール確認セッション文字列を読み込みます。
         /// </summary>
         /// <param name="redis">Redis クライアント</param>
-        /// <param name="token">確認トークン</param>
+        /// <param name="signupSessionId">サインアップセッションID</param>
         /// <returns>セッション文字列</returns>
-        public async Task<string?> ReadValueFromRedisAsync(IRedisClient redis, string? token)
+        public async Task<string?> ReadValueFromRedisAsync(IRedisClient redis, string? signupSessionId)
         {
-            if (string.IsNullOrWhiteSpace(token))
+            if (string.IsNullOrWhiteSpace(signupSessionId))
             {
                 return null;
             }
 
-            return await redis.GetStringAsync(GetRedisKey(token), Common.Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
+            return await redis.GetStringAsync(GetRedisKey(signupSessionId), Common.Code.RedisDbNo.SIGNUP_SESSION);
         }
 
         /// <summary>
@@ -60,17 +60,17 @@ namespace AuthFoundation.Session
                 return false;
             }
 
-            MailVerificationSession? session = JsonConvert.DeserializeObject<MailVerificationSession>(value);
+            SignupSession? session = JsonConvert.DeserializeObject<SignupSession>(value);
             if (session == null)
             {
                 return false;
             }
 
-            VerificationToken = session.VerificationToken;
-            OsolabId = session.OsolabId;
+            SignupSessionId = session.SignupSessionId;
+            AuthRequestSessionId = session.AuthRequestSessionId;
             Email = session.Email;
-            SessionId = session.SessionId;
             Code = session.Code;
+            Verified = session.Verified;
             CreatedAt = session.CreatedAt;
             ExpiresAt = session.ExpiresAt;
             return true;
@@ -82,11 +82,19 @@ namespace AuthFoundation.Session
         /// <param name="redis">Redis クライアント</param>
         public async Task WriteToRedisAsync(IRedisClient redis)
         {
-            const int expireSec = 1800;
+            if (string.IsNullOrWhiteSpace(SignupSessionId))
+            {
+                throw new ApiException(Common.Code.INTERNAL_SERVER_ERROR, "signup_session_id is empty");
+            }
+
             DateTime now = DateTimeHelper.GetJstNow();
             CreatedAt = DateTimeHelper.ToJstString(now);
-            ExpiresAt = DateTimeHelper.ToJstString(now.AddSeconds(expireSec));
-            await redis.SetStringAsync(GetRedisKey(VerificationToken), JsonConvert.SerializeObject(this), TimeSpan.FromSeconds(expireSec), Common.Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
+            ExpiresAt = DateTimeHelper.ToJstString(now.AddSeconds(ExpireSeconds));
+            await redis.SetStringAsync(
+                GetRedisKey(SignupSessionId),
+                JsonConvert.SerializeObject(this),
+                TimeSpan.FromSeconds(ExpireSeconds),
+                Common.Code.RedisDbNo.SIGNUP_SESSION);
         }
 
         /// <summary>
@@ -101,8 +109,13 @@ namespace AuthFoundation.Session
         /// <summary>
         /// Redis キーを取得します。
         /// </summary>
-        /// <param name="token">確認トークン</param>
+        /// <param name="signupSessionId">サインアップセッションID</param>
         /// <returns>Redis キー</returns>
-        public static string GetRedisKey(string token) => $"{RedisKeyPrefix}{token}";
+        public static string GetRedisKey(string signupSessionId)
+        {
+            return $"{RedisKeyPrefix}{signupSessionId}";
+        }
     }
 }
+
+

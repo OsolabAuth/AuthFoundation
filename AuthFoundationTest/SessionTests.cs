@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Http;
@@ -19,10 +19,10 @@ public sealed class SessionTests
     /// 検証項目: 認可セッション登録時に32桁session_idを生成し、Redis保存値へユーザーIDとscopeを保持すること。
     /// </summary>
     [TestMethod]
-    public async Task RegisterAuthorizationSession_GeneratesSessionIdAndWritesRedisValue()
+    public async Task RegisterAuthRequestSession_GeneratesSessionIdAndWritesRedisValue()
     {
         var redis = new FakeRedisClient();
-        var session = new AuthorizationSession
+        var session = new AuthRequestSession
         {
             ResponseType = "code",
             ClientId = "12345678901234567890123456789012",
@@ -34,13 +34,13 @@ public sealed class SessionTests
             Nonce = "nonce-1"
         };
 
-        string sessionId = await AuthorizeExecutionService.RegisterAuthorizationSession(redis, session, "user-1");
-        string? raw = await redis.GetStringAsync(AuthorizationSession.GetRedisKey(sessionId));
+        string sessionId = await AuthorizeExecutionService.RegisterAuthRequestSession(redis, session, "user-1");
+        string? raw = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(sessionId));
 
         Assert.AreEqual(32, sessionId.Length);
         Assert.IsNotNull(raw);
 
-        var saved = new AuthorizationSession();
+        var saved = new AuthRequestSession();
         Assert.IsTrue(saved.SetValue(raw));
         Assert.AreEqual("user-1", saved.OsolabId);
         Assert.AreEqual("openid email", saved.Scope);
@@ -128,3 +128,4 @@ public sealed class SessionTests
         Assert.AreEqual("auth_code:code-1", AuthCodeSession.GetRedisKey("code-1"));
     }
 }
+

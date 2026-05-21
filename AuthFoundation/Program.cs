@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -50,7 +50,7 @@ builder.Services.AddSingleton<IRedisClient, RedisClient>();
 builder.Services.AddSingleton<OidcSigningService>();
 builder.Services.AddScoped<AuthorizeExecutionService>();
 
-builder.Services.AddHttpClient<BrevoMail>();
+builder.Services.AddSingleton<GmailSmtpMail>();
 
 var app = builder.Build();
 
@@ -110,3 +110,4 @@ static void AddOrigin(List<string> origins, string? value)
 
     origins.Add(uri.GetLeftPart(UriPartial.Authority));
 }
+

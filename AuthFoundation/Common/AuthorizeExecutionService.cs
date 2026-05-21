@@ -31,7 +31,7 @@ namespace AuthFoundation.Common
         /// <param name="loginSessionId">ログインセッションID</param>
         /// <returns>遷移先 URL</returns>
         public async Task<string> ExecuteAsync(
-            AuthorizationSession session,
+            AuthRequestSession session,
             string? loginSessionId)
         {
             string sessionId = string.Empty;
@@ -59,7 +59,7 @@ namespace AuthFoundation.Common
                     AuthCodeSession codeSession = CreateAuthCodeSession(session, loginSession);
                     await codeSession.WriteToRedisAsync(_redis);
                     // 認可セッションは削除する
-                    await _redis.DeleteAsync(session.SessionId, Code.RedisDbNo.AUTH_CODE_SESSION);
+                    await _redis.DeleteAsync(AuthRequestSession.GetRedisKey(session.SessionId), Code.RedisDbNo.AUTH_REQUEST_SESSION);
                     // リクエストのリダイレクトURIにクエリを付与して、リダイレクトURIを生成
                     Dictionary<string, string> queries = new Dictionary<string, string>
                     {
@@ -69,11 +69,11 @@ namespace AuthFoundation.Common
                     return Helper.BuildRedirectUri(session.RedirectUri, queries);
                 }
                 // 未同意の場合は、認可セッションを登録し、同意画面にセッションIDを付与してリダイレクトURIを生成
-                sessionId = await RegisterAuthorizationSession(_redis, session, loginSession.OsolabId);
+                sessionId = await RegisterAuthRequestSession(_redis, session, loginSession.OsolabId);
                 return AuthUiUrl.Build("/terms", sessionId);
             }
             // 未ログインの場合、認可セッションを登録し、ログイン画面にセッションIDを付与してリダイレクトURIを生成
-            sessionId = await RegisterAuthorizationSession(_redis, session, string.Empty);
+            sessionId = await RegisterAuthRequestSession(_redis, session, string.Empty);
             return AuthUiUrl.Build("/login", sessionId);
         }
 
@@ -85,7 +85,7 @@ namespace AuthFoundation.Common
         /// <returns>遷移先 URL。認可セッションが無効な場合は null</returns>
         public async Task<string?> TryExecuteFromSessionAsync(string authorizationSessionId, string? loginSessionId)
         {
-            AuthorizationSession session = await LoadAuthorizationSessionAsync(authorizationSessionId);
+            AuthRequestSession session = await LoadAuthRequestSessionAsync(authorizationSessionId);
             if (string.IsNullOrWhiteSpace(session.SessionId))
             {
                 return null;
@@ -99,13 +99,13 @@ namespace AuthFoundation.Common
         /// </summary>
         /// <param name="sessionId">認可セッションID</param>
         /// <returns>認可セッション</returns>
-        public async Task<AuthorizationSession> LoadAuthorizationSessionAsync(string? sessionId)
+        public async Task<AuthRequestSession> LoadAuthRequestSessionAsync(string? sessionId)
         {
-            AuthorizationSession session = new AuthorizationSession();
+            AuthRequestSession session = new AuthRequestSession();
             string? raw = await session.ReadValueFromRedisAsync(_redis, sessionId);
             if (string.IsNullOrWhiteSpace(raw) || !session.SetValue(raw))
             {
-                return new AuthorizationSession();
+                return new AuthRequestSession();
             }
 
             return session;
@@ -117,7 +117,7 @@ namespace AuthFoundation.Common
         /// <param name="session">認可セッション</param>
         /// <param name="loginSession">ログインセッション</param>
         /// <returns>認可コードセッション</returns>
-        public AuthCodeSession CreateAuthCodeSession(AuthorizationSession session, AuthSession loginSession)
+        public AuthCodeSession CreateAuthCodeSession(AuthRequestSession session, AuthSession loginSession)
         {
             return new AuthCodeSession
             {
@@ -141,7 +141,7 @@ namespace AuthFoundation.Common
         /// <param name="session">認可セッション</param>
         /// <param name="osolabId">ユーザーID</param>
         /// <returns></returns>
-        public static async Task<string> RegisterAuthorizationSession(IRedisClient redis, AuthorizationSession session, string osolabId)
+        public static async Task<string> RegisterAuthRequestSession(IRedisClient redis, AuthRequestSession session, string osolabId)
         {
             if (string.IsNullOrWhiteSpace(session.SessionId))
             {

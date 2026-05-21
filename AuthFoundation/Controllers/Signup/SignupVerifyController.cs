@@ -1,97 +1,129 @@
-using AuthFoundation.Common;
-using AuthFoundation.Data;
-using AuthFoundation.Models;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthFoundation.Controllers.Signup
 {
     /// <summary>
-    /// メール確認後の有効化を処理します。
+    /// サインアップ認証コードの検証を処理します。
     /// </summary>
     [ApiController]
-    [Route("Signup/Verify")]
+    [Route("signup/verify")]
     public class SignupVerifyController : ControllerBase
     {
-        private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
-        private readonly AuthorizeExecutionService _authorizeExecutionService;
 
         /// <summary>
         /// SignupVerifyController を初期化します。
         /// </summary>
-        /// <param name="dbContext">DBコンテキスト</param>
-        /// <param name="redis">Redis クライアント</param>
-        /// <param name="authorizeExecutionService">認可実行サービス</param>
-        public SignupVerifyController(
-            OsolabAuthContext dbContext,
-            IRedisClient redis,
-            AuthorizeExecutionService authorizeExecutionService)
+        public SignupVerifyController(IRedisClient redis)
         {
-            _dbContext = dbContext;
             _redis = redis;
-            _authorizeExecutionService = authorizeExecutionService;
         }
 
         /// <summary>
-        /// メール確認を完了します。
+        /// 認証コードを検証します。
         /// </summary>
-        /// <returns>遷移結果</returns>
-        [HttpGet]
+        [HttpPost]
         public async Task<IActionResult> Verify()
         {
             try
             {
-                string token = Request.Query[Code.HttpQueries.TOKEN.Key].ToString();
-                ValidateUtil.IndispensableParam(token, "token");
-                string code = Request.Query[Code.HttpQueries.CODE.Key].ToString();
-                ValidateUtil.IndispensableParam(code, "code");
+                Input input = await Input.CreateAsync(Request.HttpContext);
+                input.Validate();
 
-                MailVerificationSession verify = new MailVerificationSession();
-                string? raw = await verify.ReadValueFromRedisAsync(_redis, token);
-                if (string.IsNullOrWhiteSpace(raw))
-                {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification token is invalid");
-                }
-
-                if (!verify.SetValue(raw))
+                SignupSession verify = new SignupSession();
+                string? raw = await verify.ReadValueFromRedisAsync(_redis, input.SignupSessionId);
+                if (string.IsNullOrWhiteSpace(raw) || !verify.SetValue(raw))
                 {
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification session is invalid");
                 }
 
-                if (!string.Equals(verify.Code, code, StringComparison.Ordinal))
+                if (!string.Equals(verify.Code, input.VerificationCode, StringComparison.Ordinal))
                 {
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification code is invalid");
                 }
 
-                osolab_user? user = _dbContext.osolab_users.SingleOrDefault(x => x.osolab_id == verify.OsolabId && x.status == Code.Status.TENTATIVE);
-                if (user == null)
-                {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "tentative user is not found");
-                }
+                verify.Verified = true;
+                await verify.WriteToRedisAsync(_redis);
 
-                user.status = Code.Status.ACTIVE;
-                user.update_datetime = DateTime.UtcNow;
-                _dbContext.SaveChanges();
-                await _redis.DeleteAsync(MailVerificationSession.GetRedisKey(token),Code.RedisDbNo.MAIL_VERIFICATION_SESSION);
-
-                string loginSessionId = Helper.GenerateRandomCode(Code.Session.LENGTH, Code.Session.CHARACTORS);
-                AuthSession loginSession = new AuthSession(loginSessionId, user.osolab_id, user.email, string.Empty);
-                await loginSession.WriteToRedisAsync(_redis);
-                loginSession.AppendCookie(Response);
-
-                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.SessionId, loginSessionId);
-                if (string.IsNullOrWhiteSpace(location))
-                {
-                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
-                }
-
-                return Redirect(location);
+                return Ok(new Output());
             }
             catch (ApiException aex)
             {
-                return new ObjectResult(new { StatusCode = aex.Code, Message = aex.ErrorMessage }) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.Status };
+            }
+            catch (Exception ex)
+            {
+                return new ObjectResult(new Output(new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message)))
+                {
+                    StatusCode = (int)Code.INTERNAL_SERVER_ERROR.Status
+                };
+            }
+        }
+
+        public sealed class Input
+        {
+            public string SignupSessionId { get; set; } = string.Empty;
+
+            public string VerificationCode { get; set; } = string.Empty;
+
+            public static async Task<Input> CreateAsync(HttpContext context)
+            {
+                HttpRequest request = context.Request;
+                Helper.ValidateTypeFormUrlEncoded(request.ContentType);
+                IFormCollection form = await request.ReadFormAsync();
+                return new Input
+                {
+                    SignupSessionId = GetSignupSessionId(request, form),
+                    VerificationCode = form[Common.Code.HttpQueries.CODE.Key].ToString()
+                };
+            }
+
+            public void Validate()
+            {
+                ValidateUtil.IndispensableParam(SignupSessionId, "signup_session_id");
+                ValidateUtil.FormatParam(SignupSessionId, "signup_session_id", Common.Code.HttpBodies.SESSION_ID.Regex);
+                ValidateUtil.IndispensableParam(VerificationCode, Common.Code.HttpQueries.CODE.Key);
+                ValidateUtil.FormatParam(VerificationCode, Common.Code.HttpQueries.CODE.Key, Common.Code.HttpQueries.CODE.Regex);
+            }
+
+            private static string GetSignupSessionId(HttpRequest request, IFormCollection form)
+            {
+                string sessionId = form["signup_session_id"].ToString();
+                if (!string.IsNullOrWhiteSpace(sessionId))
+                {
+                    return sessionId;
+                }
+
+                sessionId = request.Headers["x-signup-session-id"].ToString();
+                if (!string.IsNullOrWhiteSpace(sessionId))
+                {
+                    return sessionId;
+                }
+
+                return request.Cookies["signup_session_id"] ?? string.Empty;
+            }
+        }
+
+        private sealed class Output
+        {
+            public string StatusCode { get; }
+
+            public string Message { get; }
+
+            public Output()
+            {
+                StatusCode = Code.SUCCESS.Code;
+                Message = Code.SUCCESS.ErrorMessage;
+            }
+
+            public Output(ApiException ex)
+            {
+                StatusCode = ex.Code;
+                Message = ex.ErrorMessage;
             }
         }
     }
 }
+

@@ -208,8 +208,8 @@ namespace AuthFoundation.Common
             public const int AUTHORIZATION_CODE = 2;
             public const int ACCESS_TOKEN = 3;
             public const int REFRESH_TOKEN = 4;
-            public const int AUTH_CODE_SESSION = 5;
-            public const int MAIL_VERIFICATION_SESSION = 6;
+            public const int AUTH_REQUEST_SESSION = 6;
+            public const int SIGNUP_SESSION = 7;
         }
 
     }
