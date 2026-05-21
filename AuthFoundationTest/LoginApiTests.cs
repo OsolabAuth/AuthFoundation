@@ -52,6 +52,8 @@ public sealed class LoginApiTests
             var body = ControllerTestHelper.ToJObject(result);
             Assert.AreEqual("logged_in", body.Value<string>("result"));
             Assert.AreEqual("00006", body.Value<string>("response_code"));
+            Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+            Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
 
             string setCookie = string.Join("\n", httpContext.Response.Headers.SetCookie.ToArray());
             StringAssert.Contains(setCookie, $"{Code.AUTH_SESSION_COOKIE_KEY}=");
@@ -115,6 +117,8 @@ public sealed class LoginApiTests
             Assert.AreEqual("redirect", body.Value<string>("result"));
             Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
             StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{AppConfig.AuthUiBaseUrl}/terms?session_id=");
+            Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+            Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
 
             string? storedAuthz = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(authzSessionId));
             var authz = new AuthRequestSession();
@@ -165,6 +169,10 @@ public sealed class LoginApiTests
             var body = ControllerTestHelper.ToJObject(result);
             Assert.AreEqual("error", body.Value<string>("result"));
             Assert.AreEqual(Code.AUTHENTICATION_FAILED.Code, body.Value<string>("response_code"));
+            Assert.AreEqual("access_denied", body.Value<string>("error"));
+            Assert.AreEqual(Code.AUTHENTICATION_FAILED.ErrorMessage, body.Value<string>("error_description"));
+            Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+            Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
             Assert.AreEqual(0, httpContext.Response.Headers.SetCookie.Count);
         }
         finally
@@ -217,7 +225,10 @@ public sealed class LoginApiTests
 
         IActionResult result = await controller.PostLogin();
 
-        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", controller.HttpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", controller.HttpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -250,6 +261,8 @@ public sealed class LoginApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual(true, body.Value<bool>("logged_in"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -275,6 +288,8 @@ public sealed class LoginApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual(false, body.Value<bool>("logged_in"));
+        Assert.AreEqual("no-store", controller.HttpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", controller.HttpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -302,6 +317,8 @@ public sealed class LoginApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual(false, body.Value<bool>("logged_in"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 }
 

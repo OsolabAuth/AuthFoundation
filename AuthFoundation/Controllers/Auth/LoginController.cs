@@ -72,6 +72,7 @@ namespace AuthFoundation.Controllers.Auth
 
                 if (string.IsNullOrWhiteSpace(input.SessionId))
                 {
+                    SetNoStoreHeaders(Response);
                     return Ok(new Output
                     {
                         result = "logged_in",
@@ -83,6 +84,7 @@ namespace AuthFoundation.Controllers.Auth
                 string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(input.SessionId, loginSessionId);
                 if (string.IsNullOrWhiteSpace(location))
                 {
+                    SetNoStoreHeaders(Response);
                     return Ok(new Output
                     {
                         result = "logged_in",
@@ -92,6 +94,7 @@ namespace AuthFoundation.Controllers.Auth
                 }
 
                 Response.Headers.Location = location;
+                SetNoStoreHeaders(Response);
                 return Ok(new Output
                 {
                     result = "redirect",
@@ -101,11 +104,13 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new Output(ex)) { StatusCode = (int)ex.Status };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new Output(apiEx)) { StatusCode = (int)apiEx.Status };
             }
         }
@@ -122,6 +127,7 @@ namespace AuthFoundation.Controllers.Auth
                 string? loginSessionId = AuthSession.GetCookieSessionId(Request);
                 if (string.IsNullOrWhiteSpace(loginSessionId))
                 {
+                    SetNoStoreHeaders(Response);
                     return Ok(new
                     {
                         response_code = Code.SUCCESS.Code,
@@ -133,6 +139,7 @@ namespace AuthFoundation.Controllers.Auth
                 string? raw = await session.ReadValueFromRedisAsync(_redis, loginSessionId);
                 bool loggedIn = !string.IsNullOrWhiteSpace(raw) && session.SetValue(raw);
 
+                SetNoStoreHeaders(Response);
                 return Ok(new
                 {
                     response_code = Code.SUCCESS.Code,
@@ -141,6 +148,7 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new
                 {
                     response_code = ex.Code,
@@ -153,6 +161,7 @@ namespace AuthFoundation.Controllers.Auth
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new
                 {
                     response_code = apiEx.Code,
@@ -162,6 +171,12 @@ namespace AuthFoundation.Controllers.Auth
                     StatusCode = (int)apiEx.Status
                 };
             }
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
         }
 
         /// <summary>
@@ -222,6 +237,10 @@ namespace AuthFoundation.Controllers.Auth
 
             public string? message { get; set; }
 
+            public string? error { get; set; }
+
+            public string? error_description { get; set; }
+
             /// <summary>
             /// 空の応答を初期化します。
             /// </summary>
@@ -238,6 +257,23 @@ namespace AuthFoundation.Controllers.Auth
                 result = "error";
                 response_code = ex.Code;
                 message = ex.ErrorMessage;
+                error = ToOAuthError(ex);
+                error_description = ex.ErrorMessage;
+            }
+
+            private static string ToOAuthError(ApiException ex)
+            {
+                if (string.Equals(ex.Code, Code.AUTHENTICATION_FAILED.Code, StringComparison.Ordinal))
+                {
+                    return "access_denied";
+                }
+
+                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "server_error";
+                }
+
+                return "invalid_request";
             }
         }
     }

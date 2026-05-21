@@ -69,11 +69,13 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
             }
         }
@@ -89,11 +91,13 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
             }
         }
@@ -119,6 +123,7 @@ namespace AuthFoundation.Controllers.Auth
                         ["state"] = session.State
                     });
                     Response.Headers.Location = denyLocation;
+                    SetNoStoreHeaders(Response);
                     return Ok(new { result = "redirect", error = "access_denied" });
                 }
 
@@ -133,15 +138,18 @@ namespace AuthFoundation.Controllers.Auth
                 }
 
                 Response.Headers.Location = location;
+                SetNoStoreHeaders(Response);
                 return Ok(new { result = "redirect" });
             }
             catch (ApiException ex)
             {
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
             }
         }
@@ -183,6 +191,7 @@ namespace AuthFoundation.Controllers.Auth
                 .OrderBy(x => x.term_id)
                 .ToListAsync();
 
+            SetNoStoreHeaders(Response);
             return Ok(new
             {
                 client_id = session.ClientId,
@@ -196,6 +205,12 @@ namespace AuthFoundation.Controllers.Auth
                 }),
                 scopes = Helper.ParseScopes(session.Scope)
             });
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
         }
 
         /// <summary>
@@ -346,6 +361,10 @@ namespace AuthFoundation.Controllers.Auth
 
             public string message { get; }
 
+            public string error { get; }
+
+            public string error_description { get; }
+
             /// <summary>
             /// エラー応答を初期化します。
             /// </summary>
@@ -354,6 +373,28 @@ namespace AuthFoundation.Controllers.Auth
             {
                 response_code = ex.Code;
                 message = ex.ErrorMessage;
+                error = ToOAuthError(ex);
+                error_description = ex.ErrorMessage;
+            }
+
+            private static string ToOAuthError(ApiException ex)
+            {
+                if (string.Equals(ex.Code, Code.SCREEN_EXPIRED.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_request";
+                }
+
+                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_request";
+                }
+
+                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "server_error";
+                }
+
+                return "invalid_request";
             }
         }
 

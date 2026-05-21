@@ -49,6 +49,8 @@ public sealed class TermApiTests
         Assert.AreEqual(clientId, body.Value<string>("client_id"));
         Assert.AreEqual(termId, body["terms"]!.First!.Value<string>("term_id"));
         CollectionAssert.AreEqual(new[] { "openid", "email" }, body["scopes"]!.Values<string>().ToArray());
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -83,6 +85,8 @@ public sealed class TermApiTests
         JObject body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(clientId, body.Value<string>("client_id"));
         Assert.AreEqual(termId, body["terms"]!.First!.Value<string>("term_id"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -101,7 +105,10 @@ public sealed class TermApiTests
 
         IActionResult result = await controller.PostTermsList();
 
-        ControllerTestHelper.AssertError(result, (int)Code.SCREEN_EXPIRED.Status, Code.SCREEN_EXPIRED.Code);
+        JObject body = ControllerTestHelper.AssertError(result, (int)Code.SCREEN_EXPIRED.Status, Code.SCREEN_EXPIRED.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -138,6 +145,8 @@ public sealed class TermApiTests
         Assert.AreEqual("redirect", body.Value<string>("result"));
         Assert.AreEqual("access_denied", body.Value<string>("error"));
         StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{redirectUri}?error=access_denied");
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -181,6 +190,8 @@ public sealed class TermApiTests
         JObject body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual("redirect", body.Value<string>("result"));
         StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{redirectUri}?code=");
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsTrue(await context.user_term_consents.AnyAsync(x =>
             x.osolab_id == osolabId
             && x.client_id == clientId
@@ -212,7 +223,10 @@ public sealed class TermApiTests
 
         IActionResult result = await controller.PostTerms();
 
-        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        JObject body = ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     private static AuthTermController CreateController(AuthFoundation.Data.OsolabAuthContext context, FakeRedisClient redis)

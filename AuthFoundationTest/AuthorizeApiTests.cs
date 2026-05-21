@@ -47,6 +47,8 @@ public sealed class AuthorizeApiTests
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
         Assert.AreEqual("redirect", body.Value<string>("result"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
 
         string sessionId = body.Value<string>("session_id") ?? string.Empty;
         Assert.AreEqual(Code.Session.LENGTH, sessionId.Length);
@@ -95,6 +97,9 @@ public sealed class AuthorizeApiTests
 
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.ILLEGAL_CLIENT.Code, body.Value<string>("response_code"));
+        Assert.AreEqual("invalid_client", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -122,7 +127,10 @@ public sealed class AuthorizeApiTests
 
         IActionResult result = await controller.GetAuthorize();
 
-        ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_REDIRECT_URI.Status, Code.ILLEGAL_REDIRECT_URI.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_REDIRECT_URI.Status, Code.ILLEGAL_REDIRECT_URI.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsTrue(string.IsNullOrWhiteSpace(httpContext.Response.Headers.Location));
     }
 
@@ -151,8 +159,85 @@ public sealed class AuthorizeApiTests
 
         IActionResult result = await controller.GetAuthorize();
 
-        ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_REDIRECT_URI.Status, Code.ILLEGAL_REDIRECT_URI.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_REDIRECT_URI.Status, Code.ILLEGAL_REDIRECT_URI.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         Assert.IsTrue(string.IsNullOrWhiteSpace(httpContext.Response.Headers.Location));
+    }
+
+    /// <summary>
+    /// 検証項目: GET /authorize でredirect_uriにfragmentが含まれる場合は00005を返すこと。
+    /// </summary>
+    [TestMethod]
+    public async Task GetAuthorize_RedirectUriWithFragment_ReturnsIllegalRedirectUri()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string clientId = ApiTestData.NewClientId();
+        string redirectUri = "https://portal.osolab-auth.jp/callback";
+        await ApiTestData.CreateClientAsync(context, clientId, redirectUri: redirectUri);
+
+        var redis = new FakeRedisClient();
+        var controller = new AuthorizeController(context, new AuthorizeExecutionService(context, redis));
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.QueryString = new QueryString(
+            "?response_type=code"
+            + $"&client_id={clientId}"
+            + "&redirect_uri=https%3A%2F%2Fportal.osolab-auth.jp%2Fcallback%23fragment"
+            + "&state=state-api-test"
+            + "&scope=openid"
+            + "&code_challenge_method=S256"
+            + $"&code_challenge={new string('a', 43)}"
+            + "&nonce=nonce-api-test");
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.GetAuthorize();
+
+        var body = ControllerTestHelper.AssertError(result, (int)Code.ILLEGAL_REDIRECT_URI.Status, Code.ILLEGAL_REDIRECT_URI.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+    }
+
+    /// <summary>
+    /// 検証項目: GET /authorize でlocalhostのhttp redirect_uriが登録済みの場合に受理されること。
+    /// </summary>
+    [TestMethod]
+    public async Task GetAuthorize_LocalhostHttpRedirectUri_WhenRegistered_IsAccepted()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string clientId = ApiTestData.NewClientId();
+        string redirectUri = "http://localhost:5173/callback";
+        await ApiTestData.CreateClientAsync(context, clientId, redirectUri: redirectUri);
+
+        var redis = new FakeRedisClient();
+        var controller = new AuthorizeController(context, new AuthorizeExecutionService(context, redis));
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers["x-auth-ui-session-mode"] = "body";
+        httpContext.Request.QueryString = new QueryString(
+            "?response_type=code"
+            + $"&client_id={clientId}"
+            + "&redirect_uri=http%3A%2F%2Flocalhost%3A5173%2Fcallback"
+            + "&state=state-api-test"
+            + "&scope=openid"
+            + "&code_challenge_method=S256"
+            + $"&code_challenge={new string('a', 43)}"
+            + "&nonce=nonce-api-test");
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.GetAuthorize();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual("redirect", body.Value<string>("result"));
+        StringAssert.StartsWith(body.Value<string>("redirect_url"), $"{AppConfig.AuthUiBaseUrl}/login");
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -183,7 +268,10 @@ public sealed class AuthorizeApiTests
 
         IActionResult result = await controller.GetAuthorize();
 
-        ControllerTestHelper.AssertError(result, (int)Code.INVALID_SCOPE.Status, Code.INVALID_SCOPE.Code);
+        var body = ControllerTestHelper.AssertError(result, (int)Code.INVALID_SCOPE.Status, Code.INVALID_SCOPE.Code);
+        Assert.AreEqual("invalid_scope", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
     /// <summary>
@@ -225,6 +313,8 @@ public sealed class AuthorizeApiTests
         string url = ((RedirectResult)result).Url!;
         StringAssert.StartsWith(url, $"{redirectUri}?code=");
         StringAssert.Contains(url, "state=state-api-test");
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
 
         string code = ExtractQueryValue(url, "code");
         string? rawCodeSession = await redis.GetStringAsync(AuthCodeSession.GetRedisKey(code), Code.RedisDbNo.AUTHORIZATION_CODE);

@@ -45,6 +45,7 @@ namespace AuthFoundation.Controllers.Auth
                 AppendAuthRequestSessionCookieIfPresent(Response, location);
                 if (ShouldReturnBodySession(Request))
                 {
+                    SetNoStoreHeaders(Response);
                     return Ok(new
                     {
                         result = "redirect",
@@ -55,11 +56,13 @@ namespace AuthFoundation.Controllers.Auth
                     });
                 }
 
+                SetNoStoreHeaders(Response);
                 return Redirect(location);
             }
             catch (ApiException ex)
             {
-                return new ObjectResult(new { response_code = ex.Code, message = ex.ErrorMessage })
+                SetNoStoreHeaders(Response);
+                return new ObjectResult(new ErrorOutput(ex))
                 {
                     StatusCode = (int)ex.Status
                 };
@@ -67,11 +70,18 @@ namespace AuthFoundation.Controllers.Auth
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new { response_code = apiEx.Code, message = apiEx.ErrorMessage })
+                SetNoStoreHeaders(Response);
+                return new ObjectResult(new ErrorOutput(apiEx))
                 {
                     StatusCode = (int)apiEx.Status
                 };
             }
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
         }
 
         private static bool ShouldReturnBodySession(HttpRequest request)
@@ -139,6 +149,42 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             return location[(questionIndex + 1)..];
+        }
+
+        private sealed class ErrorOutput
+        {
+            public string response_code { get; }
+            public string message { get; }
+            public string error { get; }
+            public string error_description { get; }
+
+            public ErrorOutput(ApiException ex)
+            {
+                response_code = ex.Code;
+                message = ex.ErrorMessage;
+                error = ToOAuthError(ex);
+                error_description = ex.ErrorMessage;
+            }
+
+            private static string ToOAuthError(ApiException ex)
+            {
+                if (string.Equals(ex.Code, Code.ILLEGAL_CLIENT.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_client";
+                }
+
+                if (string.Equals(ex.Code, Code.INVALID_SCOPE.Code, StringComparison.Ordinal))
+                {
+                    return "invalid_scope";
+                }
+
+                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                {
+                    return "server_error";
+                }
+
+                return "invalid_request";
+            }
         }
 
         /// <summary>
