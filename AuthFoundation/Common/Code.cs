@@ -7,50 +7,72 @@ namespace AuthFoundation.Common
     /// </summary>
     public static class Code
     {
-        public static readonly ApiException SUCCESS = new ApiException()
-            {
-                Error = string.Empty,
-                ErrorDescription = string.Empty,
-                ErrorUri = string.Empty,
-                InternalCode = "00000",
-                CanRedirect = true,
-                StatusCode = HttpStatusCode.OK,
-            };
-        public static readonly ApiException REQUEST_PARAMETER_ERROR = new ApiException()
-            {
-                Error = "invalid_request",
-                ErrorDescription = "some of the input values are incorrect",
-                ErrorUri = string.Empty,
-                InternalCode = "00001",
-                CanRedirect = false,
-                StatusCode = HttpStatusCode.BadRequest,
-            };
-        public static readonly ApiException ILLEGAL_CLIENT = new()
-        {
-            Error = "invalid_client",
-            ErrorDescription = "illegal client",
-            ErrorUri = string.Empty,
-            InternalCode = "00002",
-            CanRedirect = false,
-            StatusCode = HttpStatusCode.BadRequest,
-        };
-        public static readonly ApiException SCREEN_EXPIRED = new()
-        {
-            Error = "invalid_request",
-            ErrorDescription = "screen expired",
-            ErrorUri = string.Empty,
-            InternalCode = "00003",
-            CanRedirect = false,
-            StatusCode = HttpStatusCode.BadRequest,
-        };
-        public static readonly ApiException AUTHENTICATION_FAILED = new("00004", HttpStatusCode.BadRequest, "authentication failed");
-        public static readonly ApiException ILLEGAL_REDIRECT_URI = new("00005", HttpStatusCode.BadRequest, "illegal redirect_uri");
-        public static readonly ApiException INVALID_AUTH_CODE = new("00007", HttpStatusCode.BadRequest, "invalid auth code");
-        public static readonly ApiException UNAUTHORIZED = new("00008", HttpStatusCode.Unauthorized, "unauthorized");
-        public static readonly ApiException INVALID_SCOPE = new("00009", HttpStatusCode.BadRequest, "invalid scope");
+        public static readonly ApiException SUCCESS = Define(
+            code: "00000",
+            status: HttpStatusCode.OK,
+            description: string.Empty,
+            error: string.Empty,
+            canRedirect: true);
 
-        public static readonly ApiException INTERNAL_SERVER_ERROR = new("90000", HttpStatusCode.InternalServerError, "Unhandled server error");
-        public static readonly ApiException ID_GENERATION_ERROR = new("90001", HttpStatusCode.InternalServerError, "ID generation failed");
+        public static readonly ApiException REQUEST_PARAMETER_ERROR = Define(
+            code: "00001",
+            status: HttpStatusCode.BadRequest,
+            description: "some of the input values are incorrect",
+            error: "invalid_request");
+
+        public static readonly ApiException ILLEGAL_CLIENT = Define(
+            code: "00002",
+            status: HttpStatusCode.BadRequest,
+            description: "illegal client",
+            error: "invalid_client");
+
+        public static readonly ApiException SCREEN_EXPIRED = Define(
+            code: "00003",
+            status: HttpStatusCode.BadRequest,
+            description: "screen expired",
+            error: "invalid_request");
+
+        public static readonly ApiException AUTHENTICATION_FAILED = Define(
+            code: "00004",
+            status: HttpStatusCode.BadRequest,
+            description: "authentication failed",
+            error: "access_denied");
+
+        public static readonly ApiException ILLEGAL_REDIRECT_URI = Define(
+            code: "00005",
+            status: HttpStatusCode.BadRequest,
+            description: "illegal redirect_uri",
+            error: "invalid_request");
+
+        public static readonly ApiException INVALID_AUTH_CODE = Define(
+            code: "00007",
+            status: HttpStatusCode.BadRequest,
+            description: "invalid auth code",
+            error: "invalid_grant");
+
+        public static readonly ApiException UNAUTHORIZED = Define(
+            code: "00008",
+            status: HttpStatusCode.Unauthorized,
+            description: "unauthorized",
+            error: "invalid_token");
+
+        public static readonly ApiException INVALID_SCOPE = Define(
+            code: "00009",
+            status: HttpStatusCode.BadRequest,
+            description: "invalid scope",
+            error: "invalid_scope");
+
+        public static readonly ApiException INTERNAL_SERVER_ERROR = Define(
+            code: "90000",
+            status: HttpStatusCode.InternalServerError,
+            description: "Unhandled server error",
+            error: "server_error");
+
+        public static readonly ApiException ID_GENERATION_ERROR = Define(
+            code: "90001",
+            status: HttpStatusCode.InternalServerError,
+            description: "ID generation failed",
+            error: "server_error");
 
         public const string AUTH_SESSION_COOKIE_KEY = "AuthSessionId";
         public const string AUTH_REQUEST_SESSION_COOKIE_KEY = "AuthRequestSessionId";
@@ -243,6 +265,25 @@ namespace AuthFoundation.Common
             public const int REFRESH_TOKEN = 4;
             public const int AUTH_REQUEST_SESSION = 6;
             public const int SIGNUP_SESSION = 7;
+        }
+
+        private static ApiException Define(
+            string code,
+            HttpStatusCode status,
+            string description,
+            string error,
+            bool canRedirect = false,
+            string errorUri = "")
+        {
+            return new ApiException
+            {
+                InternalCode = code,
+                StatusCode = status,
+                Error = error,
+                ErrorDescription = description,
+                ErrorUri = errorUri,
+                CanRedirect = canRedirect
+            };
         }
 
     }

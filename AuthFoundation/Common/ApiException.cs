@@ -9,6 +9,43 @@ namespace AuthFoundation.Common;
 /// </summary>
 public class ApiException : Exception
 {
+    /// <summary>
+    /// Sample実装の FoundationException.Value に合わせたコード値オブジェクト。
+    /// </summary>
+    public readonly struct Value : IEquatable<Value>
+    {
+        public string Code { get; init; }
+        public HttpStatusCode Status { get; init; }
+        public string Msg { get; init; }
+        public string Error { get; init; }
+        public string ErrorUri { get; init; }
+        public bool CanRedirect { get; init; }
+
+        public bool Equals(Value other)
+        {
+            return string.Equals(Code, other.Code, StringComparison.Ordinal)
+                && Status == other.Status
+                && string.Equals(Msg, other.Msg, StringComparison.Ordinal)
+                && string.Equals(Error, other.Error, StringComparison.Ordinal)
+                && string.Equals(ErrorUri, other.ErrorUri, StringComparison.Ordinal)
+                && CanRedirect == other.CanRedirect;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is Value other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Code, Status, Msg, Error, ErrorUri, CanRedirect);
+        }
+
+        public static bool operator ==(Value left, Value right) => left.Equals(right);
+
+        public static bool operator !=(Value left, Value right) => !(left == right);
+    }
+
     [JsonProperty("error")]
     public string Error { get; set; } = string.Empty;
     [JsonProperty("error_description")]
@@ -45,12 +82,56 @@ public class ApiException : Exception
         set => ErrorDescription = value;
     }
 
+    [JsonIgnore]
+    public Value Cause => new()
+    {
+        Code = InternalCode,
+        Status = StatusCode,
+        Msg = ErrorDescription,
+        Error = Error,
+        ErrorUri = ErrorUri,
+        CanRedirect = CanRedirect
+    };
+
     /// <summary>
     /// コンストラクタ
     /// </summary>
     public ApiException()
     { 
     
+    }
+
+    /// <summary>
+    /// Valueから例外生成（sample互換）。
+    /// </summary>
+    public ApiException(Value value)
+        : this(
+            value.Code,
+            value.Status,
+            string.IsNullOrWhiteSpace(value.Msg) ? string.Empty : value.Msg)
+    {
+        if (!string.IsNullOrWhiteSpace(value.Error))
+        {
+            Error = value.Error;
+        }
+
+        ErrorUri = value.ErrorUri;
+        CanRedirect = value.CanRedirect;
+    }
+
+    /// <summary>
+    /// Valueから例外生成（メッセージ上書き、sample互換）。
+    /// </summary>
+    public ApiException(Value value, string errorDescription)
+        : this(value.Code, value.Status, errorDescription)
+    {
+        if (!string.IsNullOrWhiteSpace(value.Error))
+        {
+            Error = value.Error;
+        }
+
+        ErrorUri = value.ErrorUri;
+        CanRedirect = value.CanRedirect;
     }
 
     /// <summary>
@@ -97,6 +178,7 @@ public class ApiException : Exception
     /// <param name="baseEx">例外</param>
     /// <param name="errorDescription">メッセージ</param>
     public ApiException(ApiException baseEx, string errorDescription)
+        : base(errorDescription)
     {
         Error = baseEx.Error;
         ErrorUri = baseEx.ErrorUri;
