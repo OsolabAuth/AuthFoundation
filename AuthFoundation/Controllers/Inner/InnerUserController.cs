@@ -67,7 +67,7 @@ namespace AuthFoundation.Controllers.Inner
             {
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -75,7 +75,7 @@ namespace AuthFoundation.Controllers.Inner
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }
@@ -118,7 +118,7 @@ namespace AuthFoundation.Controllers.Inner
             {
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -126,7 +126,7 @@ namespace AuthFoundation.Controllers.Inner
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }
@@ -218,7 +218,7 @@ namespace AuthFoundation.Controllers.Inner
             {
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -226,7 +226,7 @@ namespace AuthFoundation.Controllers.Inner
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }
@@ -248,13 +248,13 @@ namespace AuthFoundation.Controllers.Inner
             }
             catch
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             string[] parts = decoded.Split(':', 2);
             if (parts.Length != 2)
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             string clientId = parts[0];
@@ -263,13 +263,13 @@ namespace AuthFoundation.Controllers.Inner
 
             if (!string.Equals(clientId, AppConfig.InnerClientId, StringComparison.Ordinal))
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             client_master client = Helper.CertClient(_dbContext, clientId);
             if (!Helper.IsSameValue(client.client_secret, secret))
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
         }
 
@@ -339,8 +339,8 @@ namespace AuthFoundation.Controllers.Inner
             /// </summary>
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
             }
         }
     }

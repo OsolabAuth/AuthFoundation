@@ -64,8 +64,8 @@ namespace AuthFoundation.Controllers
             /// </summary>
             public Output(Common.ApiException ex)
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
+                StatusCode = ex.InternalCode;
+                Message = ex.ErrorDescription;
             }
 
             /// <summary>
@@ -74,7 +74,7 @@ namespace AuthFoundation.Controllers
             public Output(string version)
             {
                 StatusCode = Common.Code.SUCCESS.Code;
-                Message = Common.Code.SUCCESS.ErrorMessage;
+                Message = Common.Code.SUCCESS.ErrorDescription;
                 Version = version;
             }
         }

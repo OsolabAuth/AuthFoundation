@@ -111,7 +111,7 @@ public sealed class UserInfoApiTests
 
         JObject body = ControllerTestHelper.AssertError(result, (int)Code.UNAUTHORIZED.Status, Code.UNAUTHORIZED.Code);
         Assert.AreEqual("invalid_token", body.Value<string>("error"));
-        Assert.AreEqual(Code.UNAUTHORIZED.ErrorMessage, body.Value<string>("error_description"));
+        Assert.AreEqual(Code.UNAUTHORIZED.ErrorDescription, body.Value<string>("error_description"));
         Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         StringAssert.Contains(httpContext.Response.Headers["WWW-Authenticate"].ToString(), "Bearer error=\"invalid_token\"");
@@ -150,7 +150,7 @@ public sealed class UserInfoApiTests
 
         JObject body = ControllerTestHelper.AssertError(result, (int)Code.UNAUTHORIZED.Status, Code.UNAUTHORIZED.Code);
         Assert.AreEqual("invalid_token", body.Value<string>("error"));
-        Assert.AreEqual(Code.UNAUTHORIZED.ErrorMessage, body.Value<string>("error_description"));
+        Assert.AreEqual(Code.UNAUTHORIZED.ErrorDescription, body.Value<string>("error_description"));
         Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
         StringAssert.Contains(httpContext.Response.Headers["WWW-Authenticate"].ToString(), "Bearer error=\"invalid_token\"");

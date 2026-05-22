@@ -33,7 +33,7 @@ namespace AuthFoundation.Controllers.Auth
                 ValidateUtil.IndispensableParam(authorization, "Authorization");
                 if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorMessage);
+                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorDescription);
                 }
 
                 string accessToken = authorization.Substring("Bearer ".Length).Trim();
@@ -42,20 +42,20 @@ namespace AuthFoundation.Controllers.Auth
                 string? raw = await _redis.GetStringAsync(AccessTokenSession.GetRedisKey(accessToken), Code.RedisDbNo.ACCESS_TOKEN);
                 if (string.IsNullOrWhiteSpace(raw))
                 {
-                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorMessage);
+                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorDescription);
                 }
 
                 AccessTokenSession? tokenSession = JsonConvert.DeserializeObject<AccessTokenSession>(raw);
                 if (tokenSession == null)
                 {
-                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorMessage);
+                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorDescription);
                 }
 
                 osolab_user? user = await _dbContext.osolab_users.AsNoTracking()
                     .SingleOrDefaultAsync(x => x.osolab_id == tokenSession.OsolabId && x.status == Code.Status.ACTIVE);
                 if (user == null)
                 {
-                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorMessage);
+                    throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorDescription);
                 }
 
                 List<string> scopes = Helper.ParseScopes(tokenSession.Scope);
@@ -87,14 +87,14 @@ namespace AuthFoundation.Controllers.Auth
             catch (ApiException ex)
             {
                 SetNoStoreHeaders(Response);
-                if (ex.Status == Code.UNAUTHORIZED.Status)
+                if (ex.StatusCode == Code.UNAUTHORIZED.Status)
                 {
-                    SetBearerErrorHeader(Response, "invalid_token", ex.ErrorMessage);
+                    SetBearerErrorHeader(Response, "invalid_token", ex.ErrorDescription);
                 }
 
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -103,7 +103,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }
@@ -133,25 +133,25 @@ namespace AuthFoundation.Controllers.Auth
             /// <summary>             /// Initializes a new instance of ErrorOutput.             /// </summary>
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.UNAUTHORIZED.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.UNAUTHORIZED.Code, StringComparison.Ordinal))
                 {
                     return "invalid_token";
                 }
 
-                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
                 {
                     return "invalid_request";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }

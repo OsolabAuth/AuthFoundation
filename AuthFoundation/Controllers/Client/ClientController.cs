@@ -56,12 +56,12 @@ namespace AuthFoundation.Controllers.Client
             }
             catch (ApiException ex)
             {
-                return new ObjectResult(new PostOutput(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new PostOutput(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException aex = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new PostOutput(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new PostOutput(aex)) { StatusCode = (int)aex.StatusCode };
             }
         }
 
@@ -163,8 +163,8 @@ namespace AuthFoundation.Controllers.Client
             /// </summary>
             public PostOutput(ApiException ex)
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
+                StatusCode = ex.InternalCode;
+                Message = ex.ErrorDescription;
             }
 
             /// <summary>
@@ -173,7 +173,7 @@ namespace AuthFoundation.Controllers.Client
             public PostOutput(string clientId, string clientSecret, string clientName)
             {
                 StatusCode = Code.SUCCESS.Code;
-                Message = Code.SUCCESS.ErrorMessage;
+                Message = Code.SUCCESS.ErrorDescription;
                 ClientId = clientId;
                 ClientSecret = clientSecret;
                 ClientName = clientName;
@@ -199,22 +199,22 @@ namespace AuthFoundation.Controllers.Client
                     client_scope = clientScopes,
                     client_redirect_uri = clientRedirectUris,
                     response_code = Code.SUCCESS.Code,
-                    message = Code.SUCCESS.ErrorMessage
+                    message = Code.SUCCESS.ErrorDescription
                 });
             }
             catch (ApiException ex)
             {
-                return new ObjectResult(new { response_code = ex.Code, message = ex.ErrorMessage })
+                return new ObjectResult(new { response_code = ex.InternalCode, message = ex.ErrorDescription })
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new { response_code = apiEx.Code, message = apiEx.ErrorMessage })
+                return new ObjectResult(new { response_code = apiex.InternalCode, message = apiEx.ErrorDescription })
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }

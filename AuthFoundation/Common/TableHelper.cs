@@ -26,7 +26,7 @@ namespace AuthFoundation.Common
             }
             if (string.IsNullOrEmpty(newOsolabId))
             {
-                throw new ApiException(Common.Code.ID_GENERATION_ERROR, Common.Code.ID_GENERATION_ERROR.ErrorMessage);
+                throw new ApiException(Common.Code.ID_GENERATION_ERROR, Common.Code.ID_GENERATION_ERROR.ErrorDescription);
             }
 
             string nonce = Helper.GenerateRandomCode(Code.Nonce.LENGTH, Code.Nonce.CHARACTORS);

@@ -40,8 +40,8 @@
 //            /// <param name="ex">例外</param>
 //            public Output(Common.ApiException ex)
 //            {
-//                StatusCode = ex.Code;
-//                Message = ex.ErrorMessage;
+//                StatusCode = ex.InternalCode;
+//                Message = ex.ErrorDescription;
 //            }
 
 //            /// <summary>
@@ -50,7 +50,7 @@
 //            public Output()
 //            {
 //                StatusCode = Common.Code.SUCCESS.Code;
-//                Message = Common.Code.SUCCESS.ErrorMessage;
+//                Message = Common.Code.SUCCESS.ErrorDescription;
 //            }
 
 //        }

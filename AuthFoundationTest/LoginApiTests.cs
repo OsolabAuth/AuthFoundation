@@ -170,7 +170,7 @@ public sealed class LoginApiTests
             Assert.AreEqual("error", body.Value<string>("result"));
             Assert.AreEqual(Code.AUTHENTICATION_FAILED.Code, body.Value<string>("response_code"));
             Assert.AreEqual("access_denied", body.Value<string>("error"));
-            Assert.AreEqual(Code.AUTHENTICATION_FAILED.ErrorMessage, body.Value<string>("error_description"));
+            Assert.AreEqual(Code.AUTHENTICATION_FAILED.ErrorDescription, body.Value<string>("error_description"));
             Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
             Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
             Assert.AreEqual(0, httpContext.Response.Headers.SetCookie.Count);

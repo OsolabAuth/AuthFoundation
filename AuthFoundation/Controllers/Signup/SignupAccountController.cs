@@ -58,29 +58,29 @@ namespace AuthFoundation.Controllers.Signup
                 await loginSession.WriteToRedisAsync(_redis);
                 loginSession.AppendCookie(Response);
 
-                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.AuthRequestSessionId, loginSessionId);
-                if (string.IsNullOrWhiteSpace(location))
+                AuthorizeExecutionService.AuthorizResult? excuteResult = await _authorizeExecutionService.TryExecuteFromSessionAsync(verify.AuthRequestSessionId, loginSessionId);
+                if (excuteResult is null || string.IsNullOrWhiteSpace(excuteResult.RedirectUrl))
                 {
-                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorDescription);
                 }
 
-                Response.Headers.Location = location;
+                Response.Headers.Location = excuteResult.RedirectUrl;
                 return Ok(new Output
                 {
                     result = "redirect",
                     response_code = Code.SUCCESS.Code,
-                    message = Code.SUCCESS.ErrorMessage
+                    message = Code.SUCCESS.ErrorDescription
                 });
             }
             catch (ApiException aex)
             {
                 StructuredLog.LogInfo(_logger, "SignupAccount.ApiException", new
                 {
-                    aex.Code,
-                    Status = (int)aex.Status,
-                    aex.ErrorMessage
+                    aex.InternalCode,
+                    Status = (int)aex.StatusCode,
+                    aex.ErrorDescription
                 });
-                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.StatusCode };
             }
             catch (Exception ex)
             {
@@ -201,8 +201,8 @@ namespace AuthFoundation.Controllers.Signup
             public Output(ApiException ex)
             {
                 result = "error";
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
             }
         }
     }

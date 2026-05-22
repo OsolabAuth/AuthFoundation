@@ -51,22 +51,22 @@ namespace AuthFoundation.Controllers.Temp
                     client_scope = clientScopes,
                     client_redirect_uri = clientRedirectUris,
                     response_code = Code.SUCCESS.Code,
-                    message = Code.SUCCESS.ErrorMessage
+                    message = Code.SUCCESS.ErrorDescription
                 });
             }
             catch (ApiException ex)
             {
-                return new ObjectResult(new { response_code = ex.Code, message = ex.ErrorMessage })
+                return new ObjectResult(new { response_code = ex.InternalCode, message = ex.ErrorDescription })
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new { response_code = apiEx.Code, message = apiEx.ErrorMessage })
+                return new ObjectResult(new { response_code = apiex.InternalCode, message = apiEx.ErrorDescription })
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }

@@ -57,12 +57,12 @@ namespace AuthFoundation.Controllers.Auth
             }
             catch (ApiException ex)
             {
-                return new ObjectResult(new Output(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new Output(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException aex = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.StatusCode };
             }
         }
 
@@ -164,8 +164,8 @@ namespace AuthFoundation.Controllers.Auth
             /// </summary>
             public Output(ApiException ex)
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
+                StatusCode = ex.InternalCode;
+                Message = ex.ErrorDescription;
             }
 
             /// <summary>
@@ -174,7 +174,7 @@ namespace AuthFoundation.Controllers.Auth
             public Output(string clientId, string clientSecret, string clientName)
             {
                 StatusCode = Code.SUCCESS.Code;
-                Message = Code.SUCCESS.ErrorMessage;
+                Message = Code.SUCCESS.ErrorDescription;
                 ClientId = clientId;
                 ClientSecret = clientSecret;
                 ClientName = clientName;

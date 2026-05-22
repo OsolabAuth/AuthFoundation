@@ -75,12 +75,12 @@ namespace AuthFoundation.Controllers.Client
             }
             catch (ApiException ex)
             {
-                return new ObjectResult(new PostOutput(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new PostOutput(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException aex = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new PostOutput(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new PostOutput(aex)) { StatusCode = (int)aex.StatusCode };
             }
         }
 
@@ -197,8 +197,8 @@ namespace AuthFoundation.Controllers.Client
             /// </summary>
             public PostOutput(ApiException ex)
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
+                StatusCode = ex.InternalCode;
+                Message = ex.ErrorDescription;
             }
 
             /// <summary>
@@ -207,7 +207,7 @@ namespace AuthFoundation.Controllers.Client
             public PostOutput(client_term clientTerm)
             {
                 StatusCode = Code.SUCCESS.Code;
-                Message = Code.SUCCESS.ErrorMessage;
+                Message = Code.SUCCESS.ErrorDescription;
                 SequenceId = clientTerm.sequence_id;
                 ClientId = clientTerm.client_id;
                 TermId = clientTerm.term_id;

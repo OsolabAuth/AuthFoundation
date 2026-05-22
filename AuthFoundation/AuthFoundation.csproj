@@ -13,9 +13,6 @@
 
   <ItemGroup>
     <None Include="efpt.config.json.user" />
-    <Content Include="ViewTemplates\\**\\*.html">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
   <ItemGroup>

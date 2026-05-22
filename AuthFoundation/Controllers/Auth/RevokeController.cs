@@ -51,7 +51,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -60,7 +60,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }
@@ -78,7 +78,7 @@ namespace AuthFoundation.Controllers.Auth
                 var client = Helper.CertClient(_dbContext, input.BasicClientId);
                 if (!Helper.IsSameValue(client.client_secret, input.BasicClientSecret ?? string.Empty))
                 {
-                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                 }
 
                 return input.BasicClientId;
@@ -86,7 +86,7 @@ namespace AuthFoundation.Controllers.Auth
 
             if (string.IsNullOrWhiteSpace(input.ClientId))
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             Helper.CertClient(_dbContext, input.ClientId);
@@ -107,7 +107,7 @@ namespace AuthFoundation.Controllers.Auth
                 return;
             }
 
-            throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+            throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorDescription);
         }
 
         private async Task RevokeAccessTokenAsync(string token, string clientId)
@@ -184,13 +184,13 @@ namespace AuthFoundation.Controllers.Auth
                     }
                     catch
                     {
-                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                     }
 
                     string[] parts = decoded.Split(':', 2);
                     if (parts.Length != 2)
                     {
-                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                     }
 
                     basicClientId = parts[0];
@@ -245,25 +245,25 @@ namespace AuthFoundation.Controllers.Auth
 
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.ILLEGAL_CLIENT.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.ILLEGAL_CLIENT.Code, StringComparison.Ordinal))
                 {
                     return "invalid_client";
                 }
 
-                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
                 {
                     return "invalid_request";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }

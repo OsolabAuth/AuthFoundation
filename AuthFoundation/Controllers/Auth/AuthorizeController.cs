@@ -37,34 +37,29 @@ namespace AuthFoundation.Controllers.Auth
             {
                 Input input = Input.Create(Request.HttpContext);
                 input.Validate();
-
+                // Client検証
                 Helper.CertAuthorizeClient(_dbContext, input.ClientId, input.RedirectUri);
 
+                // 認可処理実行
                 AuthRequestSession session = input.ToAuthRequestSession();
-                string location = await _authorizeExecutionService.ExecuteAsync(session, AuthSession.GetCookieSessionId(Request));
-                AppendAuthRequestSessionCookieIfPresent(Response, location);
-                if (ShouldReturnBodySession(Request))
+                AuthorizeExecutionService.AuthorizResult excuteResult = await _authorizeExecutionService.ExecuteAsync(session, AuthSession.GetCookieSessionId(Request));
+
+                // 認可リクエストセッションをCookieに登録
+                if (excuteResult.SetSessionCookie && !string.IsNullOrWhiteSpace(excuteResult.SessionId))
                 {
-                    SetNoStoreHeaders(Response);
-                    return Ok(new
-                    {
-                        result = "redirect",
-                        redirect_url = RemoveSessionIdFromUrl(location),
-                        session_id = ExtractSessionId(location),
-                        response_code = Code.SUCCESS.Code,
-                        message = Code.SUCCESS.ErrorMessage
-                    });
+                    CookieOptions options = Helper.BuildSessionCookieOptions(Response.HttpContext.Request, Code.AuthCode.EXPIRE_SEC);
+                    Response.Cookies.Append(Code.AUTH_REQUEST_SESSION_COOKIE_KEY, excuteResult.SessionId, options);
                 }
 
                 SetNoStoreHeaders(Response);
-                return Redirect(location);
+                return Redirect(excuteResult.RedirectUrl);
             }
             catch (ApiException ex)
             {
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -73,7 +68,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }
@@ -82,73 +77,6 @@ namespace AuthFoundation.Controllers.Auth
         {
             response.Headers["Cache-Control"] = "no-store";
             response.Headers["Pragma"] = "no-cache";
-        }
-
-        private static bool ShouldReturnBodySession(HttpRequest request)
-        {
-            return string.Equals(
-                request.Headers["x-auth-ui-session-mode"].ToString(),
-                "body",
-                StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static void AppendAuthRequestSessionCookieIfPresent(HttpResponse response, string location)
-        {
-            string sessionId = ExtractSessionId(location);
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                return;
-            }
-
-            CookieOptions options = Helper.BuildSessionCookieOptions(response.HttpContext.Request, Code.AuthCode.EXPIRE_SEC);
-
-            response.Cookies.Append(Code.AUTH_REQUEST_SESSION_COOKIE_KEY, sessionId, options);
-            response.Cookies.Append("session_id", sessionId, options);
-        }
-
-        private static string ExtractSessionId(string location)
-        {
-            string query = GetQuery(location);
-            foreach (string part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
-            {
-                string[] pair = part.Split('=', 2);
-                if (pair.Length == 2 && string.Equals(pair[0], "session_id", StringComparison.OrdinalIgnoreCase))
-                {
-                    return Uri.UnescapeDataString(pair[1]);
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private static string RemoveSessionIdFromUrl(string location)
-        {
-            int questionIndex = location.IndexOf('?', StringComparison.Ordinal);
-            if (questionIndex < 0)
-            {
-                return location;
-            }
-
-            string basePart = location[..questionIndex];
-            string queryPart = location[(questionIndex + 1)..];
-            string filteredQuery = string.Join("&", queryPart
-                .Split('&', StringSplitOptions.RemoveEmptyEntries)
-                .Where(part => !part.StartsWith("session_id=", StringComparison.OrdinalIgnoreCase)));
-
-            return string.IsNullOrWhiteSpace(filteredQuery)
-                ? basePart
-                : $"{basePart}?{filteredQuery}";
-        }
-
-        private static string GetQuery(string location)
-        {
-            int questionIndex = location.IndexOf('?', StringComparison.Ordinal);
-            if (questionIndex < 0 || questionIndex == location.Length - 1)
-            {
-                return string.Empty;
-            }
-
-            return location[(questionIndex + 1)..];
         }
 
         private sealed class ErrorOutput
@@ -160,25 +88,25 @@ namespace AuthFoundation.Controllers.Auth
 
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.ILLEGAL_CLIENT.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.ILLEGAL_CLIENT.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_client";
                 }
 
-                if (string.Equals(ex.Code, Code.INVALID_SCOPE.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INVALID_SCOPE.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_scope";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.InternalCode, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }

@@ -35,24 +35,6 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// 同意画面を返します。
-        /// </summary>
-        /// <returns>同意画面</returns>
-        [HttpGet("view")]
-        public IActionResult GetTermView()
-        {
-            string sessionId = Request.Query["session_id"].ToString();
-            if (AuthUiUrl.IsConfigured)
-            {
-                return Redirect(AuthUiUrl.Build("/terms", sessionId));
-            }
-
-            string safeSessionId = System.Net.WebUtility.HtmlEncode(sessionId);
-            string html = LoadTemplate("term.html").Replace("__SESSION_ID__", safeSessionId, StringComparison.Ordinal);
-            return Content(html, "text/html; charset=utf-8");
-        }
-
-        /// <summary>
         /// 同意対象の規約一覧を返します。
         /// </summary>
         /// <returns>規約一覧</returns>
@@ -70,13 +52,13 @@ namespace AuthFoundation.Controllers.Auth
             catch (ApiException ex)
             {
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
+                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.StatusCode };
             }
         }
 
@@ -92,13 +74,13 @@ namespace AuthFoundation.Controllers.Auth
             catch (ApiException ex)
             {
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
+                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.StatusCode };
             }
         }
 
@@ -128,41 +110,29 @@ namespace AuthFoundation.Controllers.Auth
                 }
 
                 await SaveConsentAsync(session, input.TermIds);
-
-                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(
+                AuthorizeExecutionService.AuthorizResult? excuteResult = await _authorizeExecutionService.TryExecuteFromSessionAsync(
                     input.SessionId,
                     AuthSession.GetCookieSessionId(Request));
-                if (string.IsNullOrWhiteSpace(location))
+                if (excuteResult is null)
                 {
-                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                    throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorDescription);
                 }
 
-                Response.Headers.Location = location;
+                Response.Headers.Location = excuteResult.RedirectUrl;
                 SetNoStoreHeaders(Response);
                 return Ok(new { result = "redirect" });
             }
             catch (ApiException ex)
             {
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.Status };
+                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.StatusCode };
             }
-        }
-
-        /// <summary>
-        /// HTML テンプレートを読み込みます。
-        /// </summary>
-        /// <param name="fileName">ファイル名</param>
-        /// <returns>HTML 文字列</returns>
-        private string LoadTemplate(string fileName)
-        {
-            string path = Path.Combine(_environment.ContentRootPath, "ViewTemplates", "Auth", fileName);
-            return System.IO.File.ReadAllText(path);
         }
 
         /// <summary>
@@ -176,7 +146,7 @@ namespace AuthFoundation.Controllers.Auth
             AuthRequestSession session = await _authorizeExecutionService.LoadAuthRequestSessionAsync(sessionId);
             if (string.IsNullOrWhiteSpace(session.SessionId))
             {
-                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorDescription);
             }
 
             return session;
@@ -223,7 +193,7 @@ namespace AuthFoundation.Controllers.Auth
         {
             if (string.IsNullOrWhiteSpace(session.OsolabId))
             {
-                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorDescription);
             }
 
             List<client_term> requiredTerms = await _dbContext.client_terms
@@ -233,7 +203,7 @@ namespace AuthFoundation.Controllers.Auth
             HashSet<string> acceptedSet = acceptedTermIds.ToHashSet(StringComparer.Ordinal);
             if (requiredTerms.Any(x => !acceptedSet.Contains(x.term_id)))
             {
-                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+                throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorDescription);
             }
 
             var existingTerms = await _dbContext.user_term_consents
@@ -371,25 +341,25 @@ namespace AuthFoundation.Controllers.Auth
             /// <param name="ex">API 例外</param>
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.SCREEN_EXPIRED.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.SCREEN_EXPIRED.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_request";
                 }
 
-                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.REQUEST_PARAMETER_ERROR.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_request";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.InternalCode, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }

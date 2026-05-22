@@ -74,11 +74,11 @@ namespace AuthFoundation.Controllers.Signup
             {
                 StructuredLog.LogInfo(_logger, "SignupEmail.ApiException", new
                 {
-                    aex.Code,
-                    Status = (int)aex.Status,
-                    aex.ErrorMessage
+                    aex.InternalCode,
+                    Status = (int)aex.StatusCode,
+                    aex.ErrorDescription
                 });
-                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new Output(aex)) { StatusCode = (int)aex.StatusCode };
             }
             catch (Exception ex)
             {
@@ -102,7 +102,7 @@ namespace AuthFoundation.Controllers.Signup
             string? raw = await session.ReadValueFromRedisAsync(_redis, sessionId);
             if (string.IsNullOrWhiteSpace(raw) || !session.SetValue(raw))
             {
-                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorMessage);
+                throw new ApiException(Code.SCREEN_EXPIRED, Code.SCREEN_EXPIRED.ErrorDescription);
             }
 
             return session;
@@ -144,13 +144,13 @@ namespace AuthFoundation.Controllers.Signup
             public Output()
             {
                 StatusCode = Code.SUCCESS.Code;
-                Message = Code.SUCCESS.ErrorMessage;
+                Message = Code.SUCCESS.ErrorDescription;
             }
 
             public Output(ApiException ex)
             {
-                StatusCode = ex.Code;
-                Message = ex.ErrorMessage;
+                StatusCode = ex.InternalCode;
+                Message = ex.ErrorDescription;
             }
         }
     }

@@ -38,22 +38,22 @@ namespace AuthFoundation.Controllers.Auth
                 string? raw = await codeSession.ReadValueFromRedisAsync(_redis, input.AuthorizationCode);
                 if (string.IsNullOrWhiteSpace(raw) || !codeSession.SetValue(raw))
                 {
-                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorDescription);
                 }
 
                 if (!string.Equals(codeSession.ClientId, clientId, StringComparison.Ordinal))
                 {
-                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorDescription);
                 }
 
                 if (!string.Equals(codeSession.RedirectUri, input.RedirectUri, StringComparison.Ordinal))
                 {
-                    throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                    throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorDescription);
                 }
 
                 if (!IsPkceValid(input.CodeVerifier, codeSession.CodeChallenge, codeSession.CodeChallengeMethod))
                 {
-                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorMessage);
+                    throw new ApiException(Code.INVALID_AUTH_CODE, Code.INVALID_AUTH_CODE.ErrorDescription);
                 }
 
                 string tokenId = Helper.GenerateHex(32).ToLowerInvariant();
@@ -85,7 +85,7 @@ namespace AuthFoundation.Controllers.Auth
 
                 return Ok(new
                 {
-                    response_code = Code.SUCCESS.Code,
+                    response_code = Code.SUCCESS.InternalCode,
                     access_token = accessToken,
                     refresh_token = refreshToken,
                     token_type = Code.AccessToken.TOKEN_TYPE_BEARER,
@@ -100,7 +100,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(ex))
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -109,7 +109,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }
@@ -126,13 +126,13 @@ namespace AuthFoundation.Controllers.Auth
             {
                 if (!string.IsNullOrWhiteSpace(input.ClientId) && !string.Equals(input.ClientId, input.BasicClientId, StringComparison.Ordinal))
                 {
-                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                 }
 
                 client_master client = Helper.CertClient(_dbContext, input.BasicClientId);
                 if (!Helper.IsSameValue(client.client_secret, input.BasicClientSecret ?? string.Empty))
                 {
-                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                    throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                 }
 
                 return input.BasicClientId;
@@ -140,7 +140,7 @@ namespace AuthFoundation.Controllers.Auth
 
             if (string.IsNullOrWhiteSpace(input.ClientId))
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             Helper.CertClient(_dbContext, input.ClientId);
@@ -195,7 +195,7 @@ namespace AuthFoundation.Controllers.Auth
                     }
                     catch
                     {
-                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                     }
 
                     string[] parts = decoded.Split(':', 2);
@@ -206,7 +206,7 @@ namespace AuthFoundation.Controllers.Auth
                     }
                     else
                     {
-                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                        throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
                     }
                 }
 
@@ -254,31 +254,31 @@ namespace AuthFoundation.Controllers.Auth
 
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.ILLEGAL_CLIENT.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.ILLEGAL_CLIENT.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_client";
                 }
 
-                if (string.Equals(ex.Code, Code.INVALID_AUTH_CODE.Code, StringComparison.Ordinal)
-                    || string.Equals(ex.Code, Code.ILLEGAL_REDIRECT_URI.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INVALID_AUTH_CODE.InternalCode, StringComparison.Ordinal)
+                    || string.Equals(ex.InternalCode, Code.ILLEGAL_REDIRECT_URI.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_grant";
                 }
 
-                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.REQUEST_PARAMETER_ERROR.InternalCode, StringComparison.Ordinal))
                 {
                     return "invalid_request";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.InternalCode, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }

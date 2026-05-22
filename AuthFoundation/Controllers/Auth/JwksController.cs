@@ -26,11 +26,11 @@ namespace AuthFoundation.Controllers.Auth
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new
                 {
-                    response_code = apiEx.Code,
-                    message = apiEx.ErrorMessage
+                    response_code = apiex.InternalCode,
+                    message = apiEx.ErrorDescription
                 })
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiex.StatusCode
                 };
             }
         }

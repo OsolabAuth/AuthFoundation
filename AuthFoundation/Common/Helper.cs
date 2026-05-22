@@ -27,7 +27,7 @@ namespace AuthFoundation.Common
 
             if (client == null)
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             return client;
@@ -56,17 +56,17 @@ namespace AuthFoundation.Common
                 .SingleOrDefault();
             if (clientWithRedirect == null)
             {
-                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
 
             if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out Uri? uri))
             {
-                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorDescription);
             }
 
             if (!string.IsNullOrEmpty(uri.Fragment))
             {
-                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorDescription);
             }
 
             bool isHttps = uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
@@ -77,12 +77,12 @@ namespace AuthFoundation.Common
                         && uri.Host.EndsWith("-local", StringComparison.OrdinalIgnoreCase)));
             if (!isHttps && !isAllowedLocalHttp)
             {
-                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorDescription);
             }
 
             if (!clientWithRedirect.HasRedirectUri)
             {
-                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorMessage);
+                throw new ApiException(Code.ILLEGAL_REDIRECT_URI, Code.ILLEGAL_REDIRECT_URI.ErrorDescription);
             }
 
             return clientWithRedirect.Client;
@@ -100,7 +100,7 @@ namespace AuthFoundation.Common
                 return;
             }
 
-            throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+            throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorDescription);
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace AuthFoundation.Common
                 return;
             }
 
-            throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+            throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorDescription);
         }
 
         /// <summary>
@@ -312,7 +312,7 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// RedirectUri を組み立てます。
+        /// URIにクエリを付与
         /// </summary>
         /// <param name="baseUri">ベース URI</param>
         /// <param name="parameters">クエリパラメータ</param>

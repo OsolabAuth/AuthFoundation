@@ -73,13 +73,13 @@ namespace AuthFoundation.Controllers.Auth
             catch (ApiException aex)
             {
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new ErrorOutput(aex)) { StatusCode = (int)aex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException aex = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new ErrorOutput(aex)) { StatusCode = (int)aex.Status };
+                return new ObjectResult(new ErrorOutput(aex)) { StatusCode = (int)aex.StatusCode };
             }
         }
 
@@ -114,7 +114,7 @@ namespace AuthFoundation.Controllers.Auth
                 if (!string.IsNullOrWhiteSpace(request.ContentType)
                     && !Helper.HasContentType(request.ContentType, Code.Content.TYPE_X_WWW_FORM))
                 {
-                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorMessage);
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, Code.REQUEST_PARAMETER_ERROR.ErrorDescription);
                 }
 
                 string logoutAll = string.Empty;
@@ -152,20 +152,20 @@ namespace AuthFoundation.Controllers.Auth
 
             public ErrorOutput(ApiException ex)
             {
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))
                 {
                     return "invalid_request";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }

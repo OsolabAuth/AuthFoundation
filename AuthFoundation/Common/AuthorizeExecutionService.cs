@@ -14,7 +14,7 @@ namespace AuthFoundation.Common
         private readonly IRedisClient _redis;
 
         /// <summary>
-        /// AuthorizeExecutionService を初期化します。
+        /// コンストラクタ
         /// </summary>
         /// <param name="dbContext">DBコンテキスト</param>
         /// <param name="redis">Redis クライアント</param>
@@ -25,14 +25,12 @@ namespace AuthFoundation.Common
         }
 
         /// <summary>
-        /// 認可処理を実行し、遷移先 URL を返します。
+        /// 認可処理を実行し、遷移先URLを返却
         /// </summary>
         /// <param name="session">認可セッション</param>
         /// <param name="loginSessionId">ログインセッションID</param>
         /// <returns>遷移先 URL</returns>
-        public async Task<string> ExecuteAsync(
-            AuthRequestSession session,
-            string? loginSessionId)
+        public async Task<AuthorizResult> ExecuteAsync(AuthRequestSession session, string? loginSessionId)
         {
             string sessionId = string.Empty;
             List<string> requestedScopes = Helper.ParseScopes(session.Scope);
@@ -66,15 +64,31 @@ namespace AuthFoundation.Common
                         ["code"] = codeSession.Code,
                         ["state"] = session.State
                     };
-                    return Helper.BuildRedirectUri(session.RedirectUri, queries);
+                    return new AuthorizResult()
+                    {
+                        RedirectUrl = Helper.BuildRedirectUri(session.RedirectUri, queries),
+                        SetSessionCookie = false
+                    };
                 }
                 // 未同意の場合は、認可セッションを登録し、同意画面にセッションIDを付与してリダイレクトURIを生成
                 sessionId = await RegisterAuthRequestSession(_redis, session, loginSession.OsolabId);
-                return AuthUiUrl.Build("/terms", sessionId);
+                return new AuthorizResult()
+                {
+
+                    RedirectUrl = AuthUiUrl.Build("/terms", string.Empty),
+                    SessionId = sessionId,
+                    SetSessionCookie = true
+                };
             }
             // 未ログインの場合、認可セッションを登録し、ログイン画面にセッションIDを付与してリダイレクトURIを生成
             sessionId = await RegisterAuthRequestSession(_redis, session, string.Empty);
-            return AuthUiUrl.Build("/login", sessionId);
+            return new AuthorizResult()
+            {
+
+                RedirectUrl = AuthUiUrl.Build("/login", string.Empty),
+                SessionId = sessionId,
+                SetSessionCookie = true
+            };
         }
 
         /// <summary>
@@ -83,7 +97,7 @@ namespace AuthFoundation.Common
         /// <param name="authorizationSessionId">認可セッションID</param>
         /// <param name="loginSessionId">ログインセッションID</param>
         /// <returns>遷移先 URL。認可セッションが無効な場合は null</returns>
-        public async Task<string?> TryExecuteFromSessionAsync(string authorizationSessionId, string? loginSessionId)
+        public async Task<AuthorizResult?> TryExecuteFromSessionAsync(string authorizationSessionId, string? loginSessionId)
         {
             AuthRequestSession session = await LoadAuthRequestSessionAsync(authorizationSessionId);
             if (string.IsNullOrWhiteSpace(session.SessionId))
@@ -221,8 +235,26 @@ namespace AuthFoundation.Common
         {
             if (!requiredScopeSet.IsSubsetOf(requestedScopes))
             {
-                throw new ApiException(Code.INVALID_SCOPE, Code.INVALID_SCOPE.ErrorMessage);
+                throw new ApiException(Code.INVALID_SCOPE, Code.INVALID_SCOPE.ErrorDescription);
             };
+        }
+
+        /// <summary>
+        /// 認可リクエストの処理結果
+        /// </summary>
+        public class AuthorizResult
+        {
+            public string RedirectUrl { get; set; } = "";
+            public string? SessionId { get; set; }
+            public bool SetSessionCookie { get; set; }
+
+            /// <summary>
+            /// コンストラクタ
+            /// </summary>
+            public AuthorizResult()
+            { 
+            
+            }
         }
     }
 }

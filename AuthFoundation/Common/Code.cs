@@ -7,10 +7,42 @@ namespace AuthFoundation.Common
     /// </summary>
     public static class Code
     {
-        public static readonly ApiException SUCCESS = new("00000", HttpStatusCode.OK, "OK");
-        public static readonly ApiException REQUEST_PARAMETER_ERROR = new("00001", HttpStatusCode.BadRequest, "request parameter error");
-        public static readonly ApiException ILLEGAL_CLIENT = new("00002", HttpStatusCode.BadRequest, "illegal client");
-        public static readonly ApiException SCREEN_EXPIRED = new("00003", HttpStatusCode.BadRequest, "screen expired");
+        public static readonly ApiException SUCCESS = new ApiException()
+            {
+                Error = string.Empty,
+                ErrorDescription = string.Empty,
+                ErrorUri = string.Empty,
+                InternalCode = "00000",
+                CanRedirect = true,
+                StatusCode = HttpStatusCode.OK,
+            };
+        public static readonly ApiException REQUEST_PARAMETER_ERROR = new ApiException()
+            {
+                Error = "invalid_request",
+                ErrorDescription = "some of the input values are incorrect",
+                ErrorUri = string.Empty,
+                InternalCode = "00001",
+                CanRedirect = false,
+                StatusCode = HttpStatusCode.BadRequest,
+            };
+        public static readonly ApiException ILLEGAL_CLIENT = new()
+        {
+            Error = "invalid_client",
+            ErrorDescription = "illegal client",
+            ErrorUri = string.Empty,
+            InternalCode = "00002",
+            CanRedirect = false,
+            StatusCode = HttpStatusCode.BadRequest,
+        };
+        public static readonly ApiException SCREEN_EXPIRED = new()
+        {
+            Error = "invalid_client",
+            ErrorDescription = "screen expired",
+            ErrorUri = string.Empty,
+            InternalCode = "00003",
+            CanRedirect = false,
+            StatusCode = HttpStatusCode.BadRequest,
+        };
         public static readonly ApiException AUTHENTICATION_FAILED = new("00004", HttpStatusCode.BadRequest, "authentication failed");
         public static readonly ApiException ILLEGAL_REDIRECT_URI = new("00005", HttpStatusCode.BadRequest, "illegal redirect_uri");
         public static readonly ApiException INVALID_AUTH_CODE = new("00007", HttpStatusCode.BadRequest, "invalid auth code");

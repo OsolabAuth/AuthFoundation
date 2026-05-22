@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.RegularExpressions;
 using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
@@ -56,13 +53,13 @@ namespace AuthFoundation.Controllers.Auth
                     x.email == input.Email && x.status == Code.Status.ACTIVE);
                 if (user == null)
                 {
-                    throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
+                    throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorDescription);
                 }
 
                 string inputPassHash = Helper.GetPassHash(input.Password, user.nonce);
                 if (!Helper.IsSameValue(user.password, inputPassHash))
                 {
-                    throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorMessage);
+                    throw new ApiException(Code.AUTHENTICATION_FAILED, Code.AUTHENTICATION_FAILED.ErrorDescription);
                 }
 
                 string loginSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
@@ -81,8 +78,8 @@ namespace AuthFoundation.Controllers.Auth
                     });
                 }
 
-                string? location = await _authorizeExecutionService.TryExecuteFromSessionAsync(input.SessionId, loginSessionId);
-                if (string.IsNullOrWhiteSpace(location))
+                AuthorizeExecutionService.AuthorizResult? excuteResult = await _authorizeExecutionService.TryExecuteFromSessionAsync(input.SessionId, loginSessionId);
+                if (excuteResult is null || string.IsNullOrWhiteSpace(excuteResult.RedirectUrl))
                 {
                     SetNoStoreHeaders(Response);
                     return Ok(new Output
@@ -93,25 +90,25 @@ namespace AuthFoundation.Controllers.Auth
                     });
                 }
 
-                Response.Headers.Location = location;
+                Response.Headers.Location = excuteResult.RedirectUrl;
                 SetNoStoreHeaders(Response);
                 return Ok(new Output
                 {
                     result = "redirect",
-                    response_code = Code.SUCCESS.Code,
-                    message = Code.SUCCESS.ErrorMessage
+                    response_code = Code.SUCCESS.InternalCode,
+                    message = Code.SUCCESS.ErrorDescription
                 });
             }
             catch (ApiException ex)
             {
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new Output(ex)) { StatusCode = (int)ex.Status };
+                return new ObjectResult(new Output(ex)) { StatusCode = (int)ex.StatusCode };
             }
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 SetNoStoreHeaders(Response);
-                return new ObjectResult(new Output(apiEx)) { StatusCode = (int)apiEx.Status };
+                return new ObjectResult(new Output(apiEx)) { StatusCode = (int)apiEx.StatusCode };
             }
         }
 
@@ -130,7 +127,7 @@ namespace AuthFoundation.Controllers.Auth
                     SetNoStoreHeaders(Response);
                     return Ok(new
                     {
-                        response_code = Code.SUCCESS.Code,
+                        response_code = Code.SUCCESS.InternalCode,
                         logged_in = false
                     });
                 }
@@ -142,7 +139,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return Ok(new
                 {
-                    response_code = Code.SUCCESS.Code,
+                    response_code = Code.SUCCESS.InternalCode,
                     logged_in = loggedIn
                 });
             }
@@ -151,11 +148,11 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new
                 {
-                    response_code = ex.Code,
-                    message = ex.ErrorMessage
+                    response_code = ex.InternalCode,
+                    message = ex.ErrorDescription
                 })
                 {
-                    StatusCode = (int)ex.Status
+                    StatusCode = (int)ex.StatusCode
                 };
             }
             catch (Exception ex)
@@ -164,11 +161,11 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new
                 {
-                    response_code = apiEx.Code,
-                    message = apiEx.ErrorMessage
+                    response_code = apiEx.InternalCode,
+                    message = apiEx.ErrorDescription
                 })
                 {
-                    StatusCode = (int)apiEx.Status
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }
@@ -255,20 +252,20 @@ namespace AuthFoundation.Controllers.Auth
             public Output(ApiException ex)
             {
                 result = "error";
-                response_code = ex.Code;
-                message = ex.ErrorMessage;
+                response_code = ex.InternalCode;
+                message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
-                error_description = ex.ErrorMessage;
+                error_description = ex.ErrorDescription;
             }
 
             private static string ToOAuthError(ApiException ex)
             {
-                if (string.Equals(ex.Code, Code.AUTHENTICATION_FAILED.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.AUTHENTICATION_FAILED.InternalCode, StringComparison.Ordinal))
                 {
                     return "access_denied";
                 }
 
-                if (string.Equals(ex.Code, Code.INTERNAL_SERVER_ERROR.Code, StringComparison.Ordinal))
+                if (string.Equals(ex.InternalCode, Code.INTERNAL_SERVER_ERROR.InternalCode, StringComparison.Ordinal))
                 {
                     return "server_error";
                 }
