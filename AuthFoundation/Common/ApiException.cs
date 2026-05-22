@@ -67,6 +67,7 @@ public class ApiException : Exception
     {
         InternalCode = code;
         StatusCode = status;
+        Error = ToOAuthError(code);
         ErrorDescription = errorDescription;
     }
 
@@ -86,6 +87,7 @@ public class ApiException : Exception
     {
         InternalCode = code;
         StatusCode = status;
+        Error = ToOAuthError(code);
         ErrorDescription = errorDescription;
     }
 
@@ -96,8 +98,25 @@ public class ApiException : Exception
     /// <param name="errorDescription">メッセージ</param>
     public ApiException(ApiException baseEx, string errorDescription)
     {
+        Error = baseEx.Error;
+        ErrorUri = baseEx.ErrorUri;
         InternalCode = baseEx.InternalCode;
+        CanRedirect = baseEx.CanRedirect;
         StatusCode = baseEx.StatusCode;
         ErrorDescription = errorDescription;
+    }
+
+    private static string ToOAuthError(string internalCode)
+    {
+        return internalCode switch
+        {
+            "00002" => "invalid_client",
+            "00004" => "access_denied",
+            "00008" => "invalid_token",
+            "00009" => "invalid_scope",
+            "90000" => "server_error",
+            "90001" => "server_error",
+            _ => "invalid_request"
+        };
     }
 }

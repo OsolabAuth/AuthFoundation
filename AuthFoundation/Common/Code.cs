@@ -36,7 +36,7 @@ namespace AuthFoundation.Common
         };
         public static readonly ApiException SCREEN_EXPIRED = new()
         {
-            Error = "invalid_client",
+            Error = "invalid_request",
             ErrorDescription = "screen expired",
             ErrorUri = string.Empty,
             InternalCode = "00003",
