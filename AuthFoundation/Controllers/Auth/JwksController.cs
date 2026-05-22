@@ -1,4 +1,4 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthFoundation.Controllers.Auth
@@ -26,11 +26,11 @@ namespace AuthFoundation.Controllers.Auth
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new
                 {
-                    response_code = apiex.InternalCode,
+                    response_code = apiEx.InternalCode,
                     message = apiEx.ErrorDescription
                 })
                 {
-                    StatusCode = (int)apiex.StatusCode
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }

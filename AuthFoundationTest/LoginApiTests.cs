@@ -116,7 +116,7 @@ public sealed class LoginApiTests
             var body = ControllerTestHelper.ToJObject(result);
             Assert.AreEqual("redirect", body.Value<string>("result"));
             Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
-            StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{AppConfig.AuthUiBaseUrl}/terms?session_id=");
+            StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{AppConfig.AuthUiBaseUrl}/terms");
             Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
             Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
 

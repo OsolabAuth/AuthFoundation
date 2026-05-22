@@ -1,8 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Net;
-using System.Net.NetworkInformation;
-using static AuthFoundation.Common.Code;
 
 namespace AuthFoundation.Common;
 
@@ -25,6 +23,27 @@ public class ApiException : Exception
     public bool CanRedirect { get; set; } = false;
     [JsonProperty("status_code")]
     public HttpStatusCode StatusCode { get; set; } = HttpStatusCode.InternalServerError;
+
+    [JsonIgnore]
+    public string Code
+    {
+        get => InternalCode;
+        set => InternalCode = value;
+    }
+
+    [JsonIgnore]
+    public HttpStatusCode Status
+    {
+        get => StatusCode;
+        set => StatusCode = value;
+    }
+
+    [JsonIgnore]
+    public string ErrorMessage
+    {
+        get => ErrorDescription;
+        set => ErrorDescription = value;
+    }
 
     /// <summary>
     /// コンストラクタ

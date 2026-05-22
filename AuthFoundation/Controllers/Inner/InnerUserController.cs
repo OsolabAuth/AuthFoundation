@@ -75,7 +75,7 @@ namespace AuthFoundation.Controllers.Inner
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiex.StatusCode
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }
@@ -126,7 +126,7 @@ namespace AuthFoundation.Controllers.Inner
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiex.StatusCode
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }
@@ -226,7 +226,7 @@ namespace AuthFoundation.Controllers.Inner
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiex.StatusCode
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }

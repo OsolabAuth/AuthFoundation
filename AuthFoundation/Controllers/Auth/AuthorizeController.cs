@@ -49,6 +49,20 @@ namespace AuthFoundation.Controllers.Auth
                 {
                     CookieOptions options = Helper.BuildSessionCookieOptions(Response.HttpContext.Request, Code.AuthCode.EXPIRE_SEC);
                     Response.Cookies.Append(Code.AUTH_REQUEST_SESSION_COOKIE_KEY, excuteResult.SessionId, options);
+                    Response.Cookies.Append("session_id", excuteResult.SessionId, options);
+                }
+
+                if (ShouldReturnBodySession(Request))
+                {
+                    SetNoStoreHeaders(Response);
+                    return Ok(new
+                    {
+                        result = "redirect",
+                        redirect_url = excuteResult.RedirectUrl,
+                        session_id = excuteResult.SessionId,
+                        response_code = Code.SUCCESS.InternalCode,
+                        message = Code.SUCCESS.ErrorDescription
+                    });
                 }
 
                 SetNoStoreHeaders(Response);
@@ -77,6 +91,14 @@ namespace AuthFoundation.Controllers.Auth
         {
             response.Headers["Cache-Control"] = "no-store";
             response.Headers["Pragma"] = "no-cache";
+        }
+
+        private static bool ShouldReturnBodySession(HttpRequest request)
+        {
+            return string.Equals(
+                request.Headers["x-auth-ui-session-mode"].ToString(),
+                "body",
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private sealed class ErrorOutput

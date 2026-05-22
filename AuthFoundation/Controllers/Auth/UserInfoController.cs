@@ -1,4 +1,4 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
@@ -103,7 +103,7 @@ namespace AuthFoundation.Controllers.Auth
                 SetNoStoreHeaders(Response);
                 return new ObjectResult(new ErrorOutput(apiEx))
                 {
-                    StatusCode = (int)apiex.StatusCode
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }

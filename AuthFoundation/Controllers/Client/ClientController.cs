@@ -1,4 +1,4 @@
-ï»¿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -212,9 +212,9 @@ namespace AuthFoundation.Controllers.Client
             catch (Exception ex)
             {
                 ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
-                return new ObjectResult(new { response_code = apiex.InternalCode, message = apiEx.ErrorDescription })
+                return new ObjectResult(new { response_code = apiEx.InternalCode, message = apiEx.ErrorDescription })
                 {
-                    StatusCode = (int)apiex.StatusCode
+                    StatusCode = (int)apiEx.StatusCode
                 };
             }
         }
@@ -222,10 +222,10 @@ namespace AuthFoundation.Controllers.Client
         {
             public string ClientId { get; set; } = string.Empty;
             /// <summary>
-            /// HTTP ãƒªã‚¯ã‚¨ã‚¹ãƒˆã‹ã‚‰èªå¯å…¥åŠ›ã‚’ç”Ÿæˆã—ã¾ã™ã€‚
+            /// HTTP ƒŠƒNƒGƒXƒg‚©‚ç”F‰Â“ü—Í‚ğ¶¬‚µ‚Ü‚·B
             /// </summary>
-            /// <param name="context">HTTP ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ</param>
-            /// <returns>èªå¯å…¥åŠ›</returns>
+            /// <param name="context">HTTP ƒRƒ“ƒeƒLƒXƒg</param>
+            /// <returns>”F‰Â“ü—Í</returns>
             public static GetInput Create(HttpContext context)
             {
                 HttpRequest request = context.Request;
