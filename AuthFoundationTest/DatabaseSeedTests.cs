@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundationTest.TestSupport;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,8 +8,13 @@ namespace AuthFoundationTest;
 public sealed class DatabaseSeedTests
 {
     /// <summary>
-    /// 検証項目: SQLフォルダ初期化後のDBへ接続でき、デフォルト内部クライアントと標準scopeが存在すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Initialized Sql Folder Data を 標準入力 条件で実行
+    /// 期待値
+    /// 　Contains Default Client And Scopes を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task InitializedSqlFolderData_ContainsDefaultClientAndScopes()
     {

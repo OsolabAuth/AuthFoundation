@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
@@ -12,6 +12,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class UserInfoApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -19,8 +27,13 @@ public sealed class UserInfoApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /userinfo 正常系でBearer Access Tokenを検証し、scopeに応じたsub/email/profile claimsを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get User Info を Valid Access Token 条件で実行
+    /// 期待値
+    /// 　Returns Scoped Claims を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetUserInfo_ValidAccessToken_ReturnsScopedClaims()
     {
@@ -72,8 +85,13 @@ public sealed class UserInfoApiTests
     }
 
     /// <summary>
-    /// 検証項目: Authorizationヘッダー未指定時に設計書どおり00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get User Info を Missing Authorization 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetUserInfo_MissingAuthorization_ReturnsRequestParameterError()
     {
@@ -93,8 +111,13 @@ public sealed class UserInfoApiTests
     }
 
     /// <summary>
-    /// 検証項目: Redisに存在しないAccess Tokenでは設計書どおり00008を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get User Info を Unknown Access Token 条件で実行
+    /// 期待値
+    /// 　Returns Unauthorized を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetUserInfo_UnknownAccessToken_ReturnsUnauthorized()
     {
@@ -118,8 +141,13 @@ public sealed class UserInfoApiTests
     }
 
     /// <summary>
-    /// 検証項目: Access Tokenが有効でもユーザーが無効な場合は00008を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get User Info を Inactive User 条件で実行
+    /// 期待値
+    /// 　Returns Unauthorized を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetUserInfo_InactiveUser_ReturnsUnauthorized()
     {

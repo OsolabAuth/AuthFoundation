@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
@@ -10,6 +10,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class TokenApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -17,8 +25,13 @@ public sealed class TokenApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /token 正常系でAccess Token/Refresh Token/ID Tokenを返し、認可コードを使用済みにすること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Valid Authorization Code 条件で実行
+    /// 期待値
+    /// 　Returns Tokens And Deletes Authorization Code を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostToken_ValidAuthorizationCode_ReturnsTokensAndDeletesAuthorizationCode()
     {
@@ -75,8 +88,13 @@ public sealed class TokenApiTests
     }
 
     /// <summary>
-    /// 検証項目: client_secret_basicの正常系で、bodyのclient_idなしでもConfidential Clientとしてトークン発行できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Basic Client Authentication 条件で実行
+    /// 期待値
+    /// 　Returns Tokens を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostToken_BasicClientAuthentication_ReturnsTokens()
     {
@@ -125,8 +143,13 @@ public sealed class TokenApiTests
     }
 
     /// <summary>
-    /// 検証項目: grant_type等の必須パラメータ不足時に設計書どおり00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Missing Flow Type 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostToken_MissingFlowType_ReturnsRequestParameterError()
     {
@@ -150,8 +173,13 @@ public sealed class TokenApiTests
     }
 
     /// <summary>
-    /// 検証項目: 存在しない認可コードでは設計書どおり00007を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Unknown Authorization Code 条件で実行
+    /// 期待値
+    /// 　Returns Invalid Auth Code を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostToken_UnknownAuthorizationCode_ReturnsInvalidAuthCode()
     {
@@ -176,8 +204,13 @@ public sealed class TokenApiTests
     }
 
     /// <summary>
-    /// 検証項目: 認可コードに紐づくredirect_uriとリクエスト値が不一致の場合に00005を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Redirect Uri Mismatch 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Redirect Uri を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostToken_RedirectUriMismatch_ReturnsIllegalRedirectUri()
     {
@@ -220,8 +253,13 @@ public sealed class TokenApiTests
     }
 
     /// <summary>
-    /// 検証項目: Basic認証のsecret不一致時に設計書どおり00002を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Invalid Basic Secret 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Client を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostToken_InvalidBasicSecret_ReturnsIllegalClient()
     {
@@ -249,5 +287,145 @@ public sealed class TokenApiTests
         Assert.AreEqual("invalid_client", body.Value<string>("error"));
         Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Refresh Grant 条件で実行
+    /// 期待値
+    /// 　Rotates Refresh Token を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task PostToken_RefreshGrant_RotatesRefreshToken()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string clientId = ApiTestData.NewClientId();
+        await ApiTestData.CreateClientAsync(context, clientId);
+
+        string osolabId = ApiTestData.NewOsolabId();
+        string currentRefreshToken = $"{osolabId}_{Helper.GenerateHex(32).ToLowerInvariant()}_{clientId}";
+        var redis = new FakeRedisClient();
+        await new RefreshTokenSession
+        {
+            RefreshToken = currentRefreshToken,
+            OsolabId = osolabId,
+            ClientId = clientId,
+            Scope = "openid email"
+        }.CreateSession(redis);
+
+        var controller = new TokenController(context, redis, SigningTestHelper.CreateSigningService());
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = clientId,
+            ["refresh_token"] = currentRefreshToken
+        });
+        httpContext.Request.Headers[Code.HttpHeaders.X_FLOW_TYPE.Key] = "AuthorizationCode";
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostToken();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        var body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.IsTrue(Regex.IsMatch(body.Value<string>("access_token")!, @"^[A-Fa-f0-9]{16}_[A-Fa-f0-9]{32}_[0-9]{32}$"));
+        Assert.IsTrue(Regex.IsMatch(body.Value<string>("refresh_token")!, @"^[A-Fa-f0-9]{16}_[A-Fa-f0-9]{32}_[0-9]{32}$"));
+        Assert.AreNotEqual(currentRefreshToken, body.Value<string>("refresh_token"));
+        Assert.AreEqual("openid email", body.Value<string>("scope"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+
+        Assert.IsNull(await redis.GetStringAsync(RefreshTokenSession.GetRedisKey(currentRefreshToken), Code.RedisDbNo.REFRESH_TOKEN));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(await redis.GetStringAsync(
+            RefreshTokenSession.GetRedisKey(body.Value<string>("refresh_token")!),
+            Code.RedisDbNo.REFRESH_TOKEN)));
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Refresh Grant Unknown Refresh Token 条件で実行
+    /// 期待値
+    /// 　Returns Invalid Grant を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task PostToken_RefreshGrant_UnknownRefreshToken_ReturnsInvalidGrant()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string clientId = ApiTestData.NewClientId();
+        await ApiTestData.CreateClientAsync(context, clientId);
+
+        var controller = new TokenController(context, new FakeRedisClient(), SigningTestHelper.CreateSigningService());
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = clientId,
+            ["refresh_token"] = $"{ApiTestData.NewOsolabId()}_{Helper.GenerateHex(32).ToLowerInvariant()}_{clientId}"
+        });
+        httpContext.Request.Headers[Code.HttpHeaders.X_FLOW_TYPE.Key] = "AuthorizationCode";
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostToken();
+
+        var body = ControllerTestHelper.AssertError(result, (int)Code.INVALID_AUTH_CODE.Status, Code.INVALID_AUTH_CODE.Code);
+        Assert.AreEqual("invalid_grant", body.Value<string>("error"));
+        Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
+        Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Token を Refresh Grant Client Mismatch 条件で実行
+    /// 期待値
+    /// 　Returns Invalid Grant を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task PostToken_RefreshGrant_ClientMismatch_ReturnsInvalidGrant()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string ownerClientId = ApiTestData.NewClientId();
+        string otherClientId = ApiTestData.NewClientId();
+        await ApiTestData.CreateClientAsync(context, ownerClientId);
+        await ApiTestData.CreateClientAsync(context, otherClientId);
+
+        string osolabId = ApiTestData.NewOsolabId();
+        string refreshToken = $"{osolabId}_{Helper.GenerateHex(32).ToLowerInvariant()}_{ownerClientId}";
+        var redis = new FakeRedisClient();
+        await new RefreshTokenSession
+        {
+            RefreshToken = refreshToken,
+            OsolabId = osolabId,
+            ClientId = ownerClientId,
+            Scope = "openid"
+        }.CreateSession(redis);
+
+        var controller = new TokenController(context, redis, SigningTestHelper.CreateSigningService());
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = otherClientId,
+            ["refresh_token"] = refreshToken
+        });
+        httpContext.Request.Headers[Code.HttpHeaders.X_FLOW_TYPE.Key] = "AuthorizationCode";
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostToken();
+
+        var body = ControllerTestHelper.AssertError(result, (int)Code.INVALID_AUTH_CODE.Status, Code.INVALID_AUTH_CODE.Code);
+        Assert.AreEqual("invalid_grant", body.Value<string>("error"));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(await redis.GetStringAsync(
+            RefreshTokenSession.GetRedisKey(refreshToken),
+            Code.RedisDbNo.REFRESH_TOKEN)));
     }
 }

@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
@@ -15,7 +15,7 @@ namespace AuthFoundation.Controllers.Auth
         private readonly IRedisClient _redis;
 
         /// <summary>
-        /// LogoutController を初期化します。
+        /// <see cref="LogoutController"/> の新しいインスタンスを初期化します。
         /// </summary>
         /// <param name="redis">Redis クライアント</param>
         public LogoutController(IRedisClient redis)
@@ -24,7 +24,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// ログアウトを実行します。
+        /// ログアウト処理を実行し、セッションを破棄します。
         /// </summary>
         /// <returns>ログアウト結果</returns>
         [HttpPost]
@@ -83,6 +83,11 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// Authorization ヘッダーから Bearer トークンを抽出します。
+        /// </summary>
+        /// <param name="authorization">Authorization ヘッダー値</param>
+        /// <returns>抽出したアクセストークン</returns>
         private static string ExtractBearerToken(string authorization)
         {
             if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
@@ -96,18 +101,30 @@ namespace AuthFoundation.Controllers.Auth
                 : string.Empty;
         }
 
+        /// <summary>
+        /// レスポンスにキャッシュ無効ヘッダーを設定します。
+        /// </summary>
+        /// <param name="response">HTTP レスポンス</param>
         private static void SetNoStoreHeaders(HttpResponse response)
         {
             response.Headers["Cache-Control"] = "no-store";
             response.Headers["Pragma"] = "no-cache";
         }
 
+        /// <summary>
+        /// /logout 入力を表します。
+        /// </summary>
         private sealed class Input
         {
             public string LogoutAllRaw { get; set; } = string.Empty;
 
             public bool LogoutAll { get; set; }
 
+            /// <summary>
+            /// HTTP リクエストからログアウト入力を生成します。
+            /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>ログアウト入力</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -131,6 +148,9 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            /// <summary>
+            /// ログアウト入力値を検証します。
+            /// </summary>
             public void Validate()
             {
                 if (string.IsNullOrWhiteSpace(LogoutAllRaw))
@@ -150,6 +170,10 @@ namespace AuthFoundation.Controllers.Auth
             public string error { get; }
             public string error_description { get; }
 
+            /// <summary>
+            /// API 例外からエラー出力を生成します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
             public ErrorOutput(ApiException ex)
             {
                 response_code = ex.InternalCode;
@@ -158,6 +182,11 @@ namespace AuthFoundation.Controllers.Auth
                 error_description = ex.ErrorDescription;
             }
 
+            /// <summary>
+            /// API 例外を OAuth エラーコードへ変換します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            /// <returns>OAuth エラーコード</returns>
             private static string ToOAuthError(ApiException ex)
             {
                 if (string.Equals(ex.InternalCode, Code.REQUEST_PARAMETER_ERROR.Code, StringComparison.Ordinal))

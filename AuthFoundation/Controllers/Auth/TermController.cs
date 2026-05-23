@@ -62,6 +62,10 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// フォーム形式で受け取ったセッションIDから規約一覧を返します。
+        /// </summary>
+        /// <returns>規約一覧</returns>
         [HttpPost("list")]
         public async Task<IActionResult> PostTermsList()
         {
@@ -152,6 +156,11 @@ namespace AuthFoundation.Controllers.Auth
             return session;
         }
 
+        /// <summary>
+        /// 認可セッションに紐づく規約一覧とスコープを返却します。
+        /// </summary>
+        /// <param name="sessionId">認可セッションID</param>
+        /// <returns>規約一覧レスポンス</returns>
         private async Task<IActionResult> BuildTermsResponseAsync(string sessionId)
         {
             AuthRequestSession session = await GetAuthRequestSessionRequiredAsync(sessionId);
@@ -177,6 +186,10 @@ namespace AuthFoundation.Controllers.Auth
             });
         }
 
+        /// <summary>
+        /// レスポンスにキャッシュ無効ヘッダーを設定します。
+        /// </summary>
+        /// <param name="response">HTTP レスポンス</param>
         private static void SetNoStoreHeaders(HttpResponse response)
         {
             response.Headers["Cache-Control"] = "no-store";
@@ -260,6 +273,12 @@ namespace AuthFoundation.Controllers.Auth
             await _dbContext.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// 利用規約同意履歴の重複判定用キーを作成します。
+        /// </summary>
+        /// <param name="termId">規約ID</param>
+        /// <param name="termVersion">規約バージョン</param>
+        /// <returns>重複判定用キー</returns>
         private static string TermConsentKey(string termId, string termVersion)
         {
             return $"{termId}\u001F{termVersion}";
@@ -347,6 +366,11 @@ namespace AuthFoundation.Controllers.Auth
                 error_description = ex.ErrorDescription;
             }
 
+            /// <summary>
+            /// API 例外を OAuth エラーコードへ変換します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            /// <returns>OAuth エラーコード</returns>
             private static string ToOAuthError(ApiException ex)
             {
                 if (string.Equals(ex.InternalCode, Code.SCREEN_EXPIRED.InternalCode, StringComparison.Ordinal))
@@ -372,6 +396,11 @@ namespace AuthFoundation.Controllers.Auth
         {
             public string SessionId { get; set; } = string.Empty;
 
+            /// <summary>
+            /// HTTP リクエストからセッション入力を生成します。
+            /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>セッション入力</returns>
             public static async Task<FormSessionInput> CreateAsync(HttpContext context)
             {
                 HttpRequest request = context.Request;
@@ -383,6 +412,9 @@ namespace AuthFoundation.Controllers.Auth
                 };
             }
 
+            /// <summary>
+            /// セッション入力値を検証します。
+            /// </summary>
             public void Validate()
             {
                 ValidateUtil.IndispensableParam(SessionId, Code.HttpBodies.SESSION_ID.Key);

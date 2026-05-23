@@ -21,9 +21,11 @@ namespace AuthFoundation.Common
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly SemaphoreSlim _initializeLock = new(1, 1);
         private readonly byte[] _encryptionKey;
+        private readonly TimeSpan _reloadInterval;
 
         private RSA? _rsa;
         private JwkPublicKey[] _jwksKeys = Array.Empty<JwkPublicKey>();
+        private DateTimeOffset _lastLoadedUtc = DateTimeOffset.MinValue;
 
         /// <summary>
         /// Gets KeyId.
@@ -37,6 +39,7 @@ namespace AuthFoundation.Common
         {
             _scopeFactory = scopeFactory;
             _encryptionKey = DeriveEncryptionKey(AppConfig.JwkPrivateKeyEncryptionKey);
+            _reloadInterval = TimeSpan.FromSeconds(Math.Max(0, AppConfig.JwkSigningKeyReloadSec));
         }
 
         /// <summary>
@@ -112,7 +115,7 @@ namespace AuthFoundation.Common
         /// </summary>
         private async Task EnsureInitializedAsync()
         {
-            if (_rsa != null)
+            if (!ShouldReload(DateTimeOffset.UtcNow))
             {
                 return;
             }
@@ -120,7 +123,8 @@ namespace AuthFoundation.Common
             await _initializeLock.WaitAsync();
             try
             {
-                if (_rsa != null)
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                if (!ShouldReload(now))
                 {
                     return;
                 }
@@ -150,11 +154,27 @@ namespace AuthFoundation.Common
                 _rsa = rsa;
                 KeyId = signingKey.kid;
                 _jwksKeys = activeKeys.Select(ToPublicKey).ToArray();
+                _lastLoadedUtc = now;
             }
             finally
             {
                 _initializeLock.Release();
             }
+        }
+
+        private bool ShouldReload(DateTimeOffset now)
+        {
+            if (_rsa == null)
+            {
+                return true;
+            }
+
+            if (_reloadInterval == TimeSpan.Zero)
+            {
+                return true;
+            }
+
+            return now - _lastLoadedUtc >= _reloadInterval;
         }
 
         /// <summary>

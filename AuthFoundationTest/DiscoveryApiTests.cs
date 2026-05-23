@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +8,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class DiscoveryApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -15,8 +23,13 @@ public sealed class DiscoveryApiTests
     }
 
     /// <summary>
-    /// 検証項目: OpenID Configurationが設計書のエンドポイント、PKCE S256、none/client_secret_basic、主要claimsを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Configuration を 標準入力 条件で実行
+    /// 期待値
+    /// 　Returns Oidc Discovery Metadata を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void GetConfiguration_ReturnsOidcDiscoveryMetadata()
     {

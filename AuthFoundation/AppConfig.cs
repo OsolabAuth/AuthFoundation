@@ -32,6 +32,10 @@ namespace AuthFoundation.Common
         /// </summary>
         public static int IdTokenExpireSec { get; private set; }
         /// <summary>
+        /// Gets or sets JwkSigningKeyReloadSec.
+        /// </summary>
+        public static int JwkSigningKeyReloadSec { get; private set; } = 300;
+        /// <summary>
         /// Gets or sets Issuer.
         /// </summary>
         public static string Issuer { get; private set; } = "https://auth.osolab-auth.jp/";
@@ -95,6 +99,7 @@ namespace AuthFoundation.Common
             AccessTokenExpireSec = GetRequiredInt(config, "AccessToken_ExpireSec");
             RefreshTokenExpireSec = GetRequiredInt(config, "RefreshToken_ExpireSec");
             IdTokenExpireSec = GetRequiredInt(config, "IDToken_ExpireSec");
+            JwkSigningKeyReloadSec = GetIntOrDefault(config, "JwkSigningKeyReloadSec", 300);
             RedisDbDefault = GetIntOrDefault(config, "RedisDb_Default", 0);
             RedisDbLoginSession = GetIntOrDefault(config, "RedisDb_LoginSession", 1);
             RedisDbAuthCode = GetIntOrDefault(config, "RedisDb_AuthCode", 2);

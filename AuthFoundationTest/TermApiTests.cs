@@ -11,6 +11,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class TermApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -18,8 +26,13 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /terms/list がCookieの認可セッションIDから認可セッションを取得し、対象クライアントの規約とscopeを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Terms List を Valid Cookie Session 条件で実行
+    /// 期待値
+    /// 　Returns Terms And Scopes を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTermsList_ValidCookieSession_ReturnsTermsAndScopes()
     {
@@ -54,8 +67,13 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /terms/list がAuthRequestSessionId Cookieを優先し、互換session_idがログインセッションIDでも画面期限切れにならないこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Terms List を 標準入力 条件で実行
+    /// 期待値
+    /// 　Prefers Auth Request Cookie Over Compatibility Session Id を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTermsList_PrefersAuthRequestCookieOverCompatibilitySessionId()
     {
@@ -90,8 +108,13 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /terms/list の認可セッション期限切れ時に設計書どおり00003を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Terms List を Expired Session 条件で実行
+    /// 期待値
+    /// 　Returns Screen Expired を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTermsList_ExpiredSession_ReturnsScreenExpired()
     {
@@ -112,8 +135,13 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /terms でaccepted=falseの場合、同意を保存せずredirect_uriへaccess_deniedを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Terms を Denied 条件で実行
+    /// 期待値
+    /// 　Returns Access Denied Redirect を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTerms_Denied_ReturnsAccessDeniedRedirect()
     {
@@ -150,8 +178,13 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /terms 同意正常系で必須規約とscope同意をDBに保存し、認可コード付きLocationを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Terms を Accepts Required Term 条件で実行
+    /// 期待値
+    /// 　Saves Consent And Redirects With Code を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTerms_AcceptsRequiredTerm_SavesConsentAndRedirectsWithCode()
     {
@@ -208,8 +241,13 @@ public sealed class TermApiTests
     }
 
     /// <summary>
-    /// 検証項目: accepted未指定時に設計書どおり00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Terms を Missing Accepted 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTerms_MissingAccepted_ReturnsRequestParameterError()
     {

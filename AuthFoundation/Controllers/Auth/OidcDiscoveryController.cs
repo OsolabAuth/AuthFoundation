@@ -3,13 +3,18 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// OIDC Discovery ドキュメントを返却します。
+    /// </summary>
     [ApiController]
     [Route(".well-known/openid-configuration")]
-    /// <summary>     /// OidcDiscoveryController class.     /// </summary>
     public class OidcDiscoveryController : ControllerBase
     {
+        /// <summary>
+        /// OIDC Discovery メタデータを返却します。
+        /// </summary>
+        /// <returns>Discovery メタデータ</returns>
         [HttpGet]
-        /// <summary>         /// Executes GetConfiguration.         /// </summary>
         public IActionResult GetConfiguration()
         {
             string issuer = AppConfig.Issuer.TrimEnd('/');

@@ -1,4 +1,4 @@
-using AuthFoundation.Controllers.Auth;
+﻿using AuthFoundation.Controllers.Auth;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,6 +7,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class JwksApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -14,8 +22,13 @@ public sealed class JwksApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /jwks が公開鍵のみを返し、RSA/RS256/sigのJWK形式を満たすこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Jwks を 標準入力 条件で実行
+    /// 期待値
+    /// 　Returns Public Rsa Signing Keys Only を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetJwks_ReturnsPublicRsaSigningKeysOnly()
     {

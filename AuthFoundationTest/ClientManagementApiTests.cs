@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Controllers.Client;
 using AuthFoundationTest.TestSupport;
@@ -13,6 +13,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class ClientManagementApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -20,8 +28,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /Client 正常系でclient_id/client_secretを発行し、DBに有効クライアントとして登録すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Client を Valid Json 条件で実行
+    /// 期待値
+    /// 　Creates Client を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostClient_ValidJson_CreatesClient()
     {
@@ -46,8 +59,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /Client のContent-Type不正時に00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Client を Invalid Content Type 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostClient_InvalidContentType_ReturnsRequestParameterError()
     {
@@ -63,8 +81,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /register 互換エンドポイントでもclient_id/client_secretを発行できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Register Client を Valid Json 条件で実行
+    /// 期待値
+    /// 　Creates Client を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task RegisterClient_ValidJson_CreatesClient()
     {
@@ -88,8 +111,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /Client 正常系で登録済みclientのscopeとredirect_uriを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Client を Valid Client Id 条件で実行
+    /// 期待値
+    /// 　Returns Scopes And Redirect Uris を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetClient_ValidClientId_ReturnsScopesAndRedirectUris()
     {
@@ -115,8 +143,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /Client の未登録client_idで00002を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Client を Unknown Client Id 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Client を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetClient_UnknownClientId_ReturnsIllegalClient()
     {
@@ -134,8 +167,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /Term 正常系でクライアント規約を登録できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Term を New Term 条件で実行
+    /// 期待値
+    /// 　Creates Client Term を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTerm_NewTerm_CreatesClientTerm()
     {
@@ -168,8 +206,13 @@ public sealed class ClientManagementApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /Term のrequired不正値で00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Term を Invalid Required 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostTerm_InvalidRequired_ReturnsRequestParameterError()
     {

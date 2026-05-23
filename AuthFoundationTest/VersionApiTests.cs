@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers;
 using AuthFoundationTest.TestSupport;
 using Microsoft.AspNetCore.Http;
@@ -10,8 +10,13 @@ namespace AuthFoundationTest;
 public sealed class VersionApiTests
 {
     /// <summary>
-    /// 検証項目: GET /Version が00000と現在のバージョン文字列を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Version を 標準入力 条件で実行
+    /// 期待値
+    /// 　Returns Version を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetVersion_ReturnsVersion()
     {

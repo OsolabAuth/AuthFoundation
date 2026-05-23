@@ -11,6 +11,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class LoginApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -18,8 +26,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /login 正常系でAuthSession CookieとRedisログインセッションを作成し、認可セッションなしの場合は00006を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Login を Valid Password 条件で実行
+    /// 期待値
+    /// 　Writes Login Session Cookie And Redis Value を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogin_ValidPassword_WritesLoginSessionCookieAndRedisValue()
     {
@@ -76,8 +89,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /login でCookieのsession_idを認可セッションとして使用し、ログイン後に同意画面へのLocationを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Login を With Auth Request Session Cookie 条件で実行
+    /// 期待値
+    /// 　Returns Redirect Result を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogin_WithAuthRequestSessionCookie_ReturnsRedirectResult()
     {
@@ -133,8 +151,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /login でパスワード不一致の場合に設計書どおり00004を返し、Cookieを発行しないこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Login を Invalid Password 条件で実行
+    /// 期待値
+    /// 　Returns Authentication Failed を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogin_InvalidPassword_ReturnsAuthenticationFailed()
     {
@@ -182,6 +205,39 @@ public sealed class LoginApiTests
         }
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Login を Invalid Mail Address Format 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task PostLogin_InvalidMailAddressFormat_ReturnsRequestParameterError()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        var controller = new LoginController(
+            context,
+            redis,
+            new TestWebHostEnvironment(),
+            new AuthorizeExecutionService(context, redis));
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["email"] = "user@@example.com",
+            ["password"] = "Password123"
+        });
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostLogin();
+
+        var body = ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+        Assert.AreEqual("invalid_request", body.Value<string>("error"));
+    }
+
     private static async Task CreateUserAsync(
         AuthFoundation.Data.OsolabAuthContext context,
         string osolabId,
@@ -207,8 +263,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /login のContent-Type不正時に設計書どおり00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Login を Invalid Content Type 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogin_InvalidContentType_ReturnsRequestParameterError()
     {
@@ -232,8 +293,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /login/status が有効なAuthSession Cookie時に logged_in=true を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Status を With Valid Session 条件で実行
+    /// 期待値
+    /// 　Returns Logged In True を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetStatus_WithValidSession_ReturnsLoggedInTrue()
     {
@@ -266,8 +332,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /login/status がセッション未指定時に logged_in=false を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Status を Without Session 条件で実行
+    /// 期待値
+    /// 　Returns Logged In False を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetStatus_WithoutSession_ReturnsLoggedInFalse()
     {
@@ -293,8 +364,13 @@ public sealed class LoginApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /login/status が不正セッション時に logged_in=false を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Status を Invalid Session 条件で実行
+    /// 期待値
+    /// 　Returns Logged In False を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetStatus_InvalidSession_ReturnsLoggedInFalse()
     {

@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
@@ -11,12 +11,28 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class LogoutApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
         AppConfigTestHelper.Initialize();
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Logout Controller を Class Route 条件で実行
+    /// 期待値
+    /// 　Is Single Logout Template を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void LogoutController_ClassRoute_IsSingleLogoutTemplate()
     {
@@ -30,6 +46,14 @@ public sealed class LogoutApiTests
         Assert.AreEqual("logout", routeAttributes[0].Template);
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Logout を Logged In Session 条件で実行
+    /// 期待値
+    /// 　Deletes Cookies And Redis Sessions を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogout_LoggedInSession_DeletesCookiesAndRedisSessions()
     {
@@ -70,6 +94,14 @@ public sealed class LogoutApiTests
         StringAssert.Contains(setCookie, "session_id=");
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Logout を No Login Session 条件で実行
+    /// 期待値
+    /// 　Returns Already Logged Out を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogout_NoLoginSession_ReturnsAlreadyLoggedOut()
     {
@@ -91,6 +123,14 @@ public sealed class LogoutApiTests
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Logout を Invalid Content Type 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogout_InvalidContentType_ReturnsRequestParameterError()
     {
@@ -107,6 +147,14 @@ public sealed class LogoutApiTests
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Logout を Missing Logout All 条件で実行
+    /// 期待値
+    /// 　Defaults To False を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogout_MissingLogoutAll_DefaultsToFalse()
     {
@@ -123,6 +171,14 @@ public sealed class LogoutApiTests
         Assert.AreEqual(false, body.Value<bool>("logout_all"));
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Logout を No Content Type 条件で実行
+    /// 期待値
+    /// 　Defaults To False を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogout_NoContentType_DefaultsToFalse()
     {
@@ -140,6 +196,14 @@ public sealed class LogoutApiTests
         Assert.AreEqual(false, body.Value<bool>("logout_all"));
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Logout を Invalid Bearer Format 条件で実行
+    /// 期待値
+    /// 　Ignored And Succeeds を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostLogout_InvalidBearerFormat_IgnoredAndSucceeds()
     {

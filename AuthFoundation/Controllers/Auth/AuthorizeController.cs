@@ -87,12 +87,21 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// レスポンスにキャッシュ無効ヘッダーを設定します。
+        /// </summary>
+        /// <param name="response">HTTP レスポンス</param>
         private static void SetNoStoreHeaders(HttpResponse response)
         {
             response.Headers["Cache-Control"] = "no-store";
             response.Headers["Pragma"] = "no-cache";
         }
 
+        /// <summary>
+        /// 認可結果をレスポンスボディで返却するモードか判定します。
+        /// </summary>
+        /// <param name="request">HTTP リクエスト</param>
+        /// <returns>ボディ返却モードの場合は true</returns>
         private static bool ShouldReturnBodySession(HttpRequest request)
         {
             return string.Equals(
@@ -116,6 +125,11 @@ namespace AuthFoundation.Controllers.Auth
                 error_description = ex.ErrorDescription;
             }
 
+            /// <summary>
+            /// API 例外を OAuth エラーコードへ変換します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            /// <returns>OAuth エラーコード</returns>
             private static string ToOAuthError(ApiException ex)
             {
                 if (string.Equals(ex.InternalCode, Code.ILLEGAL_CLIENT.InternalCode, StringComparison.Ordinal))

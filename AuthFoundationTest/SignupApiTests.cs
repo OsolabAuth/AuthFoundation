@@ -14,6 +14,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class SignupApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -21,8 +29,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/email 正常系でサインアップセッションを作成し、signup_session_id Cookieを発行すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Email を Valid Request 条件で実行
+    /// 期待値
+    /// 　Creates Signup Session And Cookie を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostEmail_ValidRequest_CreatesSignupSessionAndCookie()
     {
@@ -65,8 +78,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/email で既存有効メールアドレス指定時に00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Email を Existing Active Email 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostEmail_ExistingActiveEmail_ReturnsRequestParameterError()
     {
@@ -96,8 +114,46 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/email で認可セッションが無効な場合に00003を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Email を Invalid Mail Address Format 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task PostEmail_InvalidMailAddressFormat_ReturnsRequestParameterError()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        string authzSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
+        await ApiTestData.WriteAuthRequestSessionAsync(
+            redis,
+            ApiTestData.CreateAuthRequestSession(authzSessionId, Code.InnerClient.OSOLAB_CLIENT_ID, "https://portal.osolab-auth.jp/callback"));
+
+        var controller = new SignupEmailController(context, redis, CreateGmailSmtpMail(), NullLogger<SignupEmailController>.Instance);
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["email"] = "user@@example.com"
+        });
+        ControllerTestHelper.SetCookie(httpContext, "session_id", authzSessionId);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostEmail();
+
+        ControllerTestHelper.AssertError(result, (int)Code.REQUEST_PARAMETER_ERROR.Status, Code.REQUEST_PARAMETER_ERROR.Code);
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Email を Missing Auth Request Session 条件で実行
+    /// 期待値
+    /// 　Returns Screen Expired を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostEmail_MissingAuthRequestSession_ReturnsScreenExpired()
     {
@@ -118,8 +174,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/verify 正常系で認証コードを照合し、セッションを認証済みにすること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Verify を Valid Code 条件で実行
+    /// 期待値
+    /// 　Marks Session Verified を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task Verify_ValidCode_MarksSessionVerified()
     {
@@ -155,8 +216,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/verify で確認コード不一致時に00001を返し、セッション状態を変更しないこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Verify を Invalid Code 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task Verify_InvalidCode_ReturnsRequestParameterError()
     {
@@ -189,8 +255,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/account 正常系でユーザー有効化、ログインCookie発行、認可再開を行うこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Account を Verified Session 条件で実行
+    /// 期待値
+    /// 　Activates User And Redirects を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostAccount_VerifiedSession_ActivatesUserAndRedirects()
     {
@@ -244,8 +315,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/account で認証未完了セッション指定時に00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Account を Not Verified 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostAccount_NotVerified_ReturnsRequestParameterError()
     {
@@ -281,8 +357,13 @@ public sealed class SignupApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /signup/resend 正常系で確認コードを更新すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Resend を Valid Session 条件で実行
+    /// 期待値
+    /// 　Updates Verification Code を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task Resend_ValidSession_UpdatesVerificationCode()
     {

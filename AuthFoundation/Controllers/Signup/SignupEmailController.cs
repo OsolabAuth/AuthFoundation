@@ -130,8 +130,7 @@ namespace AuthFoundation.Controllers.Signup
             {
                 ValidateUtil.IndispensableParam(AuthRequestSessionId, Code.HttpBodies.SESSION_ID.Key);
                 ValidateUtil.FormatParam(AuthRequestSessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
-                ValidateUtil.IndispensableParam(Email, Code.HttpBodies.EMAIL.Key);
-                ValidateUtil.FormatParam(Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+                ValidateUtil.EmailParam(Email, Code.HttpBodies.EMAIL.Key);
             }
         }
 

@@ -37,6 +37,7 @@ jobs:
       CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
       CLOUD_RUN_UPDATE_ENV_VARS: ${{ vars.CLOUD_RUN_UPDATE_ENV_VARS }}
       CLOUD_RUN_UPDATE_SECRETS: ${{ vars.CLOUD_RUN_UPDATE_SECRETS }}
+      CLOUD_RUN_SECRET_MAX_AGE_DAYS: ${{ vars.CLOUD_RUN_SECRET_MAX_AGE_DAYS }}
       CLOUD_RUN_VPC_EGRESS: ${{ vars.CLOUD_RUN_VPC_EGRESS || 'private-ranges-only' }}
       AUTH_ISSUER: ${{ vars.AUTH_ISSUER }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -125,6 +126,34 @@ jobs:
           CLOUD_RUN_SUBNET="$(trim_value "${CLOUD_RUN_SUBNET}")"
           CLOUD_RUN_VPC_CONNECTOR="$(trim_value "${CLOUD_RUN_VPC_CONNECTOR}")"
           CLOUD_RUN_NETWORK_TAGS="$(trim_value "${CLOUD_RUN_NETWORK_TAGS}")"
+          CLOUD_RUN_SECRET_MAX_AGE_DAYS="$(trim_value "${CLOUD_RUN_SECRET_MAX_AGE_DAYS}")"
+
+          resolve_secret_reference() {
+            local secret_reference="$1"
+            local secret_name_ref="${secret_reference%:*}"
+            local secret_version="${secret_reference##*:}"
+            if [ -z "${secret_name_ref}" ]; then
+              return 1
+            fi
+            if [ -z "${secret_version}" ] || [ "${secret_version}" = "${secret_name_ref}" ]; then
+              secret_version="latest"
+            fi
+
+            resolved_secret_project="${GCP_PROJECT_ID}"
+            resolved_secret_name="${secret_name_ref}"
+            resolved_secret_version="${secret_version}"
+
+            if [[ "${secret_name_ref}" =~ ^projects/([^/]+)/secrets/([^/]+)/versions/([^/]+)$ ]]; then
+              resolved_secret_project="${BASH_REMATCH[1]}"
+              resolved_secret_name="${BASH_REMATCH[2]}"
+              resolved_secret_version="${BASH_REMATCH[3]}"
+            elif [[ "${secret_name_ref}" =~ ^projects/([^/]+)/secrets/([^/]+)$ ]]; then
+              resolved_secret_project="${BASH_REMATCH[1]}"
+              resolved_secret_name="${BASH_REMATCH[2]}"
+            fi
+
+            return 0
+          }
 
           env_updates="ASPNETCORE_ENVIRONMENT=Production,DisableHttpsRedirection=true"
           if [ -n "${AUTH_ISSUER}" ]; then
@@ -135,49 +164,121 @@ jobs:
           fi
 
           if [ -n "${CLOUD_RUN_UPDATE_SECRETS}" ]; then
+            declare -A secret_map=()
+            declare -A secret_project_map=()
+            declare -A secret_name_map=()
+            declare -A secret_version_map=()
             missing_secret_refs=()
             IFS=',' read -r -a secret_mappings <<< "${CLOUD_RUN_UPDATE_SECRETS}"
             for mapping in "${secret_mappings[@]}"; do
               mapping="$(trim_value "${mapping}")"
               [ -z "${mapping}" ] && continue
 
+              secret_env_key="${mapping%%=*}"
+              secret_env_key="$(trim_value "${secret_env_key}")"
               secret_reference="${mapping#*=}"
               if [ -z "${secret_reference}" ] || [ "${secret_reference}" = "${mapping}" ]; then
                 continue
               fi
+              if [ -n "${secret_env_key}" ]; then
+                secret_map["${secret_env_key}"]="${secret_reference}"
+              fi
 
-              secret_name_ref="${secret_reference%:*}"
-              secret_version="${secret_reference##*:}"
-              if [ -z "${secret_name_ref}" ]; then
+              if ! resolve_secret_reference "${secret_reference}"; then
                 continue
               fi
-              if [ -z "${secret_version}" ] || [ "${secret_version}" = "${secret_name_ref}" ]; then
-                secret_version="latest"
+
+              if [ -n "${secret_env_key}" ]; then
+                secret_project_map["${secret_env_key}"]="${resolved_secret_project}"
+                secret_name_map["${secret_env_key}"]="${resolved_secret_name}"
+                secret_version_map["${secret_env_key}"]="${resolved_secret_version}"
               fi
 
-              secret_project="${GCP_PROJECT_ID}"
-              secret_name="${secret_name_ref}"
-              if [[ "${secret_name_ref}" =~ ^projects/([^/]+)/secrets/([^/]+)/versions/([^/]+)$ ]]; then
-                secret_project="${BASH_REMATCH[1]}"
-                secret_name="${BASH_REMATCH[2]}"
-                secret_version="${BASH_REMATCH[3]}"
-              elif [[ "${secret_name_ref}" =~ ^projects/([^/]+)/secrets/([^/]+)$ ]]; then
-                secret_project="${BASH_REMATCH[1]}"
-                secret_name="${BASH_REMATCH[2]}"
-              fi
-
-              if ! gcloud secrets versions describe "${secret_version}" \
-                --secret "${secret_name}" \
-                --project "${secret_project}" >/dev/null 2>&1; then
-                missing_secret_refs+=("${secret_project}/${secret_name}:${secret_version}")
+              if ! gcloud secrets versions describe "${resolved_secret_version}" \
+                --secret "${resolved_secret_name}" \
+                --project "${resolved_secret_project}" >/dev/null 2>&1; then
+                missing_secret_refs+=("${resolved_secret_project}/${resolved_secret_name}:${resolved_secret_version}")
               fi
             done
+
+            required_secret_keys=(
+              "ConnectionStrings__DefaultConnection"
+              "ConnectionStrings__Redis"
+              "PasswordHashKey"
+              "JwkPrivateKeyEncryptionKey"
+              "Mail__FromEmail"
+              "GmailSmtp__Username"
+              "GmailSmtp__AppPassword"
+            )
+            missing_required_secret_keys=()
+            for key in "${required_secret_keys[@]}"; do
+              if [ -z "${secret_map[$key]+x}" ]; then
+                missing_required_secret_keys+=("${key}")
+              fi
+            done
+
+            if [ "${#missing_required_secret_keys[@]}" -gt 0 ]; then
+              echo "CLOUD_RUN_UPDATE_SECRETS is missing required mappings:" >&2
+              printf '  - %s\n' "${missing_required_secret_keys[@]}" >&2
+              exit 1
+            fi
 
             if [ "${#missing_secret_refs[@]}" -gt 0 ]; then
               echo "Required Cloud Run runtime secrets are missing:" >&2
               printf '  - %s\n' "${missing_secret_refs[@]}" >&2
               exit 1
             fi
+
+            if [ -n "${CLOUD_RUN_SECRET_MAX_AGE_DAYS}" ]; then
+              if ! [[ "${CLOUD_RUN_SECRET_MAX_AGE_DAYS}" =~ ^[0-9]+$ ]]; then
+                echo "CLOUD_RUN_SECRET_MAX_AGE_DAYS must be an integer." >&2
+                exit 1
+              fi
+
+              if [ "${CLOUD_RUN_SECRET_MAX_AGE_DAYS}" -gt 0 ]; then
+                now_epoch="$(date -u +%s)"
+                stale_secret_refs=()
+                for key in "${required_secret_keys[@]}"; do
+                  secret_project="${secret_project_map[$key]}"
+                  secret_name="${secret_name_map[$key]}"
+                  secret_version="${secret_version_map[$key]}"
+                  if [ -z "${secret_project}" ] || [ -z "${secret_name}" ] || [ -z "${secret_version}" ]; then
+                    stale_secret_refs+=("${key} (mapping unresolved)")
+                    continue
+                  fi
+
+                  create_time="$(gcloud secrets versions describe "${secret_version}" \
+                    --secret "${secret_name}" \
+                    --project "${secret_project}" \
+                    --format='value(createTime)' 2>/dev/null || true)"
+                  if [ -z "${create_time}" ]; then
+                    stale_secret_refs+=("${secret_project}/${secret_name}:${secret_version} (createTime unavailable)")
+                    continue
+                  fi
+
+                  created_epoch="$(date -u -d "${create_time}" +%s 2>/dev/null || true)"
+                  if [ -z "${created_epoch}" ]; then
+                    stale_secret_refs+=("${secret_project}/${secret_name}:${secret_version} (createTime parse failed)")
+                    continue
+                  fi
+
+                  age_days="$(( (now_epoch - created_epoch) / 86400 ))"
+                  if [ "${age_days}" -gt "${CLOUD_RUN_SECRET_MAX_AGE_DAYS}" ]; then
+                    stale_secret_refs+=("${secret_project}/${secret_name}:${secret_version} (${age_days} days old)")
+                  fi
+                done
+
+                if [ "${#stale_secret_refs[@]}" -gt 0 ]; then
+                  echo "Secret rotation check failed. Stale runtime secrets detected:" >&2
+                  printf '  - %s\n' "${stale_secret_refs[@]}" >&2
+                  echo "Set newer secret versions or increase CLOUD_RUN_SECRET_MAX_AGE_DAYS intentionally." >&2
+                  exit 1
+                fi
+              fi
+            fi
+          else
+            echo "CLOUD_RUN_UPDATE_SECRETS is required for production deploy." >&2
+            exit 1
           fi
 
           deploy_args=(

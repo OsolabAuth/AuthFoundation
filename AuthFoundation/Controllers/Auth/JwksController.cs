@@ -3,17 +3,28 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// JWKS 配信処理を提供します。
+    /// </summary>
     [ApiController]
     [Route("jwks")]
     public class JwksController : ControllerBase
     {
         private readonly OidcSigningService _oidcSigningService;
 
+        /// <summary>
+        /// <see cref="JwksController"/> の新しいインスタンスを初期化します。
+        /// </summary>
+        /// <param name="oidcSigningService">OIDC 署名サービス</param>
         public JwksController(OidcSigningService oidcSigningService)
         {
             _oidcSigningService = oidcSigningService;
         }
 
+        /// <summary>
+        /// 公開鍵セット (JWKS) を返却します。
+        /// </summary>
+        /// <returns>JWKS レスポンス</returns>
         [HttpGet]
         public async Task<IActionResult> GetJwks()
         {

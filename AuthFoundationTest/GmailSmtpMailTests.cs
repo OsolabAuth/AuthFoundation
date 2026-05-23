@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 namespace AuthFoundationTest;
@@ -7,8 +7,13 @@ namespace AuthFoundationTest;
 public sealed class GmailSmtpMailTests
 {
     /// <summary>
-    /// 検証項目: Gmail SMTP設定不足時にネットワーク送信せずInvalidOperationExceptionを送出すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Send Mail Async を Missing Configuration 条件で実行
+    /// 期待値
+    /// 　Throws Invalid Operation Exception を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task SendMailAsync_MissingConfiguration_ThrowsInvalidOperationException()
     {
@@ -24,8 +29,71 @@ public sealed class GmailSmtpMailTests
     }
 
     /// <summary>
-    /// 検証項目: 旧Smtp設定キーのみでもSMTP設定として読み込めること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Send Mail Async を Invalid From Email 条件で実行
+    /// 期待値
+    /// 　Throws Invalid Operation Exception を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task SendMailAsync_InvalidFromEmail_ThrowsInvalidOperationException()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Mail:FromEmail"] = "invalid-from-email",
+                ["GmailSmtp:Host"] = "smtp.gmail.com",
+                ["GmailSmtp:Port"] = "587",
+                ["GmailSmtp:Username"] = "user@example.com",
+                ["GmailSmtp:AppPassword"] = "dummy"
+            })
+            .Build();
+        var mail = new GmailSmtpMail(config, NullLogger<GmailSmtpMail>.Instance);
+
+        InvalidOperationException ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            mail.SendMailAsync("to@example.com", "To User", "Subject", "<p>Hello</p>"));
+
+        StringAssert.Contains(ex.Message, "Mail:FromEmail is invalid.");
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Send Mail Async を Invalid Recipient Email 条件で実行
+    /// 期待値
+    /// 　Throws Invalid Operation Exception を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task SendMailAsync_InvalidRecipientEmail_ThrowsInvalidOperationException()
+    {
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Mail:FromEmail"] = "from@example.com",
+                ["GmailSmtp:Host"] = "smtp.gmail.com",
+                ["GmailSmtp:Port"] = "587",
+                ["GmailSmtp:Username"] = "user@example.com",
+                ["GmailSmtp:AppPassword"] = "dummy"
+            })
+            .Build();
+        var mail = new GmailSmtpMail(config, NullLogger<GmailSmtpMail>.Instance);
+
+        InvalidOperationException ex = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            mail.SendMailAsync("invalid-recipient", string.Empty, "Subject", "<p>Hello</p>"));
+
+        StringAssert.Contains(ex.Message, "Recipient email is invalid.");
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Ctor を Fallback Smtp Keys 条件で実行
+    /// 期待値
+    /// 　Are Loaded を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void Ctor_FallbackSmtpKeys_AreLoaded()
     {
@@ -53,8 +121,13 @@ public sealed class GmailSmtpMailTests
     }
 
     /// <summary>
-    /// 検証項目: Mail:FromEmail が空文字でも GmailSmtp:FromEmail を採用すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Ctor を Empty Mail From Email 条件で実行
+    /// 期待値
+    /// 　Falls Back To Gmail From Email を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void Ctor_EmptyMailFromEmail_FallsBackToGmailFromEmail()
     {
@@ -79,8 +152,13 @@ public sealed class GmailSmtpMailTests
     }
 
     /// <summary>
-    /// 検証項目: Mail:FromEmail に前後空白や改行が含まれてもtrimされること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Ctor を From Email With Whitespace 条件で実行
+    /// 期待値
+    /// 　Is Trimmed を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void Ctor_FromEmail_WithWhitespace_IsTrimmed()
     {

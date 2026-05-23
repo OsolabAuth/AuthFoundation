@@ -7,28 +7,30 @@ using System.Text;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// クライアント登録 API を提供します。
+    /// </summary>
     [ApiController]
     [Route("Client/Register")]
     [Route("register")]
-    /// <summary>
-    /// ClientRegistrationController class.
-    /// </summary>
     public class ClientRegistrationController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
 
         /// <summary>
-        /// Initializes a new instance of ClientRegistrationController.
+        /// <see cref="ClientRegistrationController"/> の新しいインスタンスを初期化します。
         /// </summary>
+        /// <param name="dbContext">DB コンテキスト</param>
         public ClientRegistrationController(OsolabAuthContext dbContext)
         {
             _dbContext = dbContext;
         }
 
-        [HttpPost]
         /// <summary>
-        /// Executes RegisterClient.
+        /// クライアントを登録し、発行したクライアントIDとシークレットを返却します。
         /// </summary>
+        /// <returns>クライアント登録結果</returns>
+        [HttpPost]
         public async Task<IActionResult> RegisterClient()
         {
             try
@@ -67,8 +69,9 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// Executes GenerateUniqueClientId.
+        /// 重複しないクライアントIDを採番します。
         /// </summary>
+        /// <returns>採番したクライアントID</returns>
         private string GenerateUniqueClientId()
         {
             for (int i = 0; i < 10; i++)
@@ -85,8 +88,10 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// Executes GenerateNumericString.
+        /// 指定桁数の数字文字列を生成します。
         /// </summary>
+        /// <param name="length">生成桁数</param>
+        /// <returns>生成した数字文字列</returns>
         private static string GenerateNumericString(int length)
         {
             const string digits = "0123456789";
@@ -94,19 +99,21 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// Input class.
+        /// クライアント登録入力を表します。
         /// </summary>
         private class Input
         {
             [JsonProperty("client_name")]
             /// <summary>
-            /// Gets or sets ClientName.
+            /// クライアント名です。
             /// </summary>
             public string ClientName { get; set; } = string.Empty;
 
             /// <summary>
-            /// Executes CreateAsync.
+            /// HTTP リクエストから入力値を生成します。
             /// </summary>
+            /// <param name="context">HTTP コンテキスト</param>
+            /// <returns>入力値</returns>
             public static async Task<Input> CreateAsync(HttpContext context)
             {
                 Helper.ValidateTypeApplicationJson(context.Request.ContentType);
@@ -121,7 +128,7 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             /// <summary>
-            /// Executes Validate.
+            /// 入力値を検証します。
             /// </summary>
             public void Validate()
             {
@@ -130,38 +137,39 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// Output class.
+        /// クライアント登録レスポンスを表します。
         /// </summary>
         private class Output
         {
             /// <summary>
-            /// Gets or sets StatusCode.
+            /// アプリケーション固有のレスポンスコードです。
             /// </summary>
             public string StatusCode { get; }
 
             /// <summary>
-            /// Gets or sets Message.
+            /// メッセージです。
             /// </summary>
             public string Message { get; }
 
             /// <summary>
-            /// Gets or sets ClientId.
+            /// クライアントIDです。
             /// </summary>
             public string? ClientId { get; }
 
             /// <summary>
-            /// Gets or sets ClientSecret.
+            /// クライアントシークレットです。
             /// </summary>
             public string? ClientSecret { get; }
 
             /// <summary>
-            /// Gets or sets ClientName.
+            /// クライアント名です。
             /// </summary>
             public string? ClientName { get; }
 
             /// <summary>
-            /// Initializes a new instance of Output.
+            /// 例外情報からエラーレスポンスを生成します。
             /// </summary>
+            /// <param name="ex">API 例外</param>
             public Output(ApiException ex)
             {
                 StatusCode = ex.InternalCode;
@@ -169,8 +177,11 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             /// <summary>
-            /// Initializes a new instance of Output.
+            /// 正常系レスポンスを生成します。
             /// </summary>
+            /// <param name="clientId">クライアントID</param>
+            /// <param name="clientSecret">クライアントシークレット</param>
+            /// <param name="clientName">クライアント名</param>
             public Output(string clientId, string clientSecret, string clientName)
             {
                 StatusCode = Code.SUCCESS.Code;

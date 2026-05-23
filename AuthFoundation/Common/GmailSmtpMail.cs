@@ -73,6 +73,16 @@ public sealed class GmailSmtpMail
             throw new InvalidOperationException("Gmail SMTP configuration is incomplete.");
         }
 
+        if (!IsValidMailAddress(_senderEmail))
+        {
+            throw new InvalidOperationException("Mail:FromEmail is invalid.");
+        }
+
+        if (!IsValidMailAddress(normalizedToEmail))
+        {
+            throw new InvalidOperationException("Recipient email is invalid.");
+        }
+
         using var message = new MailMessage
         {
             From = new MailAddress(_senderEmail, _senderName),
@@ -100,6 +110,17 @@ public sealed class GmailSmtpMail
             StructuredLog.LogException(_logger, "GmailSmtpMail.SendMailFailed", ex);
             throw;
         }
+    }
+
+    private static bool IsValidMailAddress(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return MailAddress.TryCreate(value, out MailAddress? parsed)
+            && string.Equals(parsed.Address, value, StringComparison.OrdinalIgnoreCase);
     }
 }
 

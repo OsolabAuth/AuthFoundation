@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Session;
 using AuthFoundationTest.TestSupport;
@@ -9,6 +9,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class RevokeApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -16,8 +24,13 @@ public sealed class RevokeApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /revoke でaccess_token指定時に対象アクセストークンを失効できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Revoke を Access Token 条件で実行
+    /// 期待値
+    /// 　Deletes Access Token Session を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostRevoke_AccessToken_DeletesAccessTokenSession()
     {
@@ -59,8 +72,13 @@ public sealed class RevokeApiTests
     }
 
     /// <summary>
-    /// 検証項目: POST /revoke でrefresh_token指定時に対象リフレッシュトークンを失効できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Revoke を Refresh Token 条件で実行
+    /// 期待値
+    /// 　Deletes Refresh Token Session を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostRevoke_RefreshToken_DeletesRefreshTokenSession()
     {
@@ -102,8 +120,13 @@ public sealed class RevokeApiTests
     }
 
     /// <summary>
-    /// 検証項目: token_type_hint 指定でも失効処理できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Revoke を Token Type Hint 条件で実行
+    /// 期待値
+    /// 　Works を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostRevoke_TokenTypeHint_Works()
     {
@@ -141,8 +164,13 @@ public sealed class RevokeApiTests
     }
 
     /// <summary>
-    /// 検証項目: 別クライアントのトークンは失効しないこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Revoke を Other Client Token 条件で実行
+    /// 期待値
+    /// 　Does Not Delete を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostRevoke_OtherClientToken_DoesNotDelete()
     {
@@ -182,8 +210,13 @@ public sealed class RevokeApiTests
     }
 
     /// <summary>
-    /// 検証項目: token_type不正時に00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Post Revoke を Invalid Token Type 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PostRevoke_InvalidTokenType_ReturnsRequestParameterError()
     {

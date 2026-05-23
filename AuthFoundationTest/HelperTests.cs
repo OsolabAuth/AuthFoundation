@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundationTest.TestSupport;
 
 namespace AuthFoundationTest;
@@ -7,8 +7,13 @@ namespace AuthFoundationTest;
 public sealed class HelperTests
 {
     /// <summary>
-    /// 検証項目: scope文字列の空白除去と重複削除が行われること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Parse Scopes を 標準入力 条件で実行
+    /// 期待値
+    /// 　Trims Empty Values And Removes Duplicates を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void ParseScopes_TrimsEmptyValuesAndRemovesDuplicates()
     {
@@ -20,8 +25,13 @@ public sealed class HelperTests
     }
 
     /// <summary>
-    /// 検証項目: 認可クライアント検証がclient有効性、redirect_uri形式、fragment禁止、登録済みURI確認を1つのHelperで行うこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Cert Authorize Client を 標準入力 条件で実行
+    /// 期待値
+    /// 　Validates Client Format Fragment And Registration を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task CertAuthorizeClient_ValidatesClientFormatFragmentAndRegistration()
     {
@@ -52,8 +62,38 @@ public sealed class HelperTests
     }
 
     /// <summary>
-    /// 検証項目: redirect_uriへQueryパラメータをURLエンコードして追加できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Cert Authorize Client を 標準入力 条件で実行
+    /// 期待値
+    /// 　Allows Only Osolab Hyphen Local Pattern For Http を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task CertAuthorizeClient_AllowsOnlyOsolabHyphenLocalPatternForHttp()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        string clientId = ApiTestData.NewClientId();
+        string allowedLocalRedirectUri = "http://osolab-portal-local:5173/callback";
+        await ApiTestData.CreateClientAsync(context, clientId, "secret", allowedLocalRedirectUri);
+
+        Helper.CertAuthorizeClient(context, clientId, allowedLocalRedirectUri);
+
+        ApiException disallowedLocalHostStyle = Assert.ThrowsExactly<ApiException>(() =>
+            Helper.CertAuthorizeClient(context, clientId, "http://osolab-portal.local:5173/callback"));
+        Assert.AreEqual(Code.ILLEGAL_REDIRECT_URI.Code, disallowedLocalHostStyle.Code);
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Build Redirect Uri を 標準入力 条件で実行
+    /// 期待値
+    /// 　Appends Escaped Parameters を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void BuildRedirectUri_AppendsEscapedParameters()
     {

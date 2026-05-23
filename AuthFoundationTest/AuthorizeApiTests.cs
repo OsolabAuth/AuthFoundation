@@ -11,6 +11,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class AuthorizeApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -18,8 +26,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize 未ログイン正常系で認可セッションをRedisへ保存し、body modeではredirect_urlからsession_idを除去しCookieへ設定すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Anonymous User 条件で実行
+    /// 期待値
+    /// 　Returns Login Redirect Body And Stores Auth Request Session を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_AnonymousUser_ReturnsLoginRedirectBodyAndStoresAuthRequestSession()
     {
@@ -67,8 +80,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize の未登録client_idで設計書どおり00002を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Invalid Client 条件で実行
+    /// 期待値
+    /// 　Returns Request Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_InvalidClient_ReturnsRequestError()
     {
@@ -103,8 +121,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize の未登録redirect_uriで設計書どおり00005を返し、未登録URIへリダイレクトしないこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Unregistered Redirect Uri 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Redirect Uri を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_UnregisteredRedirectUri_ReturnsIllegalRedirectUri()
     {
@@ -135,8 +158,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize の形式不正なredirect_uriで00005を返し、指定URIへリダイレクトしないこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Invalid Redirect Uri Format 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Redirect Uri を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_InvalidRedirectUriFormat_ReturnsIllegalRedirectUri()
     {
@@ -167,8 +195,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize でredirect_uriにfragmentが含まれる場合は00005を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Redirect Uri With Fragment 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Redirect Uri を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_RedirectUriWithFragment_ReturnsIllegalRedirectUri()
     {
@@ -202,8 +235,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize でlocalhostのhttp redirect_uriが登録済みの場合に受理されること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Localhost Http Redirect Uri When Registered 条件で実行
+    /// 期待値
+    /// 　Is Accepted を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_LocalhostHttpRedirectUri_WhenRegistered_IsAccepted()
     {
@@ -241,8 +279,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize で要求scopeがクライアント必須scopeを満たさない場合に設計書どおり00009を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Missing Required Scope 条件で実行
+    /// 期待値
+    /// 　Returns Invalid Scope を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_MissingRequiredScope_ReturnsInvalidScope()
     {
@@ -275,8 +318,13 @@ public sealed class AuthorizeApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /authorize ログイン済みかつscope同意済みの場合、認可コードを発行してredirect_uriへリダイレクトすること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Authorize を Logged In And Consented 条件で実行
+    /// 期待値
+    /// 　Redirects With Authorization Code を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetAuthorize_LoggedInAndConsented_RedirectsWithAuthorizationCode()
     {

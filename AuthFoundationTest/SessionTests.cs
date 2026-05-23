@@ -10,6 +10,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class SessionTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -17,8 +25,13 @@ public sealed class SessionTests
     }
 
     /// <summary>
-    /// 検証項目: 認可セッション登録時に32桁session_idを生成し、Redis保存値へユーザーIDとscopeを保持すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Register Auth Request Session を 標準入力 条件で実行
+    /// 期待値
+    /// 　Generates Session Id And Writes Redis Value を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task RegisterAuthRequestSession_GeneratesSessionIdAndWritesRedisValue()
     {
@@ -48,8 +61,13 @@ public sealed class SessionTests
     }
 
     /// <summary>
-    /// 検証項目: AuthSessionのJSON復元で主要プロパティとHasValueが復元されること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Auth Session を Set Value 条件で実行
+    /// 期待値
+    /// 　Restores Properties And Marks Has Value を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void AuthSession_SetValue_RestoresPropertiesAndMarksHasValue()
     {
@@ -69,8 +87,13 @@ public sealed class SessionTests
     }
 
     /// <summary>
-    /// 検証項目: CookieからAuthSessionIdを優先取得し、互換session_idへフォールバックすること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Cookie Session Id を 標準入力 条件で実行
+    /// 期待値
+    /// 　Prefers Auth Session Id And Falls Back To Session Id を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void GetCookieSessionId_PrefersAuthSessionIdAndFallsBackToSessionId()
     {
@@ -86,8 +109,13 @@ public sealed class SessionTests
     }
 
     /// <summary>
-    /// 検証項目: AuthSession Cookieと互換session_id Cookieがレスポンスへ設定されること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Append Cookie を 標準入力 条件で実行
+    /// 期待値
+    /// 　Writes Auth Session And Compatibility Cookie を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void AppendCookie_WritesAuthSessionAndCompatibilityCookie()
     {
@@ -102,8 +130,13 @@ public sealed class SessionTests
     }
 
     /// <summary>
-    /// 検証項目: GetSessionIdがCookie読み取り時にAuthRequestSessionIdを優先し、互換session_idへフォールバックすること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Session Id を 標準入力 条件で実行
+    /// 期待値
+    /// 　Prefers Auth Request Cookie And Falls Back To Session Id を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void GetSessionId_PrefersAuthRequestCookieAndFallsBackToSessionId()
     {
@@ -118,6 +151,14 @@ public sealed class SessionTests
         Assert.AreEqual("authz-legacy", Helper.GetSessionId(fallbackContext.Request, emptyForm));
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Build Session Cookie Options を Cross Origin Https 条件で実行
+    /// 期待値
+    /// 　Uses Same Site None And Secure を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void BuildSessionCookieOptions_CrossOriginHttps_UsesSameSiteNoneAndSecure()
     {
@@ -133,6 +174,14 @@ public sealed class SessionTests
         Assert.IsTrue(options.HttpOnly);
     }
 
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Build Session Cookie Options を Same Origin 条件で実行
+    /// 期待値
+    /// 　Uses Same Site Lax を満たすレスポンス/動作になる
+    /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void BuildSessionCookieOptions_SameOrigin_UsesSameSiteLax()
     {
@@ -149,8 +198,13 @@ public sealed class SessionTests
     }
 
     /// <summary>
-    /// 検証項目: AuthCodeSessionのJSON復元とRedisキー生成が設計どおりであること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Auth Code Session を Set Value 条件で実行
+    /// 期待値
+    /// 　Restores Serialized Payload を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void AuthCodeSession_SetValue_RestoresSerializedPayload()
     {

@@ -8,8 +8,13 @@ namespace AuthFoundationTest;
 public sealed class AuthorizeInputTests
 {
     /// <summary>
-    /// 検証項目: 認可リクエストQueryをInputへ読み込み、AuthRequestSessionへ正しく変換できること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Create を 標準入力 条件で実行
+    /// 期待値
+    /// 　Reads Authorize Query And Builds Auth Request Session を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void Create_ReadsAuthorizeQueryAndBuildsAuthRequestSession()
     {
@@ -38,8 +43,13 @@ public sealed class AuthorizeInputTests
     }
 
     /// <summary>
-    /// 検証項目: redirect_uriの形式検証はHelperへ集約し、Input.Validateでは必須チェックのみ行うこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Validate を 標準入力 条件で実行
+    /// 期待値
+    /// 　Does Not Duplicate Redirect Uri Format Validation を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public void Validate_DoesNotDuplicateRedirectUriFormatValidation()
     {

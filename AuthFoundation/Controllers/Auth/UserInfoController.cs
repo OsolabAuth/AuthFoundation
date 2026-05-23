@@ -8,23 +8,32 @@ using Newtonsoft.Json;
 
 namespace AuthFoundation.Controllers.Auth
 {
+    /// <summary>
+    /// UserInfo エンドポイント処理を提供します。
+    /// </summary>
     [ApiController]
     [Route("userinfo")]
-    /// <summary>     /// UserInfoController class.     /// </summary>
     public class UserInfoController : ControllerBase
     {
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
 
-        /// <summary>         /// Initializes a new instance of UserInfoController.         /// </summary>
+        /// <summary>
+        /// <see cref="UserInfoController"/> の新しいインスタンスを初期化します。
+        /// </summary>
+        /// <param name="dbContext">DB コンテキスト</param>
+        /// <param name="redis">Redis クライアント</param>
         public UserInfoController(OsolabAuthContext dbContext, IRedisClient redis)
         {
             _dbContext = dbContext;
             _redis = redis;
         }
 
+        /// <summary>
+        /// アクセストークンを検証し、スコープに応じたユーザー情報を返却します。
+        /// </summary>
+        /// <returns>ユーザー情報</returns>
         [HttpGet]
-        /// <summary>         /// Executes GetUserInfo.         /// </summary>
         public async Task<IActionResult> GetUserInfo()
         {
             try
@@ -108,29 +117,48 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// レスポンスにキャッシュ無効ヘッダーを設定します。
+        /// </summary>
+        /// <param name="response">HTTP レスポンス</param>
         private static void SetNoStoreHeaders(HttpResponse response)
         {
             response.Headers["Cache-Control"] = "no-store";
             response.Headers["Pragma"] = "no-cache";
         }
 
+        /// <summary>
+        /// Bearer エラー情報を WWW-Authenticate ヘッダーへ設定します。
+        /// </summary>
+        /// <param name="response">HTTP レスポンス</param>
+        /// <param name="error">OAuth エラーコード</param>
+        /// <param name="description">エラー詳細</param>
         private static void SetBearerErrorHeader(HttpResponse response, string error, string description)
         {
             string safeDescription = description.Replace("\"", "'", StringComparison.Ordinal);
             response.Headers["WWW-Authenticate"] = $"Bearer error=\"{error}\", error_description=\"{safeDescription}\"";
         }
 
-        /// <summary>         /// ErrorOutput class.         /// </summary>
+        /// <summary>
+        /// UserInfo エラー出力を表します。
+        /// </summary>
         private sealed class ErrorOutput
         {
-            /// <summary>             /// Gets or sets response_code.             /// </summary>
+            /// <summary>
+            /// アプリケーション固有のレスポンスコードです。
+            /// </summary>
             public string response_code { get; }
-            /// <summary>             /// Gets or sets message.             /// </summary>
+            /// <summary>
+            /// エラーメッセージです。
+            /// </summary>
             public string message { get; }
             public string error { get; }
             public string error_description { get; }
 
-            /// <summary>             /// Initializes a new instance of ErrorOutput.             /// </summary>
+            /// <summary>
+            /// API 例外からエラー出力を生成します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
             public ErrorOutput(ApiException ex)
             {
                 response_code = ex.InternalCode;
@@ -139,6 +167,11 @@ namespace AuthFoundation.Controllers.Auth
                 error_description = ex.ErrorDescription;
             }
 
+            /// <summary>
+            /// API 例外を OAuth エラーコードへ変換します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            /// <returns>OAuth エラーコード</returns>
             private static string ToOAuthError(ApiException ex)
             {
                 if (string.Equals(ex.InternalCode, Code.UNAUTHORIZED.Code, StringComparison.Ordinal))

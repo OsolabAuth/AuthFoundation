@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Controllers.Inner;
 using AuthFoundation.Models;
 using AuthFoundationTest.TestSupport;
@@ -12,6 +12,14 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class InnerUserApiTests
 {
+    /// <summary>
+    /// 前提条件
+    /// 　DB：テスト実行前の初期データを投入可能
+    /// 　リクエスト：なし（テスト初期化処理）
+    /// 期待値
+    /// 　共通設定とテスト実行環境が初期化される
+    /// </summary>
+    /// <returns></returns>
     [TestInitialize]
     public void Initialize()
     {
@@ -19,8 +27,13 @@ public sealed class InnerUserApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /inner/users 正常系で内部クライアントBasic認証を検証し、email/status filterに一致するユーザーを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Users を Valid Inner Client 条件で実行
+    /// 期待値
+    /// 　Returns Filtered Users を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetUsers_ValidInnerClient_ReturnsFilteredUsers()
     {
@@ -43,8 +56,13 @@ public sealed class InnerUserApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /inner/users のBasic認証secret不一致時に00002を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Users を Invalid Inner Client Secret 条件で実行
+    /// 期待値
+    /// 　Returns Illegal Client を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetUsers_InvalidInnerClientSecret_ReturnsIllegalClient()
     {
@@ -62,8 +80,13 @@ public sealed class InnerUserApiTests
     }
 
     /// <summary>
-    /// 検証項目: GET /inner/users/{osolabId}/claims 正常系で対象client_idのclaimsを返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Get Claims を Valid Request 条件で実行
+    /// 期待値
+    /// 　Returns Claims を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task GetClaims_ValidRequest_ReturnsClaims()
     {
@@ -101,8 +124,13 @@ public sealed class InnerUserApiTests
     }
 
     /// <summary>
-    /// 検証項目: PUT /inner/users/{osolabId}/claims 正常系でemail/status/claimsを更新すること。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Put Claims を Valid Request 条件で実行
+    /// 期待値
+    /// 　Updates User And Claims を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PutClaims_ValidRequest_UpdatesUserAndClaims()
     {
@@ -141,8 +169,13 @@ public sealed class InnerUserApiTests
     }
 
     /// <summary>
-    /// 検証項目: PUT /inner/users/{osolabId}/claims で未定義data_key指定時に00001を返すこと。
+    /// 前提条件
+    /// 　DB：テストデータを事前投入済み
+    /// 　リクエスト：Put Claims を Unsupported Data Key 条件で実行
+    /// 期待値
+    /// 　Returns Request Parameter Error を満たすレスポンス/動作になる
     /// </summary>
+    /// <returns></returns>
     [TestMethod]
     public async Task PutClaims_UnsupportedDataKey_ReturnsRequestParameterError()
     {

@@ -309,7 +309,7 @@ namespace AuthFoundation.Controllers.Inner
 
                 if (!string.IsNullOrWhiteSpace(Email))
                 {
-                    ValidateUtil.FormatParam(Email, "email", Code.HttpBodies.EMAIL.Regex);
+                    ValidateUtil.EmailParam(Email, "email", true);
                 }
 
                 if (Status.HasValue && Status.Value is not (Code.Status.ACTIVE or Code.Status.TENTATIVE or Code.Status.INACTIVE))

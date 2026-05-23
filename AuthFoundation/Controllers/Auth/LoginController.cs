@@ -1,4 +1,4 @@
-using AuthFoundation.Common;
+﻿using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
@@ -19,9 +19,9 @@ namespace AuthFoundation.Controllers.Auth
         private readonly AuthorizeExecutionService _authorizeExecutionService;
 
         /// <summary>
-        /// LoginController を初期化します。
+        /// <see cref="LoginController"/> の新しいインスタンスを初期化します。
         /// </summary>
-        /// <param name="dbContext">DBコンテキスト</param>
+        /// <param name="dbContext">DB コンテキスト</param>
         /// <param name="redis">Redis クライアント</param>
         /// <param name="environment">ホスティング環境</param>
         /// <param name="authorizeExecutionService">認可実行サービス</param>
@@ -38,7 +38,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// ログインを実行します。
+        /// ログインを実行し、認証セッションを作成します。
         /// </summary>
         /// <returns>ログイン結果</returns>
         [HttpPost]
@@ -113,7 +113,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// ログイン状態を返します。
+        /// ログイン状態を返却します。
         /// </summary>
         /// <returns>ログイン状態</returns>
         [HttpGet("status")]
@@ -170,6 +170,10 @@ namespace AuthFoundation.Controllers.Auth
             }
         }
 
+        /// <summary>
+        /// レスポンスにキャッシュ無効ヘッダーを設定します。
+        /// </summary>
+        /// <param name="response">HTTP レスポンス</param>
         private static void SetNoStoreHeaders(HttpResponse response)
         {
             response.Headers["Cache-Control"] = "no-store";
@@ -177,7 +181,7 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// ログイン入力を表します。
+        /// /login 入力を表します。
         /// </summary>
         public sealed class Input
         {
@@ -188,7 +192,7 @@ namespace AuthFoundation.Controllers.Auth
             public string Password { get; set; } = string.Empty;
 
             /// <summary>
-            /// HTTP リクエストから入力を生成します。
+            /// HTTP リクエストからログイン入力を生成します。
             /// </summary>
             /// <param name="context">HTTP コンテキスト</param>
             /// <returns>ログイン入力</returns>
@@ -216,15 +220,14 @@ namespace AuthFoundation.Controllers.Auth
                     ValidateUtil.FormatParam(SessionId, Code.HttpBodies.SESSION_ID.Key, Code.HttpBodies.SESSION_ID.Regex);
                 }
 
-                ValidateUtil.IndispensableParam(Email, Code.HttpBodies.EMAIL.Key);
-                ValidateUtil.FormatParam(Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+                ValidateUtil.EmailParam(Email, Code.HttpBodies.EMAIL.Key);
                 ValidateUtil.IndispensableParam(Password, Code.HttpBodies.PASSWORD.Key);
                 ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
             }
         }
 
         /// <summary>
-        /// ログイン応答を表します。
+        /// ログイン処理のレスポンスを表します。
         /// </summary>
         private sealed class Output
         {
@@ -239,14 +242,14 @@ namespace AuthFoundation.Controllers.Auth
             public string? error_description { get; set; }
 
             /// <summary>
-            /// 空の応答を初期化します。
+            /// 既定のレスポンスを初期化します。
             /// </summary>
             public Output()
             {
             }
 
             /// <summary>
-            /// 例外から応答を初期化します。
+            /// API 例外からエラーレスポンスを生成します。
             /// </summary>
             /// <param name="ex">API 例外</param>
             public Output(ApiException ex)
@@ -258,6 +261,11 @@ namespace AuthFoundation.Controllers.Auth
                 error_description = ex.ErrorDescription;
             }
 
+            /// <summary>
+            /// API 例外を OAuth エラーコードへ変換します。
+            /// </summary>
+            /// <param name="ex">API 例外</param>
+            /// <returns>OAuth エラーコード</returns>
             private static string ToOAuthError(ApiException ex)
             {
                 if (string.Equals(ex.InternalCode, Code.AUTHENTICATION_FAILED.InternalCode, StringComparison.Ordinal))
