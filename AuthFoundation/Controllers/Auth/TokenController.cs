@@ -387,6 +387,7 @@ namespace AuthFoundation.Controllers.Auth
             public string response_code { get; }
             public string message { get; }
             public string error { get; }
+            public string error_code { get; }
             public string error_description { get; }
 
             /// <summary>
@@ -398,6 +399,7 @@ namespace AuthFoundation.Controllers.Auth
                 response_code = ex.InternalCode;
                 message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
+                error_code = ex.InternalCode;
                 error_description = ex.ErrorDescription;
             }
 

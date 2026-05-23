@@ -101,7 +101,7 @@ public sealed class AuthFlowSmokeTests
     {
         var controller = new AuthorizeController(context, authorizeService);
         var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers["x-auth-ui-session-mode"] = "body";
+        httpContext.Request.Headers["x-auth-ui-response-mode"] = "json";
         httpContext.Request.QueryString = new QueryString(
             "?response_type=code"
             + $"&client_id={clientId}"
@@ -118,7 +118,10 @@ public sealed class AuthFlowSmokeTests
         JObject body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual("redirect", body.Value<string>("result"));
 
-        string authRequestSessionId = body.Value<string>("session_id") ?? string.Empty;
+        Assert.IsNull(body["session_id"]);
+        string authRequestSessionId = ControllerTestHelper.ExtractCookieValue(
+            httpContext.Response.Headers,
+            Code.AUTH_REQUEST_SESSION_COOKIE_KEY);
         Assert.AreEqual(Code.Session.LENGTH, authRequestSessionId.Length);
         StringAssert.StartsWith(body.Value<string>("redirect_url"), $"{AppConfig.AuthUiBaseUrl}/login");
         return authRequestSessionId;

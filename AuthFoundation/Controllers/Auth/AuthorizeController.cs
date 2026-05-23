@@ -52,14 +52,13 @@ namespace AuthFoundation.Controllers.Auth
                     Response.Cookies.Append("session_id", excuteResult.SessionId, options);
                 }
 
-                if (ShouldReturnBodySession(Request))
+                if (ShouldReturnJsonRedirect(Request))
                 {
                     SetNoStoreHeaders(Response);
                     return Ok(new
                     {
                         result = "redirect",
                         redirect_url = excuteResult.RedirectUrl,
-                        session_id = excuteResult.SessionId,
                         response_code = Code.SUCCESS.InternalCode,
                         message = Code.SUCCESS.ErrorDescription
                     });
@@ -98,16 +97,19 @@ namespace AuthFoundation.Controllers.Auth
         }
 
         /// <summary>
-        /// 認可結果をレスポンスボディで返却するモードか判定します。
+        /// 認可結果をJSONで返却するモードか判定します。
         /// </summary>
         /// <param name="request">HTTP リクエスト</param>
-        /// <returns>ボディ返却モードの場合は true</returns>
-        private static bool ShouldReturnBodySession(HttpRequest request)
+        /// <returns>JSON返却モードの場合は true</returns>
+        private static bool ShouldReturnJsonRedirect(HttpRequest request)
         {
-            return string.Equals(
-                request.Headers["x-auth-ui-session-mode"].ToString(),
-                "body",
-                StringComparison.OrdinalIgnoreCase);
+            string responseMode = request.Headers["x-auth-ui-response-mode"].ToString();
+            if (string.Equals(responseMode, "json", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private sealed class ErrorOutput
@@ -115,6 +117,7 @@ namespace AuthFoundation.Controllers.Auth
             public string response_code { get; }
             public string message { get; }
             public string error { get; }
+            public string error_code { get; }
             public string error_description { get; }
 
             public ErrorOutput(ApiException ex)
@@ -122,6 +125,7 @@ namespace AuthFoundation.Controllers.Auth
                 response_code = ex.InternalCode;
                 message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
+                error_code = ex.InternalCode;
                 error_description = ex.ErrorDescription;
             }
 
@@ -134,7 +138,7 @@ namespace AuthFoundation.Controllers.Auth
             {
                 if (string.Equals(ex.InternalCode, Code.ILLEGAL_CLIENT.InternalCode, StringComparison.Ordinal))
                 {
-                    return "invalid_client";
+                    return "unauthorized_client";
                 }
 
                 if (string.Equals(ex.InternalCode, Code.INVALID_SCOPE.InternalCode, StringComparison.Ordinal))

@@ -1,8 +1,9 @@
-﻿using AuthFoundation.Common;
+using AuthFoundation.Common;
 using AuthFoundation.Data;
 using AuthFoundation.Models;
 using AuthFoundation.Session;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
 namespace AuthFoundation.Controllers.Signup
 {
@@ -194,6 +195,15 @@ namespace AuthFoundation.Controllers.Signup
 
             public string? message { get; set; }
 
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? error { get; set; }
+
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? error_code { get; set; }
+
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? error_description { get; set; }
+
             public Output()
             {
             }
@@ -203,6 +213,9 @@ namespace AuthFoundation.Controllers.Signup
                 result = "error";
                 response_code = ex.InternalCode;
                 message = ex.ErrorDescription;
+                error = ex.Error;
+                error_code = ex.InternalCode;
+                error_description = ex.ErrorDescription;
             }
         }
     }

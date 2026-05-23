@@ -38,7 +38,10 @@ namespace AuthFoundation.Controllers.Auth
                 return new ObjectResult(new
                 {
                     response_code = apiEx.InternalCode,
-                    message = apiEx.ErrorDescription
+                    message = apiEx.ErrorDescription,
+                    error = apiEx.Error,
+                    error_code = apiEx.InternalCode,
+                    error_description = apiEx.ErrorDescription
                 })
                 {
                     StatusCode = (int)apiEx.StatusCode

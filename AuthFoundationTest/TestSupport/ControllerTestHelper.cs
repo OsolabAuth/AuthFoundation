@@ -93,7 +93,7 @@ internal static class ControllerTestHelper
         Assert.AreEqual(statusCode, objectResult.StatusCode);
 
         JObject body = ToJObject(result);
-        Assert.AreEqual(responseCode, body.Value<string>("response_code") ?? body.Value<string>("StatusCode"));
+        Assert.AreEqual(responseCode, body.Value<string>("error_code") ?? body.Value<string>("response_code") ?? body.Value<string>("StatusCode"));
         return body;
     }
 }

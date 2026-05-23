@@ -149,7 +149,10 @@ namespace AuthFoundation.Controllers.Auth
                 return new ObjectResult(new
                 {
                     response_code = ex.InternalCode,
-                    message = ex.ErrorDescription
+                    message = ex.ErrorDescription,
+                    error = ex.Error,
+                    error_code = ex.InternalCode,
+                    error_description = ex.ErrorDescription
                 })
                 {
                     StatusCode = (int)ex.StatusCode
@@ -162,7 +165,10 @@ namespace AuthFoundation.Controllers.Auth
                 return new ObjectResult(new
                 {
                     response_code = apiEx.InternalCode,
-                    message = apiEx.ErrorDescription
+                    message = apiEx.ErrorDescription,
+                    error = apiEx.Error,
+                    error_code = apiEx.InternalCode,
+                    error_description = apiEx.ErrorDescription
                 })
                 {
                     StatusCode = (int)apiEx.StatusCode
@@ -239,6 +245,8 @@ namespace AuthFoundation.Controllers.Auth
 
             public string? error { get; set; }
 
+            public string? error_code { get; set; }
+
             public string? error_description { get; set; }
 
             /// <summary>
@@ -258,6 +266,7 @@ namespace AuthFoundation.Controllers.Auth
                 response_code = ex.InternalCode;
                 message = ex.ErrorDescription;
                 error = ToOAuthError(ex);
+                error_code = ex.InternalCode;
                 error_description = ex.ErrorDescription;
             }
 

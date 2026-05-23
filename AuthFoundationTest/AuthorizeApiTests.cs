@@ -42,7 +42,7 @@ public sealed class AuthorizeApiTests
         var redis = new FakeRedisClient();
         var controller = new AuthorizeController(context, new AuthorizeExecutionService(context, redis));
         var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers["x-auth-ui-session-mode"] = "body";
+        httpContext.Request.Headers["x-auth-ui-response-mode"] = "json";
         httpContext.Request.QueryString = new QueryString(
             "?response_type=code"
             + $"&client_id={Code.InnerClient.OSOLAB_CLIENT_ID}"
@@ -63,11 +63,11 @@ public sealed class AuthorizeApiTests
         Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
 
-        string sessionId = body.Value<string>("session_id") ?? string.Empty;
+        Assert.IsNull(body["session_id"]);
+        string sessionId = ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, Code.AUTH_REQUEST_SESSION_COOKIE_KEY);
         Assert.AreEqual(Code.Session.LENGTH, sessionId.Length);
         StringAssert.StartsWith(body.Value<string>("redirect_url"), $"{AppConfig.AuthUiBaseUrl}/login");
         Assert.IsFalse(body.Value<string>("redirect_url")!.Contains("session_id=", StringComparison.OrdinalIgnoreCase));
-        Assert.AreEqual(sessionId, ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, Code.AUTH_REQUEST_SESSION_COOKIE_KEY));
         Assert.AreEqual(sessionId, ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, "session_id"));
 
         string? stored = await redis.GetStringAsync(AuthRequestSession.GetRedisKey(sessionId));
@@ -115,7 +115,7 @@ public sealed class AuthorizeApiTests
 
         var body = ControllerTestHelper.ToJObject(result);
         Assert.AreEqual(Code.ILLEGAL_CLIENT.Code, body.Value<string>("response_code"));
-        Assert.AreEqual("invalid_client", body.Value<string>("error"));
+        Assert.AreEqual("unauthorized_client", body.Value<string>("error"));
         Assert.AreEqual("no-store", httpContext.Response.Headers["Cache-Control"].ToString());
         Assert.AreEqual("no-cache", httpContext.Response.Headers["Pragma"].ToString());
     }
@@ -255,7 +255,7 @@ public sealed class AuthorizeApiTests
         var redis = new FakeRedisClient();
         var controller = new AuthorizeController(context, new AuthorizeExecutionService(context, redis));
         var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers["x-auth-ui-session-mode"] = "body";
+        httpContext.Request.Headers["x-auth-ui-response-mode"] = "json";
         httpContext.Request.QueryString = new QueryString(
             "?response_type=code"
             + $"&client_id={clientId}"
