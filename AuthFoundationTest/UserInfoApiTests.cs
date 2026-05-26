@@ -48,7 +48,7 @@ public sealed class UserInfoApiTests
         context.user_infos.Add(new user_info
         {
             osolab_id = osolabId,
-            client_id = clientId,
+            client_id = Code.InnerClient.OSOLAB_CLIENT_ID,
             data_key = "name",
             data_value = "Test User",
             create_datetime = DateTime.UtcNow,

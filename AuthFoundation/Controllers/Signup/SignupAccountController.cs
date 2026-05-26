@@ -51,7 +51,7 @@ namespace AuthFoundation.Controllers.Signup
                     throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "verification is not completed");
                 }
 
-                osolab_user user = RegisterOrUpdateUser(verify.Email, input.Password);
+                osolab_user user = RegisterOrUpdateUser(verify.Email, input.Password, input.Name, input.Birthdate);
                 await _redis.DeleteAsync(SignupSession.GetRedisKey(verify.SignupSessionId), Code.RedisDbNo.SIGNUP_SESSION);
 
                 string loginSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
@@ -93,7 +93,7 @@ namespace AuthFoundation.Controllers.Signup
             }
         }
 
-        private osolab_user RegisterOrUpdateUser(string email, string password)
+        private osolab_user RegisterOrUpdateUser(string email, string password, string name, string birthdate)
         {
             osolab_user? currentUser = _dbContext.osolab_users.FirstOrDefault(x =>
                 x.email == email &&
@@ -115,8 +115,39 @@ namespace AuthFoundation.Controllers.Signup
             user.status = Code.Status.ACTIVE;
             user.update_datetime = DateTime.UtcNow;
 
+            UpsertSharedUserInfo(user.osolab_id, "name", name);
+            UpsertSharedUserInfo(user.osolab_id, "birthdate", birthdate);
+
             _dbContext.SaveChanges();
             return user;
+        }
+
+        private void UpsertSharedUserInfo(string osolabId, string dataKey, string dataValue)
+        {
+            user_info? info = _dbContext.user_infos.FirstOrDefault(x =>
+                x.osolab_id == osolabId &&
+                x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID &&
+                x.data_key == dataKey);
+
+            DateTime now = DateTime.UtcNow;
+            if (info is null)
+            {
+                _dbContext.user_infos.Add(new user_info
+                {
+                    osolab_id = osolabId,
+                    client_id = Code.InnerClient.OSOLAB_CLIENT_ID,
+                    data_key = dataKey,
+                    data_value = dataValue,
+                    create_datetime = now,
+                    update_datetime = now,
+                    status = Code.Status.ACTIVE
+                });
+                return;
+            }
+
+            info.data_value = dataValue;
+            info.update_datetime = now;
+            info.status = Code.Status.ACTIVE;
         }
 
         private async Task<SignupSession> GetSignupSessionAsync(string signupSessionId)
@@ -140,6 +171,10 @@ namespace AuthFoundation.Controllers.Signup
 
             public string Password { get; set; } = string.Empty;
 
+            public string Name { get; set; } = string.Empty;
+
+            public string Birthdate { get; set; } = string.Empty;
+
             /// <summary>
             /// HTTP リクエストから入力を生成します。
             /// </summary>
@@ -151,7 +186,9 @@ namespace AuthFoundation.Controllers.Signup
                 return new Input
                 {
                     SignupSessionId = GetSignupSessionId(request, form),
-                    Password = form["password"].ToString()
+                    Password = form["password"].ToString(),
+                    Name = form["name"].ToString().Trim(),
+                    Birthdate = form["birthdate"].ToString().Trim()
                 };
             }
 
@@ -164,6 +201,15 @@ namespace AuthFoundation.Controllers.Signup
                 ValidateUtil.FormatParam(SignupSessionId, "signup_session_id", Code.HttpBodies.SESSION_ID.Regex);
                 ValidateUtil.IndispensableParam(Password, Code.HttpBodies.PASSWORD.Key);
                 ValidateUtil.FormatParam(Password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
+                ValidateUtil.IndispensableParam(Name, Code.HttpBodies.NAME.Key);
+                ValidateUtil.FormatParam(Name, Code.HttpBodies.NAME.Key, Code.HttpBodies.NAME.Regex);
+                ValidateUtil.IndispensableParam(Birthdate, Code.HttpBodies.BIRTHDATE.Key);
+                ValidateUtil.FormatParam(Birthdate, Code.HttpBodies.BIRTHDATE.Key, Code.HttpBodies.BIRTHDATE.Regex);
+                if (!DateOnly.TryParseExact(Birthdate, "yyyy-MM-dd", out DateOnly parsedBirthdate) ||
+                    parsedBirthdate > DateOnly.FromDateTime(DateTime.UtcNow))
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "birthdate is invalid");
+                }
             }
 
             private static string GetSignupSessionId(HttpRequest request, IFormCollection form)

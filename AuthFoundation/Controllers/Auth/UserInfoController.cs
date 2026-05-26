@@ -79,15 +79,18 @@ namespace AuthFoundation.Controllers.Auth
                     claims["email_verified"] = true;
                 }
 
-                List<user_info> infos = await _dbContext.user_infos.AsNoTracking()
-                    .Where(x => x.osolab_id == tokenSession.OsolabId
-                        && x.client_id == tokenSession.ClientId
-                        && x.status == Code.Status.ACTIVE)
-                    .ToListAsync();
-
-                foreach (user_info info in infos)
+                if (scopes.Contains(Code.Scope.PROFILE, StringComparer.Ordinal))
                 {
-                    claims[info.data_key] = info.data_value;
+                    List<user_info> infos = await _dbContext.user_infos.AsNoTracking()
+                        .Where(x => x.osolab_id == tokenSession.OsolabId
+                            && x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
+                            && x.status == Code.Status.ACTIVE)
+                        .ToListAsync();
+
+                    foreach (user_info info in infos)
+                    {
+                        claims[info.data_key] = info.data_value;
+                    }
                 }
 
                 SetNoStoreHeaders(Response);

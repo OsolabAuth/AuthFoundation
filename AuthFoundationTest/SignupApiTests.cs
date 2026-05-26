@@ -293,7 +293,9 @@ public sealed class SignupApiTests
         string password = ApiTestData.NewPassword();
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
         {
-            ["password"] = password
+            ["password"] = password,
+            ["name"] = "Test User",
+            ["birthdate"] = "1990-01-02"
         });
         ControllerTestHelper.SetCookie(httpContext, "signup_session_id", signupSessionId);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
@@ -308,6 +310,14 @@ public sealed class SignupApiTests
 
         osolab_user user = context.osolab_users.Single(x => x.email == email);
         Assert.AreEqual(Code.Status.ACTIVE, user.status);
+        Assert.AreEqual("Test User", context.user_infos.Single(x =>
+            x.osolab_id == user.osolab_id
+            && x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
+            && x.data_key == "name").data_value);
+        Assert.AreEqual("1990-01-02", context.user_infos.Single(x =>
+            x.osolab_id == user.osolab_id
+            && x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
+            && x.data_key == "birthdate").data_value);
         Assert.IsNull(await redis.GetStringAsync(SignupSession.GetRedisKey(signupSessionId), Code.RedisDbNo.SIGNUP_SESSION));
 
         string authSessionId = ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, Code.AUTH_SESSION_COOKIE_KEY);
@@ -346,7 +356,9 @@ public sealed class SignupApiTests
             NullLogger<SignupAccountController>.Instance);
         var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
         {
-            ["password"] = ApiTestData.NewPassword()
+            ["password"] = ApiTestData.NewPassword(),
+            ["name"] = "Test User",
+            ["birthdate"] = "1990-01-02"
         });
         ControllerTestHelper.SetCookie(httpContext, "signup_session_id", signupSessionId);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };

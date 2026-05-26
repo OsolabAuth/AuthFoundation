@@ -139,6 +139,8 @@ namespace AuthFoundation.Common
             public static readonly RequestValidation EMAIL = new("email", @"^.+@.+$");
             public static readonly RequestValidation DUMMY_EMAIL = new("dummy_email", @"^[A-Za-z0-9._%+-]+@example\.(com|org|net)$");
             public static readonly RequestValidation PASSWORD = new("password", @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,64}$");
+            public static readonly RequestValidation NAME = new("name", @"^.{1,100}$");
+            public static readonly RequestValidation BIRTHDATE = new("birthdate", @"^\d{4}-\d{2}-\d{2}$");
             public static readonly RequestValidation GRANT_TYPE = new("grant_type", @"^(authorization_code|refresh_token)$");
             public static readonly RequestValidation CODE_VERIFIER = new("code_verifier", @"^[A-Za-z0-9._~-]{43,128}$");
             public static readonly RequestValidation AUTH_CODE = new("code", @"^[A-Za-z0-9._~-]{20,}$");

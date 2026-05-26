@@ -70,6 +70,15 @@ namespace AuthFoundation.Common
                 payload["email"] = session.Email;
             }
 
+            if (scopeSet.Contains(Code.Scope.PROFILE))
+            {
+                Dictionary<string, string> profileClaims = await LoadSharedProfileClaimsAsync(session.OsolabId);
+                foreach ((string key, string value) in profileClaims)
+                {
+                    payload[key] = value;
+                }
+            }
+
             string headerJson = JsonConvert.SerializeObject(new
             {
                 alg = "RS256",
@@ -88,6 +97,23 @@ namespace AuthFoundation.Common
                 RSASignaturePadding.Pkcs1);
 
             return $"{signingInput}.{Base64UrlEncode(signature)}";
+        }
+
+        private async Task<Dictionary<string, string>> LoadSharedProfileClaimsAsync(string osolabId)
+        {
+            using IServiceScope scope = _scopeFactory.CreateScope();
+            OsolabAuthContext dbContext = scope.ServiceProvider.GetRequiredService<OsolabAuthContext>();
+
+            return await dbContext.user_infos
+                .AsNoTracking()
+                .Where(x => x.osolab_id == osolabId
+                    && x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
+                    && x.status == Code.Status.ACTIVE
+                    && (x.data_key == "name"
+                        || x.data_key == "preferred_username"
+                        || x.data_key == "birthdate"
+                        || x.data_key == "picture"))
+                .ToDictionaryAsync(x => x.data_key, x => x.data_value, StringComparer.Ordinal);
         }
 
         /// <summary>
