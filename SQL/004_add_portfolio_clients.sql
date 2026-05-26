@@ -27,7 +27,8 @@ USING (VALUES
     ('20000000000000000000000000000002', N'https://portfolio-docs-site-210279746180.us-west1.run.app/auth/callback', 1),
     ('30000000000000000000000000000001', N'http://localhost:9000/oidc/callback/', 1),
     ('30000000000000000000000000000001', N'http://100.125.117.124:9000/oidc/callback/', 0),
-    ('30000000000000000000000000000001', N'https://home.tail8478bf.ts.net/oidc/callback/', 0)
+    ('30000000000000000000000000000001', N'https://home.tail8478bf.ts.net/oidc/callback/', 0),
+    ('30000000000000000000000000000001', N'https://ready-florist-concerning-mins.trycloudflare.com/oidc/callback/', 0)
 ) AS source(client_id, redirect_uri, is_default)
 ON target.client_id = source.client_id AND target.redirect_uri = source.redirect_uri
 WHEN MATCHED THEN UPDATE SET
