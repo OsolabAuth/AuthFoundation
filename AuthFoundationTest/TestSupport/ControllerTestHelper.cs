@@ -96,4 +96,10 @@ internal static class ControllerTestHelper
         Assert.AreEqual(responseCode, body.Value<string>("error_code") ?? body.Value<string>("response_code") ?? body.Value<string>("StatusCode"));
         return body;
     }
+
+    public static JObject AssertOk(IActionResult result)
+    {
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        return ToJObject(result);
+    }
 }
