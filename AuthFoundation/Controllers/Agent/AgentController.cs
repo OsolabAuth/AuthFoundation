@@ -25,11 +25,18 @@ namespace AuthFoundation.Controllers.Agent
 
         private readonly OsolabAuthContext _dbContext;
         private readonly IRedisClient _redis;
+        private readonly OidcSigningService? _oidcSigningService;
 
         public AgentController(OsolabAuthContext dbContext, IRedisClient redis)
+            : this(dbContext, redis, null)
+        {
+        }
+
+        public AgentController(OsolabAuthContext dbContext, IRedisClient redis, OidcSigningService? oidcSigningService)
         {
             _dbContext = dbContext;
             _redis = redis;
+            _oidcSigningService = oidcSigningService;
         }
 
         [HttpPost]
@@ -137,6 +144,63 @@ namespace AuthFoundation.Controllers.Agent
             }
         }
 
+        [HttpPost("token")]
+        public async Task<IActionResult> PostAgentToken()
+        {
+            try
+            {
+                if (_oidcSigningService is null)
+                {
+                    throw new ApiException(Code.INTERNAL_SERVER_ERROR, "signing service is not configured");
+                }
+
+                PostTokenInput input = await PostTokenInput.CreateAsync(Request.HttpContext);
+                input.Validate();
+
+                string[] requestedScopes = NormalizeScopes(input.Scope);
+                string requestedScope = string.Join(' ', requestedScopes);
+                DateTime now = DateTime.UtcNow;
+
+                (agent_master agent, agent_delegation delegation) = await ValidateAgentTokenRequestAsync(input, requestedScopes, now);
+
+                string accessToken = await _oidcSigningService.CreateAgentAccessTokenAsync(agent, delegation, requestedScope);
+                string idToken = await _oidcSigningService.CreateAgentIdTokenAsync(agent, delegation);
+
+                agent.last_used_datetime = now;
+                agent.update_datetime = now;
+                AddAuditLog(
+                    agent.agent_id,
+                    agent.owner_osolab_id,
+                    "agent.token_issued",
+                    "success",
+                    now,
+                    delegation.delegation_id,
+                    delegation.client_id,
+                    requestedScope);
+
+                await _dbContext.SaveChangesAsync();
+                SetNoStoreHeaders(Response);
+                return Ok(new PostTokenOutput(accessToken, idToken, requestedScope));
+            }
+            catch (ApiException ex)
+            {
+                SetNoStoreHeaders(Response);
+                return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+            }
+            catch (Exception ex)
+            {
+                ApiException apiEx = new ApiException(Code.INTERNAL_SERVER_ERROR, ex.Message);
+                SetNoStoreHeaders(Response);
+                return new ObjectResult(new ErrorOutput(apiEx)) { StatusCode = (int)apiEx.StatusCode };
+            }
+        }
+
+        private static void SetNoStoreHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["Pragma"] = "no-cache";
+        }
+
         private async Task<AuthSession> RequireAuthSessionAsync()
         {
             string? sessionId = AuthSession.GetCookieSessionId(Request);
@@ -193,6 +257,57 @@ namespace AuthFoundation.Controllers.Agent
             {
                 throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
             }
+        }
+
+        private async Task<(agent_master Agent, agent_delegation Delegation)> ValidateAgentTokenRequestAsync(
+            PostTokenInput input,
+            string[] requestedScopes,
+            DateTime now)
+        {
+            agent_master? agent = await _dbContext.agent_masters.SingleOrDefaultAsync(x =>
+                x.agent_id == input.AgentId &&
+                x.status == Code.Status.ACTIVE &&
+                x.revoked_datetime == null);
+
+            if (agent is null || !AgentSecretHasher.Verify(input.AgentSecret, agent.secret_hash))
+            {
+                throw new ApiException(Code.ILLEGAL_CLIENT, Code.ILLEGAL_CLIENT.ErrorDescription);
+            }
+
+            bool activeOwner = await _dbContext.osolab_users.AnyAsync(x =>
+                x.osolab_id == agent.owner_osolab_id &&
+                x.status == Code.Status.ACTIVE);
+
+            if (!activeOwner)
+            {
+                throw new ApiException(Code.UNAUTHORIZED, Code.UNAUTHORIZED.ErrorDescription);
+            }
+
+            await RequireActiveClientAsync(input.ClientId);
+
+            agent_delegation? delegation = await _dbContext.agent_delegations.SingleOrDefaultAsync(x =>
+                x.agent_id == agent.agent_id &&
+                x.owner_osolab_id == agent.owner_osolab_id &&
+                x.client_id == input.ClientId &&
+                x.status == Code.Status.ACTIVE &&
+                x.revoked_datetime == null &&
+                x.expires_datetime > now);
+
+            if (delegation is null)
+            {
+                throw new ApiException(Code.INVALID_SCOPE, Code.INVALID_SCOPE.ErrorDescription);
+            }
+
+            HashSet<string> allowedScopes = delegation.scopes
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (requestedScopes.Any(scope => !allowedScopes.Contains(scope)))
+            {
+                throw new ApiException(Code.INVALID_SCOPE, Code.INVALID_SCOPE.ErrorDescription);
+            }
+
+            return (agent, delegation);
         }
 
         private async Task<string> GenerateUniqueAgentIdAsync()
@@ -346,6 +461,51 @@ namespace AuthFoundation.Controllers.Agent
             }
         }
 
+        private sealed class PostTokenInput
+        {
+            [JsonProperty("agent_id")]
+            public string AgentId { get; set; } = string.Empty;
+
+            [JsonProperty("agent_secret")]
+            public string AgentSecret { get; set; } = string.Empty;
+
+            [JsonProperty("client_id")]
+            public string ClientId { get; set; } = string.Empty;
+
+            [JsonProperty("scope")]
+            public string Scope { get; set; } = string.Empty;
+
+            public static async Task<PostTokenInput> CreateAsync(HttpContext context)
+            {
+                Helper.ValidateTypeApplicationJson(context.Request.ContentType);
+                using var reader = new StreamReader(context.Request.Body, Encoding.UTF8);
+                string raw = await reader.ReadToEndAsync();
+                PostTokenInput? body = JsonConvert.DeserializeObject<PostTokenInput>(raw);
+                if (body is null)
+                {
+                    throw new ApiException(Code.REQUEST_PARAMETER_ERROR, "invalid json object");
+                }
+
+                body.AgentId = body.AgentId.Trim();
+                body.AgentSecret = body.AgentSecret.Trim();
+                body.ClientId = body.ClientId.Trim();
+                body.Scope = body.Scope.Trim();
+                return body;
+            }
+
+            public void Validate()
+            {
+                ValidateUtil.IndispensableParam(AgentId, "agent_id");
+                ValidateUtil.FormatParam(AgentId, "agent_id", @"^agent_[a-f0-9]{24}$");
+                ValidateUtil.IndispensableParam(AgentSecret, "agent_secret");
+                ValidateUtil.FormatParam(AgentSecret, "agent_secret", @"^ags_[a-f0-9]{64}$");
+                ValidateUtil.IndispensableParam(ClientId, Code.HttpQueries.CLIENT_ID.Key);
+                ValidateUtil.FormatParam(ClientId, Code.HttpQueries.CLIENT_ID.Key, Code.HttpQueries.CLIENT_ID.Regex);
+                ValidateUtil.IndispensableParam(Scope, Code.HttpQueries.SCOPE.Key);
+                ValidateUtil.FormatParam(Scope, Code.HttpQueries.SCOPE.Key, @"^[A-Za-z0-9_. ]{1,1000}$");
+            }
+        }
+
         private sealed class PostOutput
         {
             [JsonProperty("response_code")]
@@ -406,6 +566,34 @@ namespace AuthFoundation.Controllers.Agent
                 ClientId = clientId;
                 Scope = scope;
                 ExpiresDatetime = expiresDatetime;
+            }
+        }
+
+        private sealed class PostTokenOutput
+        {
+            [JsonProperty("response_code")]
+            public string ResponseCode { get; } = Code.SUCCESS.Code;
+
+            [JsonProperty("access_token")]
+            public string AccessToken { get; }
+
+            [JsonProperty("id_token")]
+            public string IdToken { get; }
+
+            [JsonProperty("token_type")]
+            public string TokenType { get; } = Code.AccessToken.TOKEN_TYPE_BEARER;
+
+            [JsonProperty("expires_in")]
+            public int ExpiresIn { get; } = AppConfig.AccessTokenExpireSec;
+
+            [JsonProperty("scope")]
+            public string Scope { get; }
+
+            public PostTokenOutput(string accessToken, string idToken, string scope)
+            {
+                AccessToken = accessToken;
+                IdToken = idToken;
+                Scope = scope;
             }
         }
 

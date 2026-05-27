@@ -48,7 +48,6 @@ namespace AuthFoundation.Common
         public async Task<string> CreateIdTokenAsync(AuthCodeSession session, IEnumerable<string> scopes)
         {
             await EnsureInitializedAsync();
-            RSA rsa = _rsa ?? throw new ApiException(Code.INTERNAL_SERVER_ERROR, "signing key initialization failed");
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             DateTimeOffset expires = now.AddSeconds(AppConfig.IdTokenExpireSec);
@@ -78,6 +77,64 @@ namespace AuthFoundation.Common
                     payload[key] = value;
                 }
             }
+
+            return CreateSignedJwt(payload);
+        }
+
+        public async Task<string> CreateAgentIdTokenAsync(agent_master agent, agent_delegation delegation)
+        {
+            await EnsureInitializedAsync();
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset expires = now.AddSeconds(AppConfig.IdTokenExpireSec);
+
+            var payload = new Dictionary<string, object>
+            {
+                ["iss"] = AppConfig.Issuer.TrimEnd('/'),
+                ["sub"] = agent.agent_id,
+                ["aud"] = delegation.client_id,
+                ["exp"] = expires.ToUnixTimeSeconds(),
+                ["iat"] = now.ToUnixTimeSeconds(),
+                ["jti"] = Helper.GenerateHex(32).ToLowerInvariant(),
+                ["principal_type"] = "ai_agent",
+                ["agent_id"] = agent.agent_id,
+                ["agent_name"] = agent.agent_name,
+                ["owner_sub"] = agent.owner_osolab_id,
+                ["delegation_id"] = delegation.delegation_id,
+                ["amr"] = new[] { "agent_secret" },
+                ["acr"] = "urn:osolab:acr:agent-delegated"
+            };
+
+            return CreateSignedJwt(payload);
+        }
+
+        public async Task<string> CreateAgentAccessTokenAsync(agent_master agent, agent_delegation delegation, string scope)
+        {
+            await EnsureInitializedAsync();
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset expires = now.AddSeconds(AppConfig.AccessTokenExpireSec);
+
+            var payload = new Dictionary<string, object>
+            {
+                ["iss"] = AppConfig.Issuer.TrimEnd('/'),
+                ["sub"] = agent.agent_id,
+                ["aud"] = delegation.client_id,
+                ["exp"] = expires.ToUnixTimeSeconds(),
+                ["iat"] = now.ToUnixTimeSeconds(),
+                ["jti"] = Helper.GenerateHex(32).ToLowerInvariant(),
+                ["principal_type"] = "ai_agent",
+                ["owner_sub"] = agent.owner_osolab_id,
+                ["delegation_id"] = delegation.delegation_id,
+                ["scope"] = scope
+            };
+
+            return CreateSignedJwt(payload);
+        }
+
+        private string CreateSignedJwt(Dictionary<string, object> payload)
+        {
+            RSA rsa = _rsa ?? throw new ApiException(Code.INTERNAL_SERVER_ERROR, "signing key initialization failed");
 
             string headerJson = JsonConvert.SerializeObject(new
             {

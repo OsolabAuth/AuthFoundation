@@ -1,3 +1,4 @@
+using System.Text;
 using AuthFoundation.Common;
 using AuthFoundation.Controllers.Agent;
 using AuthFoundation.Data;
@@ -103,7 +104,7 @@ public sealed class AgentApiTests
         await ApiTestData.CreateClientAsync(context, clientId);
 
         string sessionId = await ApiTestData.WriteLoginSessionAsync(redis, osolabId, email);
-        string agentId = await CreateAgentAsync(context, redis, sessionId);
+        string agentId = (await CreateAgentCredentialsAsync(context, redis, sessionId)).AgentId;
         DateTimeOffset expiresAt = DateTimeOffset.UtcNow.AddDays(30);
 
         var controller = new AgentController(context, redis);
@@ -155,7 +156,7 @@ public sealed class AgentApiTests
         await ApiTestData.CreateClientAsync(context, clientId);
 
         string sessionId = await ApiTestData.WriteLoginSessionAsync(redis, osolabId, email);
-        string agentId = await CreateAgentAsync(context, redis, sessionId);
+        string agentId = (await CreateAgentCredentialsAsync(context, redis, sessionId)).AgentId;
 
         var controller = new AgentController(context, redis);
         var httpContext = ControllerTestHelper.CreateJsonContext(new
@@ -173,7 +174,112 @@ public sealed class AgentApiTests
         Assert.AreEqual("invalid_scope", body.Value<string>("error"));
     }
 
-    private static async Task<string> CreateAgentAsync(OsolabAuthContext context, FakeRedisClient redis, string sessionId)
+    [TestMethod]
+    public async Task PostToken_ValidAgentSecretAndDelegation_ReturnsAgentJwtTokens()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        string osolabId = ApiTestData.NewOsolabId();
+        string email = $"agent-token-owner-{Guid.NewGuid():N}@example.com";
+        string clientId = ApiTestData.NewClientId();
+        await ApiTestData.CreateUserAsync(context, osolabId, email, ApiTestData.NewPassword());
+        await ApiTestData.CreateClientAsync(context, clientId);
+
+        string sessionId = await ApiTestData.WriteLoginSessionAsync(redis, osolabId, email);
+        (string agentId, string agentSecret) = await CreateAgentCredentialsAsync(context, redis, sessionId);
+        string delegationId = await CreateDelegationAsync(context, redis, sessionId, agentId, clientId, "task.read task.comment");
+
+        var controller = new AgentController(context, redis, SigningTestHelper.CreateSigningService());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = ControllerTestHelper.CreateJsonContext(new
+            {
+                agent_id = agentId,
+                agent_secret = agentSecret,
+                client_id = clientId,
+                scope = "task.comment"
+            })
+        };
+
+        IActionResult result = await controller.PostAgentToken();
+
+        JObject body = ControllerTestHelper.AssertOk(result);
+        Assert.AreEqual(Code.SUCCESS.Code, body.Value<string>("response_code"));
+        Assert.AreEqual(Code.AccessToken.TOKEN_TYPE_BEARER, body.Value<string>("token_type"));
+        Assert.AreEqual(AppConfig.AccessTokenExpireSec, body.Value<int>("expires_in"));
+        Assert.AreEqual("task.comment", body.Value<string>("scope"));
+        Assert.AreEqual(3, body.Value<string>("access_token")!.Split('.').Length);
+        Assert.AreEqual(3, body.Value<string>("id_token")!.Split('.').Length);
+
+        JObject accessPayload = DecodeJwtPayload(body.Value<string>("access_token")!);
+        Assert.AreEqual(agentId, accessPayload.Value<string>("sub"));
+        Assert.AreEqual(clientId, accessPayload.Value<string>("aud"));
+        Assert.AreEqual("ai_agent", accessPayload.Value<string>("principal_type"));
+        Assert.AreEqual(osolabId, accessPayload.Value<string>("owner_sub"));
+        Assert.AreEqual(delegationId, accessPayload.Value<string>("delegation_id"));
+        Assert.AreEqual("task.comment", accessPayload.Value<string>("scope"));
+
+        JObject idPayload = DecodeJwtPayload(body.Value<string>("id_token")!);
+        Assert.AreEqual(agentId, idPayload.Value<string>("sub"));
+        Assert.AreEqual(clientId, idPayload.Value<string>("aud"));
+        Assert.AreEqual("ai_agent", idPayload.Value<string>("principal_type"));
+        Assert.AreEqual(agentId, idPayload.Value<string>("agent_id"));
+        Assert.AreEqual("Issue Triage Agent", idPayload.Value<string>("agent_name"));
+        Assert.AreEqual(osolabId, idPayload.Value<string>("owner_sub"));
+        Assert.AreEqual(delegationId, idPayload.Value<string>("delegation_id"));
+        Assert.AreEqual("agent_secret", idPayload["amr"]!.First!.Value<string>());
+
+        var savedAgent = await context.agent_masters.SingleAsync(x => x.agent_id == agentId);
+        Assert.IsNotNull(savedAgent.last_used_datetime);
+
+        string[] events = await context.agent_audit_logs
+            .Where(x => x.delegation_id == delegationId && x.event_type == "agent.token_issued")
+            .Select(x => x.event_type)
+            .ToArrayAsync();
+        CollectionAssert.AreEqual(new[] { "agent.token_issued" }, events);
+    }
+
+    [TestMethod]
+    public async Task PostToken_RequestScopeOutsideDelegation_ReturnsInvalidScope()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+
+        var redis = new FakeRedisClient();
+        string osolabId = ApiTestData.NewOsolabId();
+        string email = $"agent-token-scope-{Guid.NewGuid():N}@example.com";
+        string clientId = ApiTestData.NewClientId();
+        await ApiTestData.CreateUserAsync(context, osolabId, email, ApiTestData.NewPassword());
+        await ApiTestData.CreateClientAsync(context, clientId);
+
+        string sessionId = await ApiTestData.WriteLoginSessionAsync(redis, osolabId, email);
+        (string agentId, string agentSecret) = await CreateAgentCredentialsAsync(context, redis, sessionId);
+        await CreateDelegationAsync(context, redis, sessionId, agentId, clientId, "task.read");
+
+        var controller = new AgentController(context, redis, SigningTestHelper.CreateSigningService());
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = ControllerTestHelper.CreateJsonContext(new
+            {
+                agent_id = agentId,
+                agent_secret = agentSecret,
+                client_id = clientId,
+                scope = "task.comment"
+            })
+        };
+
+        IActionResult result = await controller.PostAgentToken();
+
+        JObject body = ControllerTestHelper.AssertError(result, (int)Code.INVALID_SCOPE.Status, Code.INVALID_SCOPE.Code);
+        Assert.AreEqual("invalid_scope", body.Value<string>("error"));
+    }
+
+    private static async Task<(string AgentId, string AgentSecret)> CreateAgentCredentialsAsync(
+        OsolabAuthContext context,
+        FakeRedisClient redis,
+        string sessionId)
     {
         var controller = new AgentController(context, redis);
         var httpContext = ControllerTestHelper.CreateJsonContext(new
@@ -185,6 +291,52 @@ public sealed class AgentApiTests
 
         IActionResult result = await controller.PostAgent();
         JObject body = ControllerTestHelper.AssertOk(result);
-        return body.Value<string>("agent_id")!;
+        return (body.Value<string>("agent_id")!, body.Value<string>("agent_secret")!);
+    }
+
+    private static async Task<string> CreateDelegationAsync(
+        OsolabAuthContext context,
+        FakeRedisClient redis,
+        string sessionId,
+        string agentId,
+        string clientId,
+        string scope)
+    {
+        var controller = new AgentController(context, redis);
+        var httpContext = ControllerTestHelper.CreateJsonContext(new
+        {
+            client_id = clientId,
+            scope,
+            expires_datetime = DateTimeOffset.UtcNow.AddDays(30).ToString("O")
+        });
+        ControllerTestHelper.SetCookie(httpContext, Code.AUTH_SESSION_COOKIE_KEY, sessionId);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostDelegation(agentId);
+        JObject body = ControllerTestHelper.AssertOk(result);
+        return body.Value<string>("delegation_id")!;
+    }
+
+    private static JObject DecodeJwtPayload(string jwt)
+    {
+        string[] parts = jwt.Split('.');
+        Assert.AreEqual(3, parts.Length);
+        return JObject.Parse(Encoding.UTF8.GetString(Base64UrlDecode(parts[1])));
+    }
+
+    private static byte[] Base64UrlDecode(string value)
+    {
+        string normalized = value.Replace('-', '+').Replace('_', '/');
+        int mod = normalized.Length % 4;
+        if (mod == 2)
+        {
+            normalized += "==";
+        }
+        else if (mod == 3)
+        {
+            normalized += "=";
+        }
+
+        return Convert.FromBase64String(normalized);
     }
 }
