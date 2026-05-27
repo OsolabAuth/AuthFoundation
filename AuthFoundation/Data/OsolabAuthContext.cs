@@ -14,6 +14,12 @@ public partial class OsolabAuthContext : DbContext
     {
     }
 
+    public virtual DbSet<agent_audit_log> agent_audit_logs { get; set; }
+
+    public virtual DbSet<agent_delegation> agent_delegations { get; set; }
+
+    public virtual DbSet<agent_master> agent_masters { get; set; }
+
     public virtual DbSet<client_data_key> client_data_keys { get; set; }
 
     public virtual DbSet<client_master> client_masters { get; set; }
@@ -42,6 +48,125 @@ public partial class OsolabAuthContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<agent_audit_log>(entity =>
+        {
+            entity.HasKey(e => e.audit_log_id);
+
+            entity.ToTable("agent_audit_log", "auth");
+
+            entity.HasIndex(e => new { e.agent_id, e.create_datetime }, "IX_agent_audit_log_agent_id_create_datetime");
+
+            entity.HasIndex(e => new { e.owner_osolab_id, e.create_datetime }, "IX_agent_audit_log_owner_osolab_id_create_datetime");
+
+            entity.Property(e => e.agent_id)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.client_id)
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.delegation_id)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.event_type)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.ip_address).HasMaxLength(64);
+            entity.Property(e => e.owner_osolab_id).HasMaxLength(16);
+            entity.Property(e => e.resource).HasMaxLength(255);
+            entity.Property(e => e.result)
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.scope)
+                .HasMaxLength(1000)
+                .IsUnicode(false);
+            entity.Property(e => e.user_agent).HasMaxLength(512);
+
+            entity.HasOne(d => d.agent).WithMany(p => p.agent_audit_logs)
+                .HasForeignKey(d => d.agent_id)
+                .HasConstraintName("FK_agent_audit_log_agent_id");
+
+            entity.HasOne(d => d.delegation).WithMany(p => p.agent_audit_logs)
+                .HasForeignKey(d => d.delegation_id)
+                .HasConstraintName("FK_agent_audit_log_delegation_id");
+
+            entity.HasOne(d => d.owner_osolab).WithMany(p => p.agent_audit_logs)
+                .HasForeignKey(d => d.owner_osolab_id)
+                .HasConstraintName("FK_agent_audit_log_owner_osolab_id");
+        });
+
+        modelBuilder.Entity<agent_delegation>(entity =>
+        {
+            entity.HasKey(e => e.delegation_id);
+
+            entity.ToTable("agent_delegation", "auth");
+
+            entity.HasIndex(e => new { e.agent_id, e.client_id, e.status }, "IX_agent_delegation_agent_id_client_id_status");
+
+            entity.HasIndex(e => new { e.owner_osolab_id, e.status }, "IX_agent_delegation_owner_osolab_id_status");
+
+            entity.Property(e => e.delegation_id)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.agent_id)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.client_id)
+                .HasMaxLength(32)
+                .IsUnicode(false);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.expires_datetime).HasPrecision(0);
+            entity.Property(e => e.owner_osolab_id).HasMaxLength(16);
+            entity.Property(e => e.revoked_datetime).HasPrecision(0);
+            entity.Property(e => e.scopes)
+                .HasMaxLength(1000)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+            entity.Property(e => e.verified_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.agent).WithMany(p => p.agent_delegations)
+                .HasForeignKey(d => d.agent_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_agent_delegation_agent_id");
+
+            entity.HasOne(d => d.client).WithMany(p => p.agent_delegations)
+                .HasForeignKey(d => d.client_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_agent_delegation_client_id");
+
+            entity.HasOne(d => d.owner_osolab).WithMany(p => p.agent_delegations)
+                .HasForeignKey(d => d.owner_osolab_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_agent_delegation_owner_osolab_id");
+        });
+
+        modelBuilder.Entity<agent_master>(entity =>
+        {
+            entity.HasKey(e => e.agent_id);
+
+            entity.ToTable("agent_master", "auth");
+
+            entity.HasIndex(e => new { e.owner_osolab_id, e.status }, "IX_agent_master_owner_osolab_id_status");
+
+            entity.Property(e => e.agent_id)
+                .HasMaxLength(64)
+                .IsUnicode(false);
+            entity.Property(e => e.agent_name).HasMaxLength(128);
+            entity.Property(e => e.create_datetime).HasPrecision(0);
+            entity.Property(e => e.last_used_datetime).HasPrecision(0);
+            entity.Property(e => e.owner_osolab_id).HasMaxLength(16);
+            entity.Property(e => e.revoked_datetime).HasPrecision(0);
+            entity.Property(e => e.secret_hash)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.update_datetime).HasPrecision(0);
+
+            entity.HasOne(d => d.owner_osolab).WithMany(p => p.agent_masters)
+                .HasForeignKey(d => d.owner_osolab_id)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_agent_master_owner_osolab_id");
+        });
+
         modelBuilder.Entity<client_data_key>(entity =>
         {
             entity.HasKey(e => e.sequence_id);

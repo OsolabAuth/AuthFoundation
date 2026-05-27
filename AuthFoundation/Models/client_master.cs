@@ -21,6 +21,8 @@ public partial class client_master
 
     public virtual ICollection<client_data_key> client_data_keys { get; set; } = new List<client_data_key>();
 
+    public virtual ICollection<agent_delegation> agent_delegations { get; set; } = new List<agent_delegation>();
+
     public virtual ICollection<client_redirect_uri> client_redirect_uris { get; set; } = new List<client_redirect_uri>();
 
     public virtual ICollection<client_scope> client_scopes { get; set; } = new List<client_scope>();

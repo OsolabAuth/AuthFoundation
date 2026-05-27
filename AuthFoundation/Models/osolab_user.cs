@@ -21,6 +21,12 @@ public partial class osolab_user
 
     public byte status { get; set; }
 
+    public virtual ICollection<agent_audit_log> agent_audit_logs { get; set; } = new List<agent_audit_log>();
+
+    public virtual ICollection<agent_delegation> agent_delegations { get; set; } = new List<agent_delegation>();
+
+    public virtual ICollection<agent_master> agent_masters { get; set; } = new List<agent_master>();
+
     public virtual ICollection<user_client_scope_consent> user_client_scope_consents { get; set; } = new List<user_client_scope_consent>();
 
     public virtual ICollection<user_info> user_infos { get; set; } = new List<user_info>();
