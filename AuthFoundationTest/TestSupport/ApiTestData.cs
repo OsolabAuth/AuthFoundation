@@ -166,6 +166,23 @@ internal static class ApiTestData
         return term;
     }
 
+    public static async Task DeactivateGeneratedInnerTermsAsync(OsolabAuthContext context)
+    {
+        List<client_term> terms = await context.client_terms
+            .Where(x => x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID
+                && x.term_id.StartsWith("term-")
+                && x.status == Code.Status.ACTIVE)
+            .ToListAsync();
+
+        foreach (client_term term in terms)
+        {
+            term.status = Code.Status.INACTIVE;
+            term.update_datetime = DateTime.UtcNow;
+        }
+
+        await context.SaveChangesAsync();
+    }
+
     public static AuthRequestSession CreateAuthRequestSession(
         string sessionId,
         string clientId,

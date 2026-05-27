@@ -187,7 +187,10 @@ namespace AuthFoundation.Common
                     && x.consent_result == Code.Status.ACTIVE)
                 .ToListAsync();
 
-            return clientTerms.All(ct => userTerms.Any(ut => ut.term_id == ct.term_id && ut.term_version == ct.term_version));
+            return clientTerms.All(ct => userTerms.Any(ut =>
+                ut.client_id == ct.client_id
+                && ut.term_id == ct.term_id
+                && ut.term_version == ct.term_version));
         }
 
         /// <summary>

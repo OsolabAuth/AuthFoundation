@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 namespace AuthFoundationTest;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class SignupApiTests
 {
     /// <summary>
@@ -322,6 +323,64 @@ public sealed class SignupApiTests
 
         string authSessionId = ControllerTestHelper.ExtractCookieValue(httpContext.Response.Headers, Code.AUTH_SESSION_COOKIE_KEY);
         Assert.IsFalse(string.IsNullOrWhiteSpace(await redis.GetStringAsync(AuthSession.GetRedisKey(authSessionId))));
+    }
+
+    /// <summary>
+    /// 前提条件
+    /// 　DB：内部クライアント共通規約を事前投入済み
+    /// 　リクエスト：Post Account を Verified Session 条件で実行
+    /// 期待値
+    /// 　アカウント登録完了後、共通規約同意画面へリダイレクトされる
+    /// </summary>
+    /// <returns></returns>
+    [TestMethod]
+    public async Task PostAccount_RequiredInnerTerm_RedirectsToTerms()
+    {
+        await using var context = TestDbContextFactory.Create();
+        await ApiTestData.AssertDatabaseAvailableAsync(context);
+        await ApiTestData.DeactivateGeneratedInnerTermsAsync(context);
+
+        string termId = $"term-{Guid.NewGuid():N}"[..32];
+        await ApiTestData.CreateRequiredTermAsync(context, Code.InnerClient.OSOLAB_CLIENT_ID, termId);
+
+        var redis = new FakeRedisClient();
+        string authzSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
+        string email = $"account-term-{Guid.NewGuid():N}@example.com";
+        await ApiTestData.WriteAuthRequestSessionAsync(
+            redis,
+            ApiTestData.CreateAuthRequestSession(authzSessionId, Code.InnerClient.OSOLAB_CLIENT_ID, "https://portal.osolab-auth.jp/callback", "openid"));
+
+        string signupSessionId = Helper.GenerateHex(Code.Session.LENGTH).ToLowerInvariant();
+        await new SignupSession
+        {
+            SignupSessionId = signupSessionId,
+            AuthRequestSessionId = authzSessionId,
+            Email = email,
+            Code = "12345",
+            Verified = true
+        }.WriteToRedisAsync(redis);
+
+        var controller = new SignupAccountController(
+            context,
+            redis,
+            new AuthorizeExecutionService(context, redis),
+            NullLogger<SignupAccountController>.Instance);
+        var httpContext = ControllerTestHelper.CreateFormContext(new Dictionary<string, string>
+        {
+            ["password"] = ApiTestData.NewPassword(),
+            ["name"] = "Test User",
+            ["birthdate"] = "1990-01-02"
+        });
+        ControllerTestHelper.SetCookie(httpContext, "signup_session_id", signupSessionId);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        IActionResult result = await controller.PostAccount();
+
+        Assert.IsInstanceOfType<OkObjectResult>(result);
+        JObject body = ControllerTestHelper.ToJObject(result);
+        Assert.AreEqual("redirect", body.Value<string>("result"));
+        StringAssert.StartsWith(httpContext.Response.Headers.Location.ToString(), $"{AppConfig.AuthUiBaseUrl}/terms");
+        Assert.IsFalse(context.user_term_consents.Any(x => x.term_id == termId && x.consent_result == Code.Status.ACTIVE));
     }
 
     /// <summary>

@@ -166,8 +166,10 @@ namespace AuthFoundation.Controllers.Auth
             AuthRequestSession session = await GetAuthRequestSessionRequiredAsync(sessionId);
 
             List<client_term> terms = await _dbContext.client_terms
-                .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE)
-                .OrderBy(x => x.term_id)
+                .Where(x => (x.client_id == session.ClientId || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID)
+                    && x.status == Code.Status.ACTIVE)
+                .OrderBy(x => x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID ? 0 : 1)
+                .ThenBy(x => x.term_id)
                 .ToListAsync();
 
             SetNoStoreHeaders(Response);
@@ -210,7 +212,9 @@ namespace AuthFoundation.Controllers.Auth
             }
 
             List<client_term> requiredTerms = await _dbContext.client_terms
-                .Where(x => x.client_id == session.ClientId && x.status == Code.Status.ACTIVE && x.required == Code.Status.ACTIVE)
+                .Where(x => (x.client_id == session.ClientId || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID)
+                    && x.status == Code.Status.ACTIVE
+                    && x.required == Code.Status.ACTIVE)
                 .ToListAsync();
 
             HashSet<string> acceptedSet = acceptedTermIds.ToHashSet(StringComparer.Ordinal);
@@ -221,12 +225,12 @@ namespace AuthFoundation.Controllers.Auth
 
             var existingTerms = await _dbContext.user_term_consents
                 .Where(x => x.osolab_id == session.OsolabId
-                    && x.client_id == session.ClientId
+                    && (x.client_id == session.ClientId || x.client_id == Code.InnerClient.OSOLAB_CLIENT_ID)
                     && x.consent_result == Code.Status.ACTIVE)
-                .Select(x => new { x.term_id, x.term_version })
+                .Select(x => new { x.client_id, x.term_id, x.term_version })
                 .ToListAsync();
             HashSet<string> existingTermKeys = existingTerms
-                .Select(x => TermConsentKey(x.term_id, x.term_version))
+                .Select(x => TermConsentKey(x.client_id, x.term_id, x.term_version))
                 .ToHashSet(StringComparer.Ordinal);
 
             List<string> requestedScopes = Helper.ParseScopes(session.Scope);
@@ -238,12 +242,12 @@ namespace AuthFoundation.Controllers.Auth
             DateTime now = DateTime.UtcNow;
             foreach (client_term term in requiredTerms)
             {
-                if (!existingTermKeys.Contains(TermConsentKey(term.term_id, term.term_version)))
+                if (!existingTermKeys.Contains(TermConsentKey(term.client_id, term.term_id, term.term_version)))
                 {
                     _dbContext.user_term_consents.Add(new user_term_consent
                     {
                         osolab_id = session.OsolabId,
-                        client_id = session.ClientId,
+                        client_id = term.client_id,
                         term_id = term.term_id,
                         term_version = term.term_version,
                         consent_result = Code.Status.ACTIVE,
@@ -276,12 +280,13 @@ namespace AuthFoundation.Controllers.Auth
         /// <summary>
         /// 利用規約同意履歴の重複判定用キーを作成します。
         /// </summary>
+        /// <param name="clientId">クライアントID</param>
         /// <param name="termId">規約ID</param>
         /// <param name="termVersion">規約バージョン</param>
         /// <returns>重複判定用キー</returns>
-        private static string TermConsentKey(string termId, string termVersion)
+        private static string TermConsentKey(string clientId, string termId, string termVersion)
         {
-            return $"{termId}\u001F{termVersion}";
+            return $"{clientId}\u001F{termId}\u001F{termVersion}";
         }
 
         /// <summary>
