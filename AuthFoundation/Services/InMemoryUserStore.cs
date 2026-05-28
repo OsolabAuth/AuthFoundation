@@ -46,6 +46,16 @@ public sealed class InMemoryUserStore
 
         return user;
     }
+
+    public UserRecord FindByEmail(string email)
+    {
+        if (!_usersByEmail.TryGetValue(email, out UserRecord? user))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return user;
+    }
 }
 
 public sealed record UserRecord(
