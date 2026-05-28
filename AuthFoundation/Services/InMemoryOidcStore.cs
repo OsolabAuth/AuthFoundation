@@ -103,6 +103,11 @@ public sealed class InMemoryOidcStore
 
         return record;
     }
+
+    public bool RevokeAccessToken(string accessToken)
+    {
+        return _accessTokens.TryRemove(accessToken, out _);
+    }
 }
 
 public sealed record AuthorizationRequestRecord(
