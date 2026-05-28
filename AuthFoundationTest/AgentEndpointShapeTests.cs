@@ -135,7 +135,7 @@ public sealed class AgentEndpointShapeTests
     private static AgentController CreateController(InMemoryUserStore users, InMemoryAgentStore agents, StepUpService stepUp)
     {
         return EndpointTestHelper.WithHttpContext(
-            new AgentController(users, agents, stepUp, new OidcTokenService(new InMemoryOidcStore())));
+            new AgentController(users, agents, stepUp, new OidcTokenService(new InMemoryOidcStore()), new AuditLogService()));
     }
 
     private static StepUpGrant IssueEmailStepUp(StepUpService stepUp, string email)

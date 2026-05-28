@@ -10,11 +10,13 @@ public sealed class LoginController : ControllerBase
 {
     private readonly InMemoryOidcStore _store;
     private readonly InMemoryUserStore _users;
+    private readonly AuditLogService _auditLogs;
 
-    public LoginController(InMemoryOidcStore store, InMemoryUserStore users)
+    public LoginController(InMemoryOidcStore store, InMemoryUserStore users, AuditLogService auditLogs)
     {
         _store = store;
         _users = users;
+        _auditLogs = auditLogs;
     }
 
     [HttpPost]
@@ -43,6 +45,15 @@ public sealed class LoginController : ControllerBase
                 user.Subject,
                 user.Email,
                 user.Name);
+            _auditLogs.Record(
+                "user.login",
+                "success",
+                user.Subject,
+                "user",
+                request.ClientId,
+                request.Scope,
+                Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                Request.Headers.UserAgent.ToString());
 
             string separator = request.RedirectUri.Contains('?') ? "&" : "?";
             string redirectUrl = $"{request.RedirectUri}{separator}code={Uri.EscapeDataString(code.Code)}&state={Uri.EscapeDataString(request.State)}";

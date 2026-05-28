@@ -13,6 +13,7 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<InMemoryOidcStore>();
 builder.Services.AddSingleton<InMemoryUserStore>();
 builder.Services.AddSingleton<InMemoryAgentStore>();
+builder.Services.AddSingleton<AuditLogService>();
 builder.Services.AddSingleton<TermsService>();
 builder.Services.AddSingleton<StepUpService>();
 builder.Services.AddSingleton<OidcTokenService>();

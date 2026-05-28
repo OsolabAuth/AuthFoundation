@@ -57,7 +57,7 @@ public sealed class MfaEndpointShapeTests
     {
         var users = CreateUsers(MfaEmail);
         var stepUp = new StepUpService(users);
-        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp, new AuditLogService()));
         MfaEmailChallenge challenge = stepUp.StartEmailChallenge(MfaEmail);
 
         var ok = EndpointTestHelper.AssertOk(controller.VerifyEmail(new VerifyRequest(MfaEmail, challenge.Code)));
@@ -79,7 +79,7 @@ public sealed class MfaEndpointShapeTests
     {
         var users = CreateUsers(MfaEmail);
         var stepUp = new StepUpService(users);
-        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp, new AuditLogService()));
         stepUp.StartEmailChallenge(MfaEmail);
 
         ErrorOutput error = EndpointTestHelper.AssertError(
@@ -135,7 +135,7 @@ public sealed class MfaEndpointShapeTests
     {
         var users = CreateUsers(MfaEmail);
         var stepUp = new StepUpService(users);
-        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp, new AuditLogService()));
         AuthenticatorSetup setup = stepUp.SetupAuthenticator(MfaEmail);
         string code = TotpUtil.GenerateCode(setup.Secret, DateTimeOffset.UtcNow);
 
@@ -174,7 +174,7 @@ public sealed class MfaEndpointShapeTests
     {
         var users = CreateUsers(MfaEmail);
         var stepUp = new StepUpService(users);
-        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp, new AuditLogService()));
         stepUp.SetupAuthenticator(MfaEmail);
 
         ErrorOutput error = EndpointTestHelper.AssertError(
@@ -187,7 +187,7 @@ public sealed class MfaEndpointShapeTests
 
     private static MfaController CreateController(InMemoryUserStore? users = null)
     {
-        return EndpointTestHelper.WithHttpContext(new MfaController(new StepUpService(users ?? new InMemoryUserStore())));
+        return EndpointTestHelper.WithHttpContext(new MfaController(new StepUpService(users ?? new InMemoryUserStore()), new AuditLogService()));
     }
 
     private static InMemoryUserStore CreateUsers(params string[] emails)

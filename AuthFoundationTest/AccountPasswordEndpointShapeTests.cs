@@ -14,7 +14,7 @@ public sealed class AccountPasswordEndpointShapeTests
         users.CreateUser("change-endpoint@example.com", "Passw0rd!", "Change User", new DateOnly(2000, 1, 1), "change_subject");
         var stepUp = new StepUpService(users);
         StepUpGrant grant = IssueEmailStepUp(stepUp, "change-endpoint@example.com");
-        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp, new AuditLogService()));
         var request = new ChangePasswordRequest("change-endpoint@example.com", "Passw0rd!", "Newpass1!", grant.StepUpToken);
 
         var ok = EndpointTestHelper.AssertOk(controller.ChangePassword(request));
@@ -29,7 +29,7 @@ public sealed class AccountPasswordEndpointShapeTests
     {
         var users = new InMemoryUserStore();
         users.CreateUser("change-no-step@example.com", "Passw0rd!", "Change User", new DateOnly(2000, 1, 1));
-        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, new StepUpService(users)));
+        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, new StepUpService(users), new AuditLogService()));
         var request = new ChangePasswordRequest("change-no-step@example.com", "Passw0rd!", "Newpass1!", "sup_missing");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.ChangePassword(request), 401);
@@ -45,7 +45,7 @@ public sealed class AccountPasswordEndpointShapeTests
         users.CreateUser("change-wrong-password@example.com", "Passw0rd!", "Change User", new DateOnly(2000, 1, 1));
         var stepUp = new StepUpService(users);
         StepUpGrant grant = IssueEmailStepUp(stepUp, "change-wrong-password@example.com");
-        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp, new AuditLogService()));
         var request = new ChangePasswordRequest("change-wrong-password@example.com", "WrongPassw0rd!", "Newpass1!", grant.StepUpToken);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.ChangePassword(request), 401);
@@ -62,7 +62,7 @@ public sealed class AccountPasswordEndpointShapeTests
         users.CreateUser("change-other@example.com", "Passw0rd!", "Other User", new DateOnly(2000, 1, 1), "change_other");
         var stepUp = new StepUpService(users);
         StepUpGrant grant = IssueEmailStepUp(stepUp, "change-other@example.com");
-        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp, new AuditLogService()));
         var request = new ChangePasswordRequest("change-owner@example.com", "Passw0rd!", "Newpass1!", grant.StepUpToken);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.ChangePassword(request), 401);
@@ -78,7 +78,7 @@ public sealed class AccountPasswordEndpointShapeTests
         users.CreateUser("change-weak@example.com", "Passw0rd!", "Change User", new DateOnly(2000, 1, 1));
         var stepUp = new StepUpService(users);
         StepUpGrant grant = IssueEmailStepUp(stepUp, "change-weak@example.com");
-        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp));
+        var controller = EndpointTestHelper.WithHttpContext(new AccountController(users, stepUp, new AuditLogService()));
         var request = new ChangePasswordRequest("change-weak@example.com", "Passw0rd!", "weak", grant.StepUpToken);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.ChangePassword(request), 400);

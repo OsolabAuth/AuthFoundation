@@ -26,7 +26,7 @@ public sealed class TermsEndpointShapeTests
     public void Signup_ReturnsAcceptedTermsIdWhenTermsAreAccepted()
     {
         var controller = EndpointTestHelper.WithHttpContext(
-            new SignupController(new InMemoryUserStore(), new TermsService()));
+            new SignupController(new InMemoryUserStore(), new TermsService(), new AuditLogService()));
         var request = new SignupRequest(
             "terms-signup@example.com",
             "Passw0rd!",
@@ -44,7 +44,7 @@ public sealed class TermsEndpointShapeTests
     public void Signup_ReturnsBadRequestWhenTermsAreNotAccepted()
     {
         var controller = EndpointTestHelper.WithHttpContext(
-            new SignupController(new InMemoryUserStore(), new TermsService()));
+            new SignupController(new InMemoryUserStore(), new TermsService(), new AuditLogService()));
         var request = new SignupRequest(
             "terms-reject@example.com",
             "Passw0rd!",

@@ -11,7 +11,7 @@ public sealed class LogoutRevokeEndpointShapeTests
     [TestMethod]
     public void Logout_ReturnsLoggedOutAndDeletesRequestCookie()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new LogoutController());
+        var controller = EndpointTestHelper.WithHttpContext(new LogoutController(new AuditLogService()));
 
         var ok = EndpointTestHelper.AssertOk(controller.Post());
 
@@ -24,7 +24,7 @@ public sealed class LogoutRevokeEndpointShapeTests
     public async Task Revoke_ReturnsRevokedForKnownToken()
     {
         var store = new InMemoryOidcStore();
-        var controller = EndpointTestHelper.WithHttpContext(new RevokeController(store));
+        var controller = EndpointTestHelper.WithHttpContext(new RevokeController(store, new AuditLogService()));
         AccessTokenRecord token = CreateAccessToken(store);
         EndpointTestHelper.SetForm(controller.HttpContext, new Dictionary<string, StringValues>
         {
@@ -41,7 +41,7 @@ public sealed class LogoutRevokeEndpointShapeTests
     [TestMethod]
     public async Task Revoke_ReturnsBadRequestForMissingToken()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new RevokeController(new InMemoryOidcStore()));
+        var controller = EndpointTestHelper.WithHttpContext(new RevokeController(new InMemoryOidcStore(), new AuditLogService()));
         EndpointTestHelper.SetForm(controller.HttpContext, new Dictionary<string, StringValues>());
 
         ErrorOutput error = EndpointTestHelper.AssertError(await controller.Post(), 400);
