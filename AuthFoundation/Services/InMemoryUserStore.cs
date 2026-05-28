@@ -11,13 +11,16 @@ public sealed class InMemoryUserStore
         string email,
         string password,
         string name,
+        DateOnly birthDate,
         string? subject = null)
     {
         var record = new UserRecord(
             subject ?? $"user_{Helper.GenerateHex(16)}",
             email,
             name,
-            password);
+            birthDate,
+            PasswordUtil.Hash(password),
+            DateTimeOffset.UtcNow);
 
         if (!_usersByEmail.TryAdd(email, record))
         {
@@ -34,7 +37,7 @@ public sealed class InMemoryUserStore
     public UserRecord Authenticate(string email, string password)
     {
         if (!_usersByEmail.TryGetValue(email, out UserRecord? user)
-            || !string.Equals(user.Password, password, StringComparison.Ordinal))
+            || !PasswordUtil.Verify(password, user.PasswordHash))
         {
             throw Code.UNAUTHORIZED;
         }
@@ -47,4 +50,6 @@ public sealed record UserRecord(
     string Subject,
     string Email,
     string Name,
-    string Password);
+    DateOnly BirthDate,
+    string PasswordHash,
+    DateTimeOffset CreatedAt);
