@@ -7,12 +7,16 @@ public static class AppConfig
     public static string Issuer { get; private set; } = "https://auth.osolab-auth.jp/";
     public static string AuthUiBaseUrl { get; private set; } = "https://portal.osolab-auth.jp";
     public static bool DisableHttpsRedirection { get; private set; }
+    public static string DevelopmentClientId { get; private set; } = "00000000000000000000000000000000";
+    public static string DevelopmentRedirectUri { get; private set; } = "http://localhost:5700/callback";
 
     public static void Initialize(IConfiguration config)
     {
         Issuer = NormalizeIssuer(config["Issuer"] ?? Issuer);
         AuthUiBaseUrl = NormalizeBaseUrl(config["AuthUiBaseUrl"] ?? AuthUiBaseUrl);
         DisableHttpsRedirection = config.GetValue("DisableHttpsRedirection", false);
+        DevelopmentClientId = config["DevelopmentClient:ClientId"] ?? DevelopmentClientId;
+        DevelopmentRedirectUri = config["DevelopmentClient:RedirectUri"] ?? DevelopmentRedirectUri;
     }
 
     private static string NormalizeIssuer(string value)
