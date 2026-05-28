@@ -1,0 +1,27 @@
+using AuthFoundation.Common;
+using System.Diagnostics.CodeAnalysis;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
+
+AppConfig.Initialize(builder.Configuration);
+
+builder.Services.AddControllers();
+
+var app = builder.Build();
+
+if (!AppConfig.DisableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
+
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
+
+[ExcludeFromCodeCoverage]
+public partial class Program
+{
+}
