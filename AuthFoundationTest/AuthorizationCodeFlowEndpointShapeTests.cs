@@ -387,7 +387,7 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
     private static InMemoryUserStore CreateLoginUsers()
     {
         var users = new InMemoryUserStore();
-        users.CreateUser(LoginEmail, LoginPassword, "Login User", "login_user");
+        users.CreateUser(LoginEmail, LoginPassword, "Login User", new DateOnly(2000, 1, 1), "login_user");
         return users;
     }
 
