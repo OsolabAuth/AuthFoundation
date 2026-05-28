@@ -17,6 +17,22 @@ public static class Code
     {
         public static readonly RequestValidation EMAIL = new("email", @"^.+@.+$");
         public static readonly RequestValidation PASSWORD = new("password", @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,128}$");
+        public static readonly RequestValidation GRANT_TYPE = new("grant_type", @"^authorization_code$");
+        public static readonly RequestValidation CODE = new("code", @"^[A-Za-z0-9._~-]{32,128}$");
+        public static readonly RequestValidation CODE_VERIFIER = new("code_verifier", @"^[A-Za-z0-9._~-]{43,128}$");
+        public static readonly RequestValidation CLIENT_ID = new("client_id", @"^[0-9]{32}$");
+    }
+
+    public static class HttpQueries
+    {
+        public static readonly RequestValidation RESPONSE_TYPE = new("response_type", @"^code$");
+        public static readonly RequestValidation CLIENT_ID = new("client_id", @"^[0-9]{32}$");
+        public static readonly RequestValidation REDIRECT_URI = new("redirect_uri", @"^(https://.+|http://localhost(:[0-9]+)?(/.*)?)$");
+        public static readonly RequestValidation SCOPE = new("scope", @"^[A-Za-z0-9_ ]+$");
+        public static readonly RequestValidation STATE = new("state", @"^.{1,255}$");
+        public static readonly RequestValidation NONCE = new("nonce", @"^.{1,255}$");
+        public static readonly RequestValidation CODE_CHALLENGE_METHOD = new("code_challenge_method", @"^S256$");
+        public static readonly RequestValidation CODE_CHALLENGE = new("code_challenge", @"^[A-Za-z0-9._~-]{43,128}$");
     }
 
     public static class Scope
