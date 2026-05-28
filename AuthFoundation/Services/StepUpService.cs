@@ -1,0 +1,86 @@
+using System.Collections.Concurrent;
+using AuthFoundation.Common;
+
+namespace AuthFoundation.Services;
+
+public sealed class StepUpService
+{
+    private static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan StepUpLifetime = TimeSpan.FromMinutes(5);
+    private readonly ConcurrentDictionary<string, MfaEmailChallenge> _emailChallenges = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _totpSecrets = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, StepUpGrant> _stepUpGrants = new();
+    private readonly InMemoryUserStore _users;
+
+    public StepUpService(InMemoryUserStore users)
+    {
+        _users = users;
+    }
+
+    public MfaEmailChallenge StartEmailChallenge(string email)
+    {
+        UserRecord user = _users.FindByEmail(email);
+        string code = Random.Shared.Next(0, 1_000_000).ToString("D6");
+        var challenge = new MfaEmailChallenge(user.Email, code, DateTimeOffset.UtcNow.Add(ChallengeLifetime));
+        _emailChallenges[user.Email] = challenge;
+        return challenge;
+    }
+
+    public StepUpGrant VerifyEmailChallenge(string email, string code)
+    {
+        UserRecord user = _users.FindByEmail(email);
+        if (!_emailChallenges.TryRemove(user.Email, out MfaEmailChallenge? challenge)
+            || challenge.ExpiresAt <= DateTimeOffset.UtcNow
+            || !string.Equals(challenge.Code, code, StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return CreateGrant(user.Subject, "email_code");
+    }
+
+    public AuthenticatorSetup SetupAuthenticator(string email)
+    {
+        UserRecord user = _users.FindByEmail(email);
+        string secret = TotpUtil.GenerateSecret();
+        _totpSecrets[user.Email] = secret;
+        string issuer = Uri.EscapeDataString("OsolabAuth");
+        string account = Uri.EscapeDataString(user.Email);
+        string uri = $"otpauth://totp/{issuer}:{account}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30";
+        return new AuthenticatorSetup(user.Email, secret, uri);
+    }
+
+    public StepUpGrant VerifyAuthenticator(string email, string code)
+    {
+        UserRecord user = _users.FindByEmail(email);
+        if (!_totpSecrets.TryGetValue(user.Email, out string? secret)
+            || !TotpUtil.VerifyCode(secret, code, DateTimeOffset.UtcNow))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return CreateGrant(user.Subject, "totp");
+    }
+
+    public StepUpGrant ValidateStepUpToken(string token)
+    {
+        if (!_stepUpGrants.TryGetValue(token, out StepUpGrant? grant)
+            || grant.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return grant;
+    }
+
+    private StepUpGrant CreateGrant(string subject, string method)
+    {
+        var grant = new StepUpGrant($"sup_{Helper.GenerateHex(48)}", subject, method, DateTimeOffset.UtcNow.Add(StepUpLifetime));
+        _stepUpGrants[grant.StepUpToken] = grant;
+        return grant;
+    }
+}
+
+public sealed record MfaEmailChallenge(string Email, string Code, DateTimeOffset ExpiresAt);
+public sealed record AuthenticatorSetup(string Email, string Secret, string OtpAuthUri);
+public sealed record StepUpGrant(string StepUpToken, string Subject, string Method, DateTimeOffset ExpiresAt);
