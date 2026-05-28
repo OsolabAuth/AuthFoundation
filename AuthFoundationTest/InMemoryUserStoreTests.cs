@@ -8,19 +8,20 @@ public sealed class InMemoryUserStoreTests
 {
     /// <summary>
     /// Purpose: verify a user registered by the test can authenticate.
-    /// Input: email=new@example.com, password=Passw0rd!, name=New User.
-    /// Expected: Authenticate returns the same subject and name.
+    /// Input: email=new@example.com, password=Passw0rd!, name=New User, birth_date=2000-01-01.
+    /// Expected: Authenticate returns the same subject, name, and created_at is not in the future.
     /// </summary>
     [TestMethod]
     public void Authenticate_ReturnsCreatedUser()
     {
         var users = new InMemoryUserStore();
-        UserRecord created = users.CreateUser("new@example.com", "Passw0rd!", "New User");
+        UserRecord created = users.CreateUser("new@example.com", "Passw0rd!", "New User", new DateOnly(2000, 1, 1));
 
         UserRecord authenticated = users.Authenticate("new@example.com", "Passw0rd!");
 
         Assert.AreEqual(created.Subject, authenticated.Subject);
         Assert.AreEqual("New User", authenticated.Name);
+        Assert.IsTrue(authenticated.CreatedAt <= DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -32,7 +33,7 @@ public sealed class InMemoryUserStoreTests
     public void Authenticate_RejectsWrongPassword()
     {
         var users = new InMemoryUserStore();
-        users.CreateUser("reject@example.com", "Passw0rd!", "Reject User");
+        users.CreateUser("reject@example.com", "Passw0rd!", "Reject User", new DateOnly(2000, 1, 1));
 
         Assert.ThrowsExactly<ApiException>(() => users.Authenticate("reject@example.com", "WrongPassw0rd!"));
     }
@@ -59,10 +60,10 @@ public sealed class InMemoryUserStoreTests
     public void CreateUser_RejectsDuplicateEmail()
     {
         var users = new InMemoryUserStore();
-        users.CreateUser("duplicate@example.com", "Passw0rd!", "Duplicate User");
+        users.CreateUser("duplicate@example.com", "Passw0rd!", "Duplicate User", new DateOnly(2000, 1, 1));
 
         ApiException error = Assert.ThrowsExactly<ApiException>(
-            () => users.CreateUser("DUPLICATE@example.com", "Passw0rd!", "Duplicate User"));
+            () => users.CreateUser("DUPLICATE@example.com", "Passw0rd!", "Duplicate User", new DateOnly(2000, 1, 1)));
 
         Assert.AreEqual("00001", error.InternalCode);
         Assert.AreEqual("invalid_request", error.Error);
