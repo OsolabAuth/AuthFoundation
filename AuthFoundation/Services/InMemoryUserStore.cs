@@ -12,13 +12,15 @@ public sealed class InMemoryUserStore
         string password,
         string name,
         DateOnly birthDate,
-        string? subject = null)
+        string? subject = null,
+        string? acceptedTermsId = null)
     {
         var record = new UserRecord(
             subject ?? $"user_{Helper.GenerateHex(16)}",
             email,
             name,
             birthDate,
+            acceptedTermsId,
             PasswordUtil.Hash(password),
             DateTimeOffset.UtcNow);
 
@@ -51,5 +53,6 @@ public sealed record UserRecord(
     string Email,
     string Name,
     DateOnly BirthDate,
+    string? AcceptedTermsId,
     string PasswordHash,
     DateTimeOffset CreatedAt);
