@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+TestResults/
+artifacts/
+*.user
+*.lscache
+/SampleClients/
+/deploy/
+/scripts/
+/docs/DEFAULT_CODE_FILES.md
+/docs/issue-progress-2026-05-22.md
