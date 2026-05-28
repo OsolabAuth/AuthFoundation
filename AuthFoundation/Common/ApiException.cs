@@ -9,6 +9,13 @@ public sealed class ApiException : Exception
     public string Error { get; }
     public string ErrorDescription { get; }
 
+    /// <summary>
+    /// APIレスポンスに変換するAuthFoundation共通例外を生成する。
+    /// </summary>
+    /// <param name="internalCode">AuthFoundation内部の返却コード。</param>
+    /// <param name="statusCode">HTTPステータスコード。</param>
+    /// <param name="error">OAuthエラーコード。</param>
+    /// <param name="errorDescription">エラー説明。</param>
     public ApiException(
         string internalCode,
         HttpStatusCode statusCode,

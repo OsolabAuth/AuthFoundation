@@ -5,6 +5,9 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class HelperTests
 {
+    /// <summary>
+    /// GenerateHexが指定桁数の小文字16進文字列を返すことを確認する。
+    /// </summary>
     [TestMethod]
     public void GenerateHex_ReturnsRequestedLength()
     {
@@ -14,6 +17,9 @@ public sealed class HelperTests
         StringAssert.Matches(value, new System.Text.RegularExpressions.Regex("^[a-f0-9]+$"));
     }
 
+    /// <summary>
+    /// ParseScopesが空白と重複を除外したscope配列を返すことを確認する。
+    /// </summary>
     [TestMethod]
     public void ParseScopes_RemovesDuplicatesAndBlanks()
     {

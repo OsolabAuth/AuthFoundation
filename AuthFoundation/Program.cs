@@ -1,4 +1,6 @@
 using AuthFoundation.Common;
+using AuthFoundation.Services;
+using System.Diagnostics.CodeAnalysis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +10,9 @@ builder.Logging.AddJsonConsole();
 AppConfig.Initialize(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddSingleton<InMemoryOidcStore>();
+builder.Services.AddSingleton<InMemoryUserStore>();
+builder.Services.AddSingleton<OidcTokenService>();
 
 var app = builder.Build();
 
@@ -20,6 +25,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.Run();
 
+[ExcludeFromCodeCoverage]
 public partial class Program
 {
 }

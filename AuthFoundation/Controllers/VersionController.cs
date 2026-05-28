@@ -6,6 +6,10 @@ namespace AuthFoundation.Controllers;
 [Route("version")]
 public sealed class VersionController : ControllerBase
 {
+    /// <summary>
+    /// AuthFoundationのバージョン情報を返却する。
+    /// </summary>
+    /// <returns>サービス稼働情報。</returns>
     [HttpGet]
     public IActionResult Get()
     {
