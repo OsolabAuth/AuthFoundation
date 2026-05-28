@@ -393,7 +393,7 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
 
     private static TokenController CreateTokenController(InMemoryOidcStore store)
     {
-        return new TokenController(store, new OidcTokenService())
+        return new TokenController(store, new OidcTokenService(store))
         {
             ControllerContext = new ControllerContext
             {
