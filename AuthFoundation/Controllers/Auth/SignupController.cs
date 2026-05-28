@@ -11,11 +11,13 @@ public sealed class SignupController : ControllerBase
 {
     private readonly InMemoryUserStore _users;
     private readonly TermsService _terms;
+    private readonly AuditLogService _auditLogs;
 
-    public SignupController(InMemoryUserStore users, TermsService terms)
+    public SignupController(InMemoryUserStore users, TermsService terms, AuditLogService auditLogs)
     {
         _users = users;
         _terms = terms;
+        _auditLogs = auditLogs;
     }
 
     [HttpPost]
@@ -42,6 +44,15 @@ public sealed class SignupController : ControllerBase
 
             TermsDocument terms = _terms.Current();
             UserRecord user = _users.CreateUser(request.Email, request.Password, request.Name, birthDate, acceptedTermsId: terms.TermsId);
+            _auditLogs.Record(
+                "user.signup",
+                "success",
+                user.Subject,
+                "user",
+                AppConfig.DevelopmentClientId,
+                ipAddress: Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                userAgent: Request.Headers.UserAgent.ToString(),
+                metadata: new Dictionary<string, string> { ["email"] = user.Email, ["terms_id"] = terms.TermsId });
             return Ok(new
             {
                 sub = user.Subject,

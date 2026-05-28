@@ -375,7 +375,7 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
 
     private static LoginController CreateLoginController(InMemoryOidcStore store, InMemoryUserStore users)
     {
-        return new LoginController(store, users)
+        return new LoginController(store, users, new AuditLogService())
         {
             ControllerContext = new ControllerContext
             {

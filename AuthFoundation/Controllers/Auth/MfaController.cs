@@ -10,10 +10,12 @@ namespace AuthFoundation.Controllers.Auth;
 public sealed class MfaController : ControllerBase
 {
     private readonly StepUpService _stepUp;
+    private readonly AuditLogService _auditLogs;
 
-    public MfaController(StepUpService stepUp)
+    public MfaController(StepUpService stepUp, AuditLogService auditLogs)
     {
         _stepUp = stepUp;
+        _auditLogs = auditLogs;
     }
 
     [HttpPost("email/start")]
@@ -23,6 +25,13 @@ public sealed class MfaController : ControllerBase
         {
             ValidateUtil.FormatParam(request.Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
             MfaEmailChallenge challenge = _stepUp.StartEmailChallenge(request.Email);
+            _auditLogs.Record(
+                "mfa.email.challenge_created",
+                "success",
+                actorType: "user",
+                ipAddress: Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                userAgent: Request.Headers.UserAgent.ToString(),
+                metadata: new Dictionary<string, string> { ["email"] = challenge.Email });
             return Ok(new
             {
                 result = "challenge_created",
@@ -75,6 +84,14 @@ public sealed class MfaController : ControllerBase
         try
         {
             StepUpGrant grant = verify();
+            _auditLogs.Record(
+                "step_up.issued",
+                "success",
+                grant.Subject,
+                "user",
+                ipAddress: Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                userAgent: Request.Headers.UserAgent.ToString(),
+                metadata: new Dictionary<string, string> { ["method"] = grant.Method });
             return Ok(new
             {
                 step_up_token = grant.StepUpToken,
