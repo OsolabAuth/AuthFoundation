@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
+using System.Net;
 using System.Text;
 
 namespace AuthFoundationTest;
@@ -16,6 +17,8 @@ internal static class EndpointTestHelper
         {
             HttpContext = new DefaultHttpContext()
         };
+        controller.HttpContext.Connection.RemoteIpAddress = IPAddress.Parse("127.0.0.1");
+        controller.Request.Headers.UserAgent = "AuthFoundationTest";
         return controller;
     }
 

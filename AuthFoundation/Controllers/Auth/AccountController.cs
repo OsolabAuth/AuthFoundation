@@ -11,11 +11,13 @@ public sealed class AccountController : ControllerBase
 {
     private readonly InMemoryUserStore _users;
     private readonly StepUpService _stepUp;
+    private readonly AuditLogService _auditLogs;
 
-    public AccountController(InMemoryUserStore users, StepUpService stepUp)
+    public AccountController(InMemoryUserStore users, StepUpService stepUp, AuditLogService auditLogs)
     {
         _users = users;
         _stepUp = stepUp;
+        _auditLogs = auditLogs;
     }
 
     [HttpPost("password")]
@@ -36,6 +38,13 @@ public sealed class AccountController : ControllerBase
             }
 
             _users.ChangePassword(request.Email, request.CurrentPassword, request.NewPassword);
+            _auditLogs.Record(
+                "user.password_changed",
+                "success",
+                user.Subject,
+                "user",
+                ipAddress: Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                userAgent: Request.Headers.UserAgent.ToString());
             return Ok(new { result = "password_changed" });
         }
         catch (ApiException ex)
@@ -61,6 +70,13 @@ public sealed class AccountController : ControllerBase
             }
 
             _users.Withdraw(request.Email, request.Password);
+            _auditLogs.Record(
+                "user.withdrawn",
+                "success",
+                user.Subject,
+                "user",
+                ipAddress: Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                userAgent: Request.Headers.UserAgent.ToString());
             return Ok(new { result = "account_withdrawn" });
         }
         catch (ApiException ex)

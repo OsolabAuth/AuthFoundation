@@ -11,7 +11,7 @@ public sealed class SignupEndpointShapeTests
     public void Post_ReturnsCreatedUserProfile()
     {
         var users = new InMemoryUserStore();
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, new TermsService()));
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, new TermsService(), new AuditLogService()));
         var request = new SignupRequest(
             "signup-success@example.com",
             "Passw0rd!",
@@ -33,7 +33,7 @@ public sealed class SignupEndpointShapeTests
     [TestMethod]
     public void Post_ReturnsBadRequestForInvalidEmail()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore(), new TermsService()));
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore(), new TermsService(), new AuditLogService()));
         var request = new SignupRequest("invalid", "Passw0rd!", "Signup User", "2001-02-03", true);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Post(request), 400);
@@ -46,7 +46,7 @@ public sealed class SignupEndpointShapeTests
     [TestMethod]
     public void Post_ReturnsBadRequestForInvalidBirthDate()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore(), new TermsService()));
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore(), new TermsService(), new AuditLogService()));
         var request = new SignupRequest("signup-birth@example.com", "Passw0rd!", "Signup User", "2001-13-40", true);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Post(request), 400);

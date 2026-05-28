@@ -10,10 +10,12 @@ namespace AuthFoundation.Controllers.Auth;
 public sealed class PasswordController : ControllerBase
 {
     private readonly InMemoryUserStore _users;
+    private readonly AuditLogService _auditLogs;
 
-    public PasswordController(InMemoryUserStore users)
+    public PasswordController(InMemoryUserStore users, AuditLogService auditLogs)
     {
         _users = users;
+        _auditLogs = auditLogs;
     }
 
     [HttpPost("reset")]
@@ -29,7 +31,14 @@ public sealed class PasswordController : ControllerBase
                 throw Code.REQUEST_PARAMETER_ERROR;
             }
 
-            _users.ResetPassword(request.Email, birthDate, request.NewPassword);
+            UserRecord user = _users.ResetPassword(request.Email, birthDate, request.NewPassword);
+            _auditLogs.Record(
+                "user.password_reset",
+                "success",
+                user.Subject,
+                "user",
+                ipAddress: Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                userAgent: Request.Headers.UserAgent.ToString());
             return Ok(new { result = "password_reset" });
         }
         catch (ApiException ex)

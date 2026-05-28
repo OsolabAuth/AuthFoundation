@@ -13,17 +13,20 @@ public sealed class AgentController : ControllerBase
     private readonly InMemoryAgentStore _agents;
     private readonly StepUpService _stepUp;
     private readonly OidcTokenService _tokens;
+    private readonly AuditLogService _auditLogs;
 
     public AgentController(
         InMemoryUserStore users,
         InMemoryAgentStore agents,
         StepUpService stepUp,
-        OidcTokenService tokens)
+        OidcTokenService tokens,
+        AuditLogService auditLogs)
     {
         _users = users;
         _agents = agents;
         _stepUp = stepUp;
         _tokens = tokens;
+        _auditLogs = auditLogs;
     }
 
     [HttpPost]
@@ -55,6 +58,20 @@ public sealed class AgentController : ControllerBase
                 request.ClientId,
                 request.Scope,
                 DateTimeOffset.UtcNow.AddDays(expiresDays));
+            _auditLogs.Record(
+                "agent.created",
+                "success",
+                result.Agent.AgentId,
+                "ai_agent",
+                request.ClientId,
+                request.Scope,
+                Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                Request.Headers.UserAgent.ToString(),
+                new Dictionary<string, string>
+                {
+                    ["owner_sub"] = owner.Subject,
+                    ["delegation_id"] = result.Delegation.DelegationId
+                });
 
             return Ok(new
             {
@@ -85,7 +102,22 @@ public sealed class AgentController : ControllerBase
                 request.AgentSecret,
                 request.ClientId,
                 request.Scope);
-            return Ok(_tokens.CreateAgentTokenResponse(grant.Agent, grant.Delegation, grant.Scope));
+            AgentTokenResponse response = _tokens.CreateAgentTokenResponse(grant.Agent, grant.Delegation, grant.Scope);
+            _auditLogs.Record(
+                "agent.token_issued",
+                "success",
+                grant.Agent.AgentId,
+                "ai_agent",
+                request.ClientId,
+                grant.Scope,
+                Convert.ToString(HttpContext.Connection.RemoteIpAddress),
+                Request.Headers.UserAgent.ToString(),
+                new Dictionary<string, string>
+                {
+                    ["owner_sub"] = grant.Agent.OwnerSubject,
+                    ["delegation_id"] = grant.Delegation.DelegationId
+                });
+            return Ok(response);
         }
         catch (ApiException ex)
         {
