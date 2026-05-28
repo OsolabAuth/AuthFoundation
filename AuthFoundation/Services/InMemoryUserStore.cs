@@ -47,6 +47,17 @@ public sealed class InMemoryUserStore
         return user;
     }
 
+    public UserRecord ChangePassword(string email, string currentPassword, string newPassword)
+    {
+        UserRecord user = Authenticate(email, currentPassword);
+        UserRecord updated = user with
+        {
+            PasswordHash = PasswordUtil.Hash(newPassword)
+        };
+        _usersByEmail[email] = updated;
+        return updated;
+    }
+
     public UserRecord FindByEmail(string email)
     {
         if (!_usersByEmail.TryGetValue(email, out UserRecord? user))
