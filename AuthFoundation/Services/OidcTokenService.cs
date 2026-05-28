@@ -9,12 +9,38 @@ public sealed class OidcTokenService
 {
     private readonly RSA _rsa = RSA.Create(2048);
     private readonly string _kid = Helper.GenerateHex(16);
+    private readonly InMemoryOidcStore _store;
+
+    public OidcTokenService(InMemoryOidcStore store)
+    {
+        _store = store;
+    }
 
     public TokenResponse CreateTokenResponse(AuthorizationCodeRecord code)
     {
-        string accessToken = $"dev_{Helper.GenerateHex(48)}";
+        AccessTokenRecord accessToken = _store.CreateAccessToken(code);
         string idToken = CreateIdToken(code);
-        return new TokenResponse(accessToken, idToken, "Bearer", 900, code.Scope);
+        return new TokenResponse(accessToken.AccessToken, idToken, "Bearer", 900, code.Scope);
+    }
+
+    public object CreateJwksResponse()
+    {
+        RSAParameters parameters = _rsa.ExportParameters(false);
+        return new
+        {
+            keys = new[]
+            {
+                new
+                {
+                    kty = "RSA",
+                    use = "sig",
+                    kid = _kid,
+                    alg = "RS256",
+                    n = PkceUtil.Base64UrlEncode(parameters.Modulus!),
+                    e = PkceUtil.Base64UrlEncode(parameters.Exponent!)
+                }
+            }
+        };
     }
 
     private string CreateIdToken(AuthorizationCodeRecord code)
