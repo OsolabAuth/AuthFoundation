@@ -69,4 +69,17 @@ public sealed class InMemoryUserStoreTests
         Assert.AreEqual("invalid_request", error.Error);
         Assert.AreEqual("email is already registered", error.ErrorDescription);
     }
+
+    /// <summary>
+    /// Purpose: verify direct lookup rejects an unknown email.
+    /// Input: missing email=missing@example.com.
+    /// Expected: ApiException unauthorized.
+    /// </summary>
+    [TestMethod]
+    public void FindByEmail_RejectsUnknownEmail()
+    {
+        var users = new InMemoryUserStore();
+
+        Assert.ThrowsExactly<ApiException>(() => users.FindByEmail("missing@example.com"));
+    }
 }
