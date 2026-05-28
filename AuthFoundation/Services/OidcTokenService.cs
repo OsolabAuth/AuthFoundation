@@ -23,6 +23,34 @@ public sealed class OidcTokenService
         return new TokenResponse(accessToken.AccessToken, idToken, "Bearer", 900, code.Scope);
     }
 
+    public AgentTokenResponse CreateAgentTokenResponse(AgentRecord agent, AgentDelegationRecord delegation, string scope)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var payload = new Dictionary<string, object>
+        {
+            ["iss"] = AppConfig.Issuer.TrimEnd('/'),
+            ["sub"] = agent.AgentId,
+            ["aud"] = delegation.ClientId,
+            ["exp"] = now.AddMinutes(15).ToUnixTimeSeconds(),
+            ["iat"] = now.ToUnixTimeSeconds(),
+            ["principal_type"] = "ai_agent",
+            ["agent_id"] = agent.AgentId,
+            ["agent_name"] = agent.AgentName,
+            ["owner_sub"] = agent.OwnerSubject,
+            ["delegation_id"] = delegation.DelegationId,
+            ["scope"] = scope,
+            ["amr"] = new[] { "agent_secret" },
+            ["acr"] = "urn:osolab:acr:agent-delegated"
+        };
+
+        return new AgentTokenResponse(
+            $"agt_{Helper.GenerateHex(48)}",
+            CreateSignedJwt(payload),
+            "Bearer",
+            900,
+            scope);
+    }
+
     public object CreateJwksResponse()
     {
         RSAParameters parameters = _rsa.ExportParameters(false);
@@ -82,6 +110,13 @@ public sealed class OidcTokenService
 }
 
 public sealed record TokenResponse(
+    string access_token,
+    string id_token,
+    string token_type,
+    int expires_in,
+    string scope);
+
+public sealed record AgentTokenResponse(
     string access_token,
     string id_token,
     string token_type,
