@@ -58,6 +58,22 @@ public sealed class InMemoryUserStore
         return updated;
     }
 
+    public UserRecord ResetPassword(string email, DateOnly birthDate, string newPassword)
+    {
+        UserRecord user = FindByEmail(email);
+        if (user.BirthDate != birthDate)
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        UserRecord updated = user with
+        {
+            PasswordHash = PasswordUtil.Hash(newPassword)
+        };
+        _usersByEmail[email] = updated;
+        return updated;
+    }
+
     public UserRecord FindByEmail(string email)
     {
         if (!_usersByEmail.TryGetValue(email, out UserRecord? user))
