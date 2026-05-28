@@ -80,6 +80,45 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual("invalid authorization code", error.ErrorDescription);
     }
 
+    [TestMethod]
+    public void FindAccessToken_ReturnsKnownAccessToken()
+    {
+        var store = new InMemoryOidcStore();
+        AuthorizationCodeRecord code = CreateCode(store);
+        AccessTokenRecord token = store.CreateAccessToken(code);
+
+        AccessTokenRecord actual = store.FindAccessToken(token.AccessToken);
+
+        Assert.AreEqual(token.AccessToken, actual.AccessToken);
+        Assert.AreEqual(AppConfig.DevelopmentClientId, actual.ClientId);
+        Assert.AreEqual("openid profile email", actual.Scope);
+        Assert.AreEqual("subject_1", actual.Subject);
+        Assert.AreEqual("subject@example.com", actual.Email);
+        Assert.AreEqual("Subject One", actual.Name);
+    }
+
+    [TestMethod]
+    public void FindAccessToken_RejectsUnknownAccessToken()
+    {
+        var store = new InMemoryOidcStore();
+
+        ApiException error = Assert.ThrowsExactly<ApiException>(() => store.FindAccessToken("missing"));
+
+        Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
+    }
+
+    [TestMethod]
+    public void FindAccessToken_RejectsExpiredAccessToken()
+    {
+        var store = new InMemoryOidcStore();
+        AccessTokenRecord token = store.CreateAccessToken(CreateCode(store));
+        AccessTokens(store)[token.AccessToken] = token with { ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(-1) };
+
+        ApiException error = Assert.ThrowsExactly<ApiException>(() => store.FindAccessToken(token.AccessToken));
+
+        Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
+    }
+
     private static AuthorizationCodeRecord CreateCode(InMemoryOidcStore store)
     {
         return store.CreateCode(CreateRequest(store), "subject_1", "subject@example.com", "Subject One");
@@ -104,6 +143,11 @@ public sealed class InMemoryOidcStoreTests
     private static ConcurrentDictionary<string, AuthorizationCodeRecord> Codes(InMemoryOidcStore store)
     {
         return PrivateField<ConcurrentDictionary<string, AuthorizationCodeRecord>>(store, "_codes");
+    }
+
+    private static ConcurrentDictionary<string, AccessTokenRecord> AccessTokens(InMemoryOidcStore store)
+    {
+        return PrivateField<ConcurrentDictionary<string, AccessTokenRecord>>(store, "_accessTokens");
     }
 
     private static T PrivateField<T>(object target, string name)
