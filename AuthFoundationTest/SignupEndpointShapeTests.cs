@@ -11,12 +11,13 @@ public sealed class SignupEndpointShapeTests
     public void Post_ReturnsCreatedUserProfile()
     {
         var users = new InMemoryUserStore();
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users));
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, new TermsService()));
         var request = new SignupRequest(
             "signup-success@example.com",
             "Passw0rd!",
             "Signup User",
-            "2001-02-03");
+            "2001-02-03",
+            true);
 
         var ok = EndpointTestHelper.AssertOk(controller.Post(request));
 
@@ -32,8 +33,8 @@ public sealed class SignupEndpointShapeTests
     [TestMethod]
     public void Post_ReturnsBadRequestForInvalidEmail()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore()));
-        var request = new SignupRequest("invalid", "Passw0rd!", "Signup User", "2001-02-03");
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore(), new TermsService()));
+        var request = new SignupRequest("invalid", "Passw0rd!", "Signup User", "2001-02-03", true);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Post(request), 400);
 
@@ -45,8 +46,8 @@ public sealed class SignupEndpointShapeTests
     [TestMethod]
     public void Post_ReturnsBadRequestForInvalidBirthDate()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore()));
-        var request = new SignupRequest("signup-birth@example.com", "Passw0rd!", "Signup User", "2001-13-40");
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(new InMemoryUserStore(), new TermsService()));
+        var request = new SignupRequest("signup-birth@example.com", "Passw0rd!", "Signup User", "2001-13-40", true);
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Post(request), 400);
 
