@@ -74,6 +74,13 @@ public sealed class InMemoryUserStore
         return updated;
     }
 
+    public UserRecord Withdraw(string email, string password)
+    {
+        UserRecord user = Authenticate(email, password);
+        _usersByEmail.TryRemove(email, out _);
+        return user;
+    }
+
     public UserRecord FindByEmail(string email)
     {
         if (!_usersByEmail.TryGetValue(email, out UserRecord? user))
