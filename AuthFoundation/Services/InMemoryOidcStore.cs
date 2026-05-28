@@ -7,8 +7,10 @@ public sealed class InMemoryOidcStore
 {
     private static readonly TimeSpan RequestLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
     private readonly ConcurrentDictionary<string, AuthorizationRequestRecord> _requests = new();
     private readonly ConcurrentDictionary<string, AuthorizationCodeRecord> _codes = new();
+    private readonly ConcurrentDictionary<string, AccessTokenRecord> _accessTokens = new();
 
     public AuthorizationRequestRecord CreateRequest(
         string clientId,
@@ -75,6 +77,32 @@ public sealed class InMemoryOidcStore
 
         return record;
     }
+
+    public AccessTokenRecord CreateAccessToken(AuthorizationCodeRecord code)
+    {
+        string accessToken = $"dev_{Helper.GenerateHex(48)}";
+        var record = new AccessTokenRecord(
+            accessToken,
+            code.ClientId,
+            code.Scope,
+            code.Subject,
+            code.Email,
+            code.Name,
+            DateTimeOffset.UtcNow.Add(AccessTokenLifetime));
+        _accessTokens[accessToken] = record;
+        return record;
+    }
+
+    public AccessTokenRecord FindAccessToken(string accessToken)
+    {
+        if (!_accessTokens.TryGetValue(accessToken, out AccessTokenRecord? record)
+            || record.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return record;
+    }
 }
 
 public sealed record AuthorizationRequestRecord(
@@ -94,6 +122,15 @@ public sealed record AuthorizationCodeRecord(
     string Scope,
     string Nonce,
     string CodeChallenge,
+    string Subject,
+    string Email,
+    string Name,
+    DateTimeOffset ExpiresAt);
+
+public sealed record AccessTokenRecord(
+    string AccessToken,
+    string ClientId,
+    string Scope,
     string Subject,
     string Email,
     string Name,
