@@ -7,6 +7,7 @@ artifacts/
 *.lscache
 /SampleClients/
 /deploy/
-/scripts/
+/scripts/*
+!/scripts/build-cloud-run-image.ps1
 /docs/DEFAULT_CODE_FILES.md
 /docs/issue-progress-2026-05-22.md
