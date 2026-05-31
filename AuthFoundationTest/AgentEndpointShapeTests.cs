@@ -55,6 +55,33 @@ public sealed class AgentEndpointShapeTests
         Assert.AreEqual("invalid_client", error.Error);
     }
 
+    /// <summary>
+    /// 目的: /agent作成時にPhase 1許可リスト外のscopeが拒否されることを検証する。
+    /// 入力値: owner_email=agent-create-invalid-scope@example.com, scope=task_read task_delete。
+    /// 期待値: 400、response_code=00009、error=invalid_scope。
+    /// </summary>
+    [TestMethod]
+    public void Create_ReturnsInvalidScopeForUnsupportedScope()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("agent-create-invalid-scope@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-create-invalid-scope@example.com");
+        var controller = CreateController(users, new InMemoryAgentStore(), stepUp);
+        var request = new CreateAgentRequest(
+            "agent-create-invalid-scope@example.com",
+            "Issue Triage Agent",
+            AppConfig.DevelopmentClientId,
+            "task_read task_delete",
+            7,
+            grant.StepUpToken);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Create(request), 400);
+
+        Assert.AreEqual("00009", error.ResponseCode);
+        Assert.AreEqual("invalid_scope", error.Error);
+    }
+
     [TestMethod]
     public void Create_ReturnsUnauthorizedForStepUpSubjectMismatch()
     {
@@ -125,6 +152,27 @@ public sealed class AgentEndpointShapeTests
         AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
         var controller = CreateController(users, agents, new StepUpService(users));
         var request = new AgentTokenRequest(created.Agent.AgentId, created.AgentSecret, AppConfig.DevelopmentClientId, "task_comment");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Token(request), 400);
+
+        Assert.AreEqual("00009", error.ResponseCode);
+        Assert.AreEqual("invalid_scope", error.Error);
+    }
+
+    /// <summary>
+    /// 目的: /agent/tokenでPhase 1許可リスト外のscope要求が拒否されることを検証する。
+    /// 入力値: agent delegation scope=task_read, requested scope=task_delete。
+    /// 期待値: 400、response_code=00009、error=invalid_scope。
+    /// </summary>
+    [TestMethod]
+    public void Token_ReturnsInvalidScopeForUnsupportedScope()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-token-invalid-scope@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
+        var controller = CreateController(users, agents, new StepUpService(users));
+        var request = new AgentTokenRequest(created.Agent.AgentId, created.AgentSecret, AppConfig.DevelopmentClientId, "task_delete");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Token(request), 400);
 
