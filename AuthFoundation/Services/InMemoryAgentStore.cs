@@ -5,6 +5,13 @@ namespace AuthFoundation.Services;
 
 public sealed class InMemoryAgentStore
 {
+    private static readonly HashSet<string> AllowedDelegatedScopes = new(StringComparer.Ordinal)
+    {
+        "task_read",
+        "task_create",
+        "task_comment"
+    };
+
     private readonly ConcurrentDictionary<string, AgentRecord> _agents = new();
     private readonly ConcurrentDictionary<string, AgentDelegationRecord> _delegations = new();
 
@@ -15,6 +22,8 @@ public sealed class InMemoryAgentStore
         string scope,
         DateTimeOffset expiresAt)
     {
+        ValidateDelegatedScopes(scope);
+
         string agentId = $"agent_{Helper.GenerateHex(16)}";
         string secret = $"ags_{Helper.GenerateHex(48)}";
         string delegationId = $"del_{Helper.GenerateHex(16)}";
@@ -43,6 +52,8 @@ public sealed class InMemoryAgentStore
 
     public AgentTokenGrant VerifyTokenRequest(string agentId, string agentSecret, string clientId, string requestedScope)
     {
+        string[] requestedScopes = ValidateDelegatedScopes(requestedScope);
+
         if (!_agents.TryGetValue(agentId, out AgentRecord? agent)
             || !string.Equals(agent.Status, "active", StringComparison.Ordinal)
             || !PasswordUtil.Verify(agentSecret, agent.SecretHash))
@@ -60,8 +71,7 @@ public sealed class InMemoryAgentStore
         }
 
         string[] allowedScopes = Helper.ParseScopes(delegation.Scope);
-        string[] requestedScopes = Helper.ParseScopes(requestedScope);
-        if (requestedScopes.Length == 0 || requestedScopes.Any(scope => !allowedScopes.Contains(scope, StringComparer.Ordinal)))
+        if (requestedScopes.Any(scope => !allowedScopes.Contains(scope, StringComparer.Ordinal)))
         {
             throw Code.INVALID_SCOPE;
         }
@@ -110,6 +120,17 @@ public sealed class InMemoryAgentStore
         }
 
         return agent;
+    }
+
+    private static string[] ValidateDelegatedScopes(string scope)
+    {
+        string[] scopes = Helper.ParseScopes(scope);
+        if (scopes.Length == 0 || scopes.Any(item => !AllowedDelegatedScopes.Contains(item)))
+        {
+            throw Code.INVALID_SCOPE;
+        }
+
+        return scopes;
     }
 }
 
