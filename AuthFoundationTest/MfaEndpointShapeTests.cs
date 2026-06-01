@@ -198,7 +198,7 @@ public sealed class MfaEndpointShapeTests
 
     /// <summary>
     /// Purpose: verify authenticator verification rejects users without a TOTP setup.
-    /// Input: registered email without setup, code=000000.
+    /// Input: registered MFA test user email without authenticator setup, code=000000.
     /// Expected: 401 invalid_token.
     /// </summary>
     [TestMethod]
