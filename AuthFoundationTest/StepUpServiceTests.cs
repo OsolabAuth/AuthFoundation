@@ -8,6 +8,29 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class StepUpServiceTests
 {
+    /// <summary>
+    /// Purpose: verify email MFA challenge creation generates a fixed-width verification code.
+    /// Input: existing user email.
+    /// Expected: generated code has 6 numeric characters.
+    /// </summary>
+    [TestMethod]
+    public void StartEmailChallenge_ReturnsSixDigitCode()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("mfa-code@example.com", "Passw0rd!", "Mfa User", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("mfa-code@example.com");
+
+        Assert.AreEqual(6, challenge.Code.Length);
+        StringAssert.Matches(challenge.Code, new System.Text.RegularExpressions.Regex("^[0-9]{6}$"));
+    }
+
+    /// <summary>
+    /// Purpose: verify email MFA challenge verification issues a step-up grant.
+    /// Input: generated email challenge code.
+    /// Expected: step-up grant method is email_code and token starts with sup_.
+    /// </summary>
     [TestMethod]
     public void VerifyEmailChallenge_ReturnsStepUpGrant()
     {
@@ -22,6 +45,11 @@ public sealed class StepUpServiceTests
         Assert.IsTrue(grant.StepUpToken.StartsWith("sup_"));
     }
 
+    /// <summary>
+    /// Purpose: verify email MFA challenge verification rejects an incorrect code.
+    /// Input: generated challenge, code=000000.
+    /// Expected: ApiException.
+    /// </summary>
     [TestMethod]
     public void VerifyEmailChallenge_RejectsWrongCode()
     {
@@ -34,6 +62,11 @@ public sealed class StepUpServiceTests
             () => stepUp.VerifyEmailChallenge("mfa-wrong@example.com", "000000"));
     }
 
+    /// <summary>
+    /// Purpose: verify expired email MFA challenge is rejected.
+    /// Input: challenge with expires_at in the past.
+    /// Expected: ApiException.
+    /// </summary>
     [TestMethod]
     public void VerifyEmailChallenge_RejectsExpiredCode()
     {
@@ -49,6 +82,11 @@ public sealed class StepUpServiceTests
             () => stepUp.VerifyEmailChallenge("mfa-expired@example.com", "123456"));
     }
 
+    /// <summary>
+    /// Purpose: verify authenticator verification issues a step-up grant for a valid TOTP code.
+    /// Input: generated TOTP secret and current TOTP code.
+    /// Expected: step-up grant method is totp.
+    /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_ReturnsStepUpGrant()
     {
@@ -63,6 +101,11 @@ public sealed class StepUpServiceTests
         Assert.AreEqual("totp", grant.Method);
     }
 
+    /// <summary>
+    /// Purpose: verify authenticator verification rejects users without setup.
+    /// Input: existing user without TOTP secret.
+    /// Expected: ApiException.
+    /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_RejectsMissingSetup()
     {
@@ -74,6 +117,11 @@ public sealed class StepUpServiceTests
             () => stepUp.VerifyAuthenticator("totp-missing@example.com", "000000"));
     }
 
+    /// <summary>
+    /// Purpose: verify known step-up token can be retrieved.
+    /// Input: token issued by email MFA verification.
+    /// Expected: same token is returned by ValidateStepUpToken.
+    /// </summary>
     [TestMethod]
     public void ValidateStepUpToken_ReturnsKnownGrant()
     {
@@ -88,6 +136,11 @@ public sealed class StepUpServiceTests
         Assert.AreEqual(grant.StepUpToken, found.StepUpToken);
     }
 
+    /// <summary>
+    /// Purpose: verify unknown step-up token is rejected.
+    /// Input: token=sup_missing.
+    /// Expected: ApiException.
+    /// </summary>
     [TestMethod]
     public void ValidateStepUpToken_RejectsUnknownToken()
     {
@@ -97,6 +150,11 @@ public sealed class StepUpServiceTests
             () => stepUp.ValidateStepUpToken("sup_missing"));
     }
 
+    /// <summary>
+    /// Purpose: verify expired step-up token is rejected.
+    /// Input: token with expires_at in the past.
+    /// Expected: ApiException.
+    /// </summary>
     [TestMethod]
     public void ValidateStepUpToken_RejectsExpiredToken()
     {
