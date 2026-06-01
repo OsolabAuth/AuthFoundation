@@ -9,10 +9,10 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("password")]
 public sealed class PasswordController : ControllerBase
 {
-    private readonly InMemoryUserStore _users;
+    private readonly IUserStore _users;
     private readonly StepUpService _stepUp;
 
-    public PasswordController(InMemoryUserStore users, StepUpService stepUp)
+    public PasswordController(IUserStore users, StepUpService stepUp)
     {
         _users = users;
         _stepUp = stepUp;

@@ -8,9 +8,9 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("authorize")]
 public sealed class AuthorizeController : ControllerBase
 {
-    private readonly InMemoryOidcStore _store;
+    private readonly IOidcStore _store;
 
-    public AuthorizeController(InMemoryOidcStore store)
+    public AuthorizeController(IOidcStore store)
     {
         _store = store;
     }

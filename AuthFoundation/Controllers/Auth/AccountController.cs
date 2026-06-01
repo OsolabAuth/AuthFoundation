@@ -9,10 +9,10 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("account")]
 public sealed class AccountController : ControllerBase
 {
-    private readonly InMemoryUserStore _users;
+    private readonly IUserStore _users;
     private readonly StepUpService _stepUp;
 
-    public AccountController(InMemoryUserStore users, StepUpService stepUp)
+    public AccountController(IUserStore users, StepUpService stepUp)
     {
         _users = users;
         _stepUp = stepUp;

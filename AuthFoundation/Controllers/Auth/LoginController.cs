@@ -8,10 +8,10 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("login")]
 public sealed class LoginController : ControllerBase
 {
-    private readonly InMemoryOidcStore _store;
-    private readonly InMemoryUserStore _users;
+    private readonly IOidcStore _store;
+    private readonly IUserStore _users;
 
-    public LoginController(InMemoryOidcStore store, InMemoryUserStore users)
+    public LoginController(IOidcStore store, IUserStore users)
     {
         _store = store;
         _users = users;
