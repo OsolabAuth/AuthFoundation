@@ -20,7 +20,7 @@ public sealed class StepUpService
     public MfaEmailChallenge StartEmailChallenge(string email)
     {
         UserRecord user = _users.FindByEmail(email);
-        string code = Random.Shared.Next(0, 1_000_000).ToString("D6");
+        string code = Helper.GenerateNumericCode(6);
         var challenge = new MfaEmailChallenge(user.Email, code, DateTimeOffset.UtcNow.Add(ChallengeLifetime));
         _emailChallenges[user.Email] = challenge;
         return challenge;
