@@ -11,23 +11,24 @@ public sealed class MfaEndpointShapeTests
     private const string MfaPassword = "Passw0rd!";
 
     /// <summary>
-    /// Purpose: verify email MFA challenge start returns a development challenge at this phase.
+    /// Purpose: verify email MFA challenge start does not expose the verification code in the response.
     /// Input: registered MFA test user email.
-    /// Expected: 200 response with development_response, email, code, and expires_at.
+    /// Expected: 200 response with delivery=email, expires_at, and no code property.
     /// </summary>
     [TestMethod]
-    public void StartEmail_ReturnsDevelopmentChallenge()
+    public void StartEmail_ReturnsChallengeWithoutCodeExposure()
     {
         var controller = CreateController(CreateUsers(MfaEmail));
 
         var ok = EndpointTestHelper.AssertOk(controller.StartEmail(new EmailRequest(MfaEmail)));
 
+        Assert.IsNotNull(ok.Value);
         Assert.AreEqual(200, ok.StatusCode ?? 200);
         Assert.AreEqual("challenge_created", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
-        Assert.AreEqual("development_response", EndpointTestHelper.ReadProperty<string>(ok.Value, "delivery"));
+        Assert.AreEqual("email", EndpointTestHelper.ReadProperty<string>(ok.Value, "delivery"));
         Assert.AreEqual(MfaEmail, EndpointTestHelper.ReadProperty<string>(ok.Value, "email"));
-        Assert.AreEqual(6, EndpointTestHelper.ReadProperty<string>(ok.Value, "code").Length);
         Assert.IsTrue(EndpointTestHelper.ReadProperty<DateTimeOffset>(ok.Value, "expires_at") > DateTimeOffset.UtcNow);
+        Assert.IsNull(ok.Value.GetType().GetProperty("code"));
     }
 
     /// <summary>
