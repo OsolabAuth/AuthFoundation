@@ -44,12 +44,13 @@ public sealed class MfaController : ControllerBase
     }
 
     [HttpPost("authenticator/setup")]
-    public IActionResult SetupAuthenticator([FromBody] EmailRequest request)
+    public IActionResult SetupAuthenticator([FromBody] SetupAuthenticatorRequest request)
     {
         try
         {
             ValidateUtil.FormatParam(request.Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
-            AuthenticatorSetup setup = _stepUp.SetupAuthenticator(request.Email);
+            ValidateUtil.IndispensableParam(request.StepUpToken, "step_up_token");
+            AuthenticatorSetup setup = _stepUp.SetupAuthenticator(request.Email, request.StepUpToken);
             return Ok(new
             {
                 email = setup.Email,
@@ -92,6 +93,12 @@ public sealed class MfaController : ControllerBase
 public sealed record EmailRequest(
     [property: JsonPropertyName("email")]
     string Email);
+
+public sealed record SetupAuthenticatorRequest(
+    [property: JsonPropertyName("email")]
+    string Email,
+    [property: JsonPropertyName("step_up_token")]
+    string StepUpToken);
 
 public sealed record VerifyRequest(
     [property: JsonPropertyName("email")]
