@@ -10,9 +10,9 @@ public sealed class StepUpService
     private readonly ConcurrentDictionary<string, MfaEmailChallenge> _emailChallenges = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _totpSecrets = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, StepUpGrant> _stepUpGrants = new();
-    private readonly InMemoryUserStore _users;
+    private readonly IUserStore _users;
 
-    public StepUpService(InMemoryUserStore users)
+    public StepUpService(IUserStore users)
     {
         _users = users;
     }
