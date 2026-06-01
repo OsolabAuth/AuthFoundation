@@ -1,6 +1,8 @@
 using AuthFoundation.Common;
 using AuthFoundation.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace AuthFoundation.Controllers.Auth;
@@ -131,6 +133,35 @@ public sealed class AgentController : ControllerBase
         }
     }
 
+    [HttpGet("me")]
+    public IActionResult Me([FromQuery(Name = "client_id")] string clientId, [FromQuery(Name = "scope")] string scope)
+    {
+        try
+        {
+            (string agentId, string agentSecret) = ReadBasicAgentCredential();
+            ValidateUtil.FormatParam(clientId, Code.HttpBodies.CLIENT_ID.Key, Code.HttpBodies.CLIENT_ID.Regex);
+            ValidateUtil.FormatParam(scope, Code.HttpQueries.SCOPE.Key, Code.HttpQueries.SCOPE.Regex);
+
+            AgentTokenGrant grant = _agents.VerifyTokenRequest(agentId, agentSecret, clientId, scope);
+            return Ok(new
+            {
+                principal_type = "ai_agent",
+                agent_id = grant.Agent.AgentId,
+                agent_name = grant.Agent.AgentName,
+                owner_sub = grant.Agent.OwnerSubject,
+                delegation_id = grant.Delegation.DelegationId,
+                client_id = grant.Delegation.ClientId,
+                scope = grant.Scope,
+                expires_at = grant.Delegation.ExpiresAt,
+                status = grant.Agent.Status
+            });
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
     private UserRecord ValidateStepUpOwner(string ownerEmail, string stepUpToken)
     {
         ValidateUtil.FormatParam(ownerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
@@ -143,6 +174,33 @@ public sealed class AgentController : ControllerBase
         }
 
         return owner;
+    }
+
+    private (string AgentId, string AgentSecret) ReadBasicAgentCredential()
+    {
+        if (!Request.Headers.TryGetValue("Authorization", out var rawHeader)
+            || !AuthenticationHeaderValue.TryParse(rawHeader.ToString(), out AuthenticationHeaderValue? header)
+            || !string.Equals(header.Scheme, "Basic", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(header.Parameter))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        try
+        {
+            string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header.Parameter));
+            int separator = decoded.IndexOf(':', StringComparison.Ordinal);
+            if (separator <= 0 || separator == decoded.Length - 1)
+            {
+                throw Code.UNAUTHORIZED;
+            }
+
+            return (decoded[..separator], decoded[(separator + 1)..]);
+        }
+        catch (FormatException)
+        {
+            throw Code.UNAUTHORIZED;
+        }
     }
 }
 

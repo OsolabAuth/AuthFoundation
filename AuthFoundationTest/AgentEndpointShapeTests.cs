@@ -1,6 +1,7 @@
 using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Services;
+using System.Text;
 
 namespace AuthFoundationTest;
 
@@ -181,6 +182,131 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
+    /// 目的: GET /agent/me でagent資格情報と委譲情報をトークン発行なしで確認できることを検証する。
+    /// 入力値: Basic認証=agent_id:agent_secret, client_id=DevelopmentClientId, scope=task_read。
+    /// 期待値: 200、principal_type=ai_agent、agent_id/owner_sub/delegation_id/scope/statusが返る。
+    /// </summary>
+    [TestMethod]
+    public void Me_ReturnsAgentMetadata()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-me@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1), "agent_me_owner");
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read task_comment", DateTimeOffset.UtcNow.AddDays(7));
+        var controller = CreateController(users, agents, new StepUpService(users));
+        SetBasicAgentCredential(controller, created.Agent.AgentId, created.AgentSecret);
+
+        var ok = EndpointTestHelper.AssertOk(controller.Me(AppConfig.DevelopmentClientId, "task_read"));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual("ai_agent", EndpointTestHelper.ReadProperty<string>(ok.Value, "principal_type"));
+        Assert.AreEqual(created.Agent.AgentId, EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_id"));
+        Assert.AreEqual("Issue Triage Agent", EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_name"));
+        Assert.AreEqual(owner.Subject, EndpointTestHelper.ReadProperty<string>(ok.Value, "owner_sub"));
+        Assert.AreEqual(created.Delegation.DelegationId, EndpointTestHelper.ReadProperty<string>(ok.Value, "delegation_id"));
+        Assert.AreEqual(AppConfig.DevelopmentClientId, EndpointTestHelper.ReadProperty<string>(ok.Value, "client_id"));
+        Assert.AreEqual("task_read", EndpointTestHelper.ReadProperty<string>(ok.Value, "scope"));
+        Assert.AreEqual("active", EndpointTestHelper.ReadProperty<string>(ok.Value, "status"));
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<DateTimeOffset>(ok.Value, "expires_at") > DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// 目的: GET /agent/me がBasic認証なしの自己確認を拒否することを検証する。
+    /// 入力値: Authorizationヘッダーなし、client_id=DevelopmentClientId, scope=task_read。
+    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// </summary>
+    [TestMethod]
+    public void Me_ReturnsUnauthorizedForMissingBasicAuth()
+    {
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new InMemoryAgentStore(), new StepUpService(users));
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Me(AppConfig.DevelopmentClientId, "task_read"), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// 目的: GET /agent/me が誤ったagent_secretを拒否することを検証する。
+    /// 入力値: Basic認証=agent_id:ags_wrong, client_id=DevelopmentClientId, scope=task_read。
+    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// </summary>
+    [TestMethod]
+    public void Me_ReturnsUnauthorizedForWrongSecret()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-me-secret@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
+        var controller = CreateController(users, agents, new StepUpService(users));
+        SetBasicAgentCredential(controller, created.Agent.AgentId, "ags_wrong");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Me(AppConfig.DevelopmentClientId, "task_read"), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// 目的: GET /agent/me がBasic認証のagent_id/agent_secret区切り不正を拒否することを検証する。
+    /// 入力値: Basic認証=agent_only、client_id=DevelopmentClientId、scope=task_read。
+    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// </summary>
+    [TestMethod]
+    public void Me_ReturnsUnauthorizedForMalformedBasicCredential()
+    {
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new InMemoryAgentStore(), new StepUpService(users));
+        string malformed = Convert.ToBase64String(Encoding.UTF8.GetBytes("agent_only"));
+        controller.Request.Headers.Authorization = $"Basic {malformed}";
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Me(AppConfig.DevelopmentClientId, "task_read"), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// 目的: GET /agent/me がbase64として復号できないBasic認証値を拒否することを検証する。
+    /// 入力値: Basic認証=a、client_id=DevelopmentClientId、scope=task_read。
+    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// </summary>
+    [TestMethod]
+    public void Me_ReturnsUnauthorizedForInvalidBasicBase64()
+    {
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new InMemoryAgentStore(), new StepUpService(users));
+        controller.Request.Headers.Authorization = "Basic a";
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Me(AppConfig.DevelopmentClientId, "task_read"), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// 目的: GET /agent/me が委譲されていないscopeを拒否することを検証する。
+    /// 入力値: delegation scope=task_read、requested scope=task_comment。
+    /// 期待値: 400、response_code=00009、error=invalid_scope。
+    /// </summary>
+    [TestMethod]
+    public void Me_ReturnsInvalidScopeForUndelegatedScope()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-me-scope@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
+        var controller = CreateController(users, agents, new StepUpService(users));
+        SetBasicAgentCredential(controller, created.Agent.AgentId, created.AgentSecret);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Me(AppConfig.DevelopmentClientId, "task_comment"), 400);
+
+        Assert.AreEqual("00009", error.ResponseCode);
+        Assert.AreEqual("invalid_scope", error.Error);
+    }
+
+    /// <summary>
     /// 目的: /agent/{agent_id}/secretでagent_secretを再発行し、旧secretを無効化できることを検証する。
     /// 入力値: owner_email=agent-rotate-api@example.com, step_up_token, active agent。
     /// 期待値: 200、agent_secretはags_始まり、旧secretのtoken発行は401、新secretのtoken発行は200。
@@ -303,6 +429,12 @@ public sealed class AgentEndpointShapeTests
     {
         return EndpointTestHelper.WithHttpContext(
             new AgentController(users, agents, stepUp, new OidcTokenService(new InMemoryOidcStore())));
+    }
+
+    private static void SetBasicAgentCredential(AgentController controller, string agentId, string agentSecret)
+    {
+        string credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{agentId}:{agentSecret}"));
+        controller.Request.Headers.Authorization = $"Basic {credentials}";
     }
 
     private static StepUpGrant IssueEmailStepUp(StepUpService stepUp, string email)
