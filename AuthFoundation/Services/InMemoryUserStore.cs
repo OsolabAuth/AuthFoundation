@@ -3,7 +3,7 @@ using AuthFoundation.Common;
 
 namespace AuthFoundation.Services;
 
-public sealed class InMemoryUserStore
+public sealed class InMemoryUserStore : IUserStore
 {
     private readonly ConcurrentDictionary<string, UserRecord> _usersByEmail = new(StringComparer.OrdinalIgnoreCase);
 

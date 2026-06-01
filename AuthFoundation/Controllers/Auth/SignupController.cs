@@ -9,10 +9,10 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("signup")]
 public sealed class SignupController : ControllerBase
 {
-    private readonly InMemoryUserStore _users;
+    private readonly IUserStore _users;
     private readonly TermsService _terms;
 
-    public SignupController(InMemoryUserStore users, TermsService terms)
+    public SignupController(IUserStore users, TermsService terms)
     {
         _users = users;
         _terms = terms;

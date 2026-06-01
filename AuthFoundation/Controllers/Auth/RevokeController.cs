@@ -8,9 +8,9 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("revoke")]
 public sealed class RevokeController : ControllerBase
 {
-    private readonly InMemoryOidcStore _store;
+    private readonly IOidcStore _store;
 
-    public RevokeController(InMemoryOidcStore store)
+    public RevokeController(IOidcStore store)
     {
         _store = store;
     }

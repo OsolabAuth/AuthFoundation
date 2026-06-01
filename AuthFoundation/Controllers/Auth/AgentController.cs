@@ -9,14 +9,14 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("agent")]
 public sealed class AgentController : ControllerBase
 {
-    private readonly InMemoryUserStore _users;
-    private readonly InMemoryAgentStore _agents;
+    private readonly IUserStore _users;
+    private readonly IAgentStore _agents;
     private readonly StepUpService _stepUp;
     private readonly OidcTokenService _tokens;
 
     public AgentController(
-        InMemoryUserStore users,
-        InMemoryAgentStore agents,
+        IUserStore users,
+        IAgentStore agents,
         StepUpService stepUp,
         OidcTokenService tokens)
     {

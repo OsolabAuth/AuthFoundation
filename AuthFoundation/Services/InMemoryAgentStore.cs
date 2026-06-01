@@ -3,7 +3,7 @@ using AuthFoundation.Common;
 
 namespace AuthFoundation.Services;
 
-public sealed class InMemoryAgentStore
+public sealed class InMemoryAgentStore : IAgentStore
 {
     private static readonly HashSet<string> AllowedDelegatedScopes = new(StringComparer.Ordinal)
     {
