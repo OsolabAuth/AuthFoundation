@@ -1,0 +1,64 @@
+name: Unit Test Coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: AuthFoundation unit tests and coverage
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore AuthFoundationTest/AuthFoundationTest.csproj
+
+      - name: Build
+        run: dotnet build AuthFoundation/AuthFoundation.csproj -c Debug --no-restore /p:UseSharedCompilation=false
+
+      - name: Test with coverage
+        run: >
+          dotnet test --project AuthFoundationTest/AuthFoundationTest.csproj
+          -c Debug
+          /p:UseSharedCompilation=false
+          --coverage
+          --coverage-output coverage.cobertura.xml
+          --coverage-output-format cobertura
+          --results-directory TestResults\coverage
+
+      - name: Publish coverage summary
+        shell: pwsh
+        run: |
+          [xml]$coverage = Get-Content TestResults\coverage\coverage.cobertura.xml
+          $lineRate = [double]$coverage.coverage.'line-rate'
+          $branchRate = [double]$coverage.coverage.'branch-rate'
+          $linePercent = [math]::Round($lineRate * 100, 2)
+          $branchPercent = [math]::Round($branchRate * 100, 2)
+          @"
+          ## Coverage
+
+          | Metric | Value |
+          | --- | ---: |
+          | Line coverage | $linePercent% |
+          | Branch coverage | $branchPercent% |
+          | Lines | $($coverage.coverage.'lines-covered') / $($coverage.coverage.'lines-valid') |
+          | Branches | $($coverage.coverage.'branches-covered') / $($coverage.coverage.'branches-valid') |
+          "@ | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: authfoundation-coverage
+          path: TestResults/coverage/coverage.cobertura.xml
