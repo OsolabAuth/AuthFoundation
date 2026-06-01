@@ -19,6 +19,7 @@ public static class Code
         public static readonly RequestValidation PASSWORD = new("password", @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,128}$");
         public static readonly RequestValidation NAME = new("name", @"^.{1,100}$");
         public static readonly RequestValidation BIRTH_DATE = new("birth_date", @"^[0-9]{4}-[0-9]{2}-[0-9]{2}$");
+        public static readonly RequestValidation EMAIL_CODE = new("email_code", @"^[0-9]{6}$");
         public static readonly RequestValidation GRANT_TYPE = new("grant_type", @"^authorization_code$");
         public static readonly RequestValidation CODE = new("code", @"^[A-Za-z0-9._~-]{32,128}$");
         public static readonly RequestValidation CODE_VERIFIER = new("code_verifier", @"^[A-Za-z0-9._~-]{43,128}$");

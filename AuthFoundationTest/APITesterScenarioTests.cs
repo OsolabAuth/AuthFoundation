@@ -92,6 +92,20 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
+    /// Purpose: verify password reset API Tester scenarios require manual email code entry.
+    /// Input: PasswordAccountFlow JSON.
+    /// Expected: password reset request uses private EmailCode variable.
+    /// </summary>
+    [TestMethod]
+    public void PasswordScenario_UsesPrivateEmailCodeVariable()
+    {
+        HashSet<string> password = ReadScenarioValues("PasswordAccountFlow.json");
+
+        Assert.IsTrue(password.Any(value => value.Contains("\"email_code\"", StringComparison.Ordinal)));
+        Assert.IsTrue(password.Any(value => value.Contains("${\"EmailCode\"}", StringComparison.Ordinal)));
+    }
+
+    /// <summary>
     /// Purpose: verify production scenario environments do not expose secrets.
     /// Input: APITester/*.json production environment variables.
     /// Expected: sensitive variables are marked private.

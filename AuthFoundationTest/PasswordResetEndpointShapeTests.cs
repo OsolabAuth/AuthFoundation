@@ -7,13 +7,20 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class PasswordResetEndpointShapeTests
 {
+    /// <summary>
+    /// Purpose: verify password reset succeeds only when birth date and email code both match.
+    /// Input: registered email, matching birth_date, valid email_code, and strong new_password.
+    /// Expected: 200 password_reset and the new password authenticates.
+    /// </summary>
     [TestMethod]
-    public void Reset_ReturnsPasswordResetForMatchingBirthDate()
+    public void Reset_ReturnsPasswordResetForMatchingBirthDateAndEmailCode()
     {
         var users = new InMemoryUserStore();
         users.CreateUser("reset-endpoint@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
-        var controller = EndpointTestHelper.WithHttpContext(new PasswordController(users));
-        var request = new ResetPasswordRequest("reset-endpoint@example.com", "2000-01-02", "Newpass1!");
+        var stepUp = new StepUpService(users);
+        var controller = CreateController(users, stepUp);
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-endpoint@example.com");
+        var request = new ResetPasswordRequest("reset-endpoint@example.com", "2000-01-02", challenge.Code, "Newpass1!");
 
         var ok = EndpointTestHelper.AssertOk(controller.Reset(request));
 
@@ -22,11 +29,17 @@ public sealed class PasswordResetEndpointShapeTests
         Assert.AreEqual("Reset User", users.Authenticate("reset-endpoint@example.com", "Newpass1!").Name);
     }
 
+    /// <summary>
+    /// Purpose: verify password reset rejects malformed birth dates before resetting the password.
+    /// Input: invalid birth_date=2000-13-40 with 6-digit email_code.
+    /// Expected: 400 invalid_request.
+    /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForInvalidBirthDateFormat()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new PasswordController(new InMemoryUserStore()));
-        var request = new ResetPasswordRequest("reset-format@example.com", "2000-13-40", "Newpass1!");
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new StepUpService(users));
+        var request = new ResetPasswordRequest("reset-format@example.com", "2000-13-40", "123456", "Newpass1!");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 400);
 
@@ -35,30 +48,95 @@ public sealed class PasswordResetEndpointShapeTests
         Assert.AreEqual("some of the input values are incorrect", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// Purpose: verify password reset rejects missing email code.
+    /// Input: matching birth_date, empty email_code, and strong new_password.
+    /// Expected: 400 invalid_request with email_code validation message.
+    /// </summary>
+    [TestMethod]
+    public void Reset_ReturnsBadRequestForMissingEmailCode()
+    {
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new StepUpService(users));
+        var request = new ResetPasswordRequest("reset-missing-code@example.com", "1990-01-01", string.Empty, "Newpass1!");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 400);
+
+        Assert.AreEqual("00001", error.ResponseCode);
+        Assert.AreEqual("invalid_request", error.Error);
+        Assert.AreEqual("email_code is required", error.ErrorDescription);
+    }
+
+    /// <summary>
+    /// Purpose: verify password reset rejects mismatched registered birth date.
+    /// Input: registered email, wrong birth_date, valid email_code, and strong new_password.
+    /// Expected: 401 invalid_token and the old password remains valid.
+    /// </summary>
     [TestMethod]
     public void Reset_ReturnsUnauthorizedForMismatchedBirthDate()
     {
         var users = new InMemoryUserStore();
         users.CreateUser("reset-mismatch@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
-        var controller = EndpointTestHelper.WithHttpContext(new PasswordController(users));
-        var request = new ResetPasswordRequest("reset-mismatch@example.com", "2001-01-02", "Newpass1!");
+        var stepUp = new StepUpService(users);
+        var controller = CreateController(users, stepUp);
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-mismatch@example.com");
+        var request = new ResetPasswordRequest("reset-mismatch@example.com", "2001-01-02", challenge.Code, "Newpass1!");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 401);
 
         Assert.AreEqual("00008", error.ResponseCode);
         Assert.AreEqual("invalid_token", error.Error);
+        Assert.AreEqual("Reset User", users.Authenticate("reset-mismatch@example.com", "Passw0rd!").Name);
     }
 
+    /// <summary>
+    /// Purpose: verify password reset rejects an incorrect email code.
+    /// Input: registered email, matching birth_date, wrong email_code, and strong new_password.
+    /// Expected: 401 invalid_token and the old password remains valid.
+    /// </summary>
+    [TestMethod]
+    public void Reset_ReturnsUnauthorizedForWrongEmailCode()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-wrong-code@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var stepUp = new StepUpService(users);
+        var controller = CreateController(users, stepUp);
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-wrong-code@example.com");
+        var request = new ResetPasswordRequest("reset-wrong-code@example.com", "2000-01-02", DifferentCode(challenge.Code), "Newpass1!");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+        Assert.AreEqual("Reset User", users.Authenticate("reset-wrong-code@example.com", "Passw0rd!").Name);
+    }
+
+    /// <summary>
+    /// Purpose: verify password reset rejects weak new passwords before changing credentials.
+    /// Input: matching birth_date, valid-looking email_code, and weak new_password.
+    /// Expected: 400 invalid_request with password validation message.
+    /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForWeakNewPassword()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new PasswordController(new InMemoryUserStore()));
-        var request = new ResetPasswordRequest("reset-weak@example.com", "2000-01-02", "weak");
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new StepUpService(users));
+        var request = new ResetPasswordRequest("reset-weak@example.com", "2000-01-02", "123456", "weak");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 400);
 
         Assert.AreEqual("00001", error.ResponseCode);
         Assert.AreEqual("invalid_request", error.Error);
         Assert.AreEqual("password is invalid", error.ErrorDescription);
+    }
+
+    private static PasswordController CreateController(InMemoryUserStore users, StepUpService stepUp)
+    {
+        return EndpointTestHelper.WithHttpContext(new PasswordController(users, stepUp));
+    }
+
+    private static string DifferentCode(string code)
+    {
+        return string.Equals(code, "000000", StringComparison.Ordinal) ? "000001" : "000000";
     }
 }
