@@ -132,6 +132,125 @@ public sealed class AgentEndpointShapeTests
         Assert.AreEqual("invalid_scope", error.Error);
     }
 
+    /// <summary>
+    /// 目的: /agent/{agent_id}/secretでagent_secretを再発行し、旧secretを無効化できることを検証する。
+    /// 入力値: owner_email=agent-rotate-api@example.com, step_up_token, active agent。
+    /// 期待値: 200、agent_secretはags_始まり、旧secretのtoken発行は401、新secretのtoken発行は200。
+    /// </summary>
+    [TestMethod]
+    public void RotateSecret_ReturnsNewSecretAndInvalidatesPreviousSecret()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-rotate-api@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-rotate-api@example.com");
+        var controller = CreateController(users, agents, stepUp);
+
+        var ok = EndpointTestHelper.AssertOk(controller.RotateSecret(
+            created.Agent.AgentId,
+            new AgentOwnerStepUpRequest("agent-rotate-api@example.com", grant.StepUpToken)));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual(created.Agent.AgentId, EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_id"));
+        string newSecret = EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_secret");
+        Assert.IsTrue(newSecret.StartsWith("ags_", StringComparison.Ordinal));
+        Assert.AreNotEqual(created.AgentSecret, newSecret);
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<DateTimeOffset>(ok.Value, "rotated_at") <= DateTimeOffset.UtcNow);
+
+        ErrorOutput oldSecretError = EndpointTestHelper.AssertError(
+            controller.Token(new AgentTokenRequest(created.Agent.AgentId, created.AgentSecret, AppConfig.DevelopmentClientId, "task_read")),
+            401);
+        Assert.AreEqual("00008", oldSecretError.ResponseCode);
+
+        var tokenOk = EndpointTestHelper.AssertOk(
+            controller.Token(new AgentTokenRequest(created.Agent.AgentId, newSecret, AppConfig.DevelopmentClientId, "task_read")));
+        Assert.AreEqual(200, tokenOk.StatusCode ?? 200);
+    }
+
+    /// <summary>
+    /// 目的: /agent/{agent_id}/revokeでagentを失効し、以後のtoken発行を拒否できることを検証する。
+    /// 入力値: owner_email=agent-revoke-api@example.com, step_up_token, active agent。
+    /// 期待値: 200、status=revoked、revoked_atあり、token発行は401。
+    /// </summary>
+    [TestMethod]
+    public void Revoke_ReturnsRevokedAndInvalidatesAgent()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-revoke-api@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-revoke-api@example.com");
+        var controller = CreateController(users, agents, stepUp);
+
+        var ok = EndpointTestHelper.AssertOk(controller.Revoke(
+            created.Agent.AgentId,
+            new AgentOwnerStepUpRequest("agent-revoke-api@example.com", grant.StepUpToken)));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual(created.Agent.AgentId, EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_id"));
+        Assert.AreEqual("revoked", EndpointTestHelper.ReadProperty<string>(ok.Value, "status"));
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<DateTimeOffset>(ok.Value, "revoked_at") <= DateTimeOffset.UtcNow);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(
+            controller.Token(new AgentTokenRequest(created.Agent.AgentId, created.AgentSecret, AppConfig.DevelopmentClientId, "task_read")),
+            401);
+        Assert.AreEqual("00008", error.ResponseCode);
+    }
+
+    /// <summary>
+    /// 目的: step_up_tokenのsubjectがownerと異なる場合にsecret再発行を拒否することを検証する。
+    /// 入力値: owner_email=agent-rotate-owner@example.com, step_up_token=別ユーザー。
+    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// </summary>
+    [TestMethod]
+    public void RotateSecret_ReturnsUnauthorizedForStepUpSubjectMismatch()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-rotate-owner@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        users.CreateUser("agent-rotate-other@example.com", "Passw0rd!", "Other Owner", new DateOnly(2000, 1, 1));
+        var agents = new InMemoryAgentStore();
+        AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read", DateTimeOffset.UtcNow.AddDays(7));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-rotate-other@example.com");
+        var controller = CreateController(users, agents, stepUp);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(
+            controller.RotateSecret(
+                created.Agent.AgentId,
+                new AgentOwnerStepUpRequest("agent-rotate-owner@example.com", grant.StepUpToken)),
+            401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// 目的: 存在しないagent_idの失効が拒否されることを検証する。
+    /// 入力値: agent_id=agent_missing, owner_email=agent-missing-revoke@example.com, step_up_token。
+    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// </summary>
+    [TestMethod]
+    public void Revoke_ReturnsUnauthorizedForUnknownAgent()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("agent-missing-revoke@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-missing-revoke@example.com");
+        var controller = CreateController(users, new InMemoryAgentStore(), stepUp);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(
+            controller.Revoke(
+                "agent_missing",
+                new AgentOwnerStepUpRequest("agent-missing-revoke@example.com", grant.StepUpToken)),
+            401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
     private static AgentController CreateController(InMemoryUserStore users, InMemoryAgentStore agents, StepUpService stepUp)
     {
         return EndpointTestHelper.WithHttpContext(
