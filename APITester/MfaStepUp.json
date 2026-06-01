@@ -31,7 +31,7 @@
                 ],
                 "body": {
                   "bodyType": "Text",
-                  "textBody": "{ \"email\": \"${\"Email\"}\" }"
+                  "textBody": "{ \"email\": \"${\"Email\"}\", \"step_up_token\": \"${\"AuthFoundation - MfaStepUp\".\"02. Verify email MFA challenge\".\"response\".\"body\".\"step_up_token\"}\" }"
                 }
               }
             },
