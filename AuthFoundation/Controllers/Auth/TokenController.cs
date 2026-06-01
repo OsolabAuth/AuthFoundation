@@ -8,10 +8,10 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("token")]
 public sealed class TokenController : ControllerBase
 {
-    private readonly InMemoryOidcStore _store;
+    private readonly IOidcStore _store;
     private readonly OidcTokenService _tokenService;
 
-    public TokenController(InMemoryOidcStore store, OidcTokenService tokenService)
+    public TokenController(IOidcStore store, OidcTokenService tokenService)
     {
         _store = store;
         _tokenService = tokenService;

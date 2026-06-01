@@ -8,9 +8,9 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("userinfo")]
 public sealed class UserInfoController : ControllerBase
 {
-    private readonly InMemoryOidcStore _store;
+    private readonly IOidcStore _store;
 
-    public UserInfoController(InMemoryOidcStore store)
+    public UserInfoController(IOidcStore store)
     {
         _store = store;
     }

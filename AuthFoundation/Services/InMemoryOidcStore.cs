@@ -3,7 +3,7 @@ using AuthFoundation.Common;
 
 namespace AuthFoundation.Services;
 
-public sealed class InMemoryOidcStore
+public sealed class InMemoryOidcStore : IOidcStore
 {
     private static readonly TimeSpan RequestLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);

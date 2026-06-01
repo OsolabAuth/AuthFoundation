@@ -10,9 +10,9 @@ builder.Logging.AddJsonConsole();
 AppConfig.Initialize(builder.Configuration);
 
 builder.Services.AddControllers();
-builder.Services.AddSingleton<InMemoryOidcStore>();
-builder.Services.AddSingleton<InMemoryUserStore>();
-builder.Services.AddSingleton<InMemoryAgentStore>();
+builder.Services.AddSingleton<IOidcStore, InMemoryOidcStore>();
+builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
+builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
 builder.Services.AddSingleton<StepUpService>();
 builder.Services.AddSingleton<OidcTokenService>();

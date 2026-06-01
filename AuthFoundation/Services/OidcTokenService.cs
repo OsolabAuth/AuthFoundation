@@ -9,9 +9,9 @@ public sealed class OidcTokenService
 {
     private readonly RSA _rsa = RSA.Create(2048);
     private readonly string _kid = Helper.GenerateHex(16);
-    private readonly InMemoryOidcStore _store;
+    private readonly IOidcStore _store;
 
-    public OidcTokenService(InMemoryOidcStore store)
+    public OidcTokenService(IOidcStore store)
     {
         _store = store;
     }
