@@ -60,22 +60,34 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify scenarios use API Tester response references for chained flows.
-    /// Input: AuthorizationCodeFlow, MfaStepUp, and AgentDelegatedAuth JSON.
-    /// Expected: request bodies or headers include ${"..."} response reference expressions.
+    /// Purpose: verify scenarios use API Tester response references only when the API safely exposes the value.
+    /// Input: AuthorizationCodeFlow and AgentDelegatedAuth JSON.
+    /// Expected: request bodies or headers include ${"..."} response reference expressions for non-MFA secrets.
     /// </summary>
     [TestMethod]
     public void ScenarioFiles_UseResponseReferenceExpressions()
     {
         HashSet<string> authorization = ReadScenarioValues("AuthorizationCodeFlow.json");
-        HashSet<string> mfa = ReadScenarioValues("MfaStepUp.json");
         HashSet<string> agent = ReadScenarioValues("AgentDelegatedAuth.json");
 
         Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"body\".\"response_code\"}", StringComparison.Ordinal)));
         Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"headers\".\"set-cookie\"}", StringComparison.Ordinal)));
-        Assert.IsTrue(mfa.Any(value => value.Contains("${\"AuthFoundation - MfaStepUp\".\"01. Start email MFA challenge\".\"response\".\"body\".\"code\"}", StringComparison.Ordinal)));
         Assert.IsTrue(agent.Any(value => value.Contains("${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_id\"}", StringComparison.Ordinal)));
         Assert.IsTrue(agent.Any(value => value.Contains("${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_secret\"}", StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Purpose: verify MFA API Tester scenarios do not rely on email code exposure from API responses.
+    /// Input: MfaStepUp JSON.
+    /// Expected: email verification uses private EmailCode variable, not response.body.code.
+    /// </summary>
+    [TestMethod]
+    public void MfaScenario_UsesPrivateEmailCodeVariable()
+    {
+        HashSet<string> mfa = ReadScenarioValues("MfaStepUp.json");
+
+        Assert.IsTrue(mfa.Any(value => value.Contains("${\"EmailCode\"}", StringComparison.Ordinal)));
+        Assert.IsFalse(mfa.Any(value => value.Contains("\"response\".\"body\".\"code\"", StringComparison.Ordinal)));
     }
 
     /// <summary>
@@ -95,6 +107,7 @@ public sealed class APITesterScenarioTests
             "StepUpToken",
             "CodeVerifier",
             "CodeChallenge",
+            "EmailCode",
             "AuthenticatorCode"
         ];
 

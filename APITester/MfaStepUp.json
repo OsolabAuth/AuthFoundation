@@ -51,7 +51,7 @@
                 ],
                 "body": {
                   "bodyType": "Text",
-                  "textBody": "{ \"email\": \"${\"Email\"}\", \"code\": \"${\"AuthFoundation - MfaStepUp\".\"01. Start email MFA challenge\".\"response\".\"body\".\"code\"}\" }"
+                  "textBody": "{ \"email\": \"${\"Email\"}\", \"code\": \"${\"EmailCode\"}\" }"
                 }
               }
             },
@@ -107,6 +107,7 @@
       "variables": {
         "auth-host": { "name": "AuthHost", "value": "auth.osolab-auth.jp", "enabled": true, "private": false },
         "email": { "name": "Email", "value": null, "enabled": true, "private": true },
+        "email-code": { "name": "EmailCode", "value": null, "enabled": true, "private": true },
         "authenticator-code": { "name": "AuthenticatorCode", "value": null, "enabled": true, "private": true }
       }
     }

@@ -26,9 +26,8 @@ public sealed class MfaController : ControllerBase
             return Ok(new
             {
                 result = "challenge_created",
-                delivery = "development_response",
+                delivery = "email",
                 email = challenge.Email,
-                code = challenge.Code,
                 expires_at = challenge.ExpiresAt
             });
         }
