@@ -41,13 +41,7 @@ public sealed class AgentController : ControllerBase
                 throw Code.ILLEGAL_CLIENT;
             }
 
-            UserRecord owner = _users.FindByEmail(request.OwnerEmail);
-            StepUpGrant grant = _stepUp.ValidateStepUpToken(request.StepUpToken);
-            if (!string.Equals(grant.Subject, owner.Subject, StringComparison.Ordinal))
-            {
-                throw Code.UNAUTHORIZED;
-            }
-
+            UserRecord owner = ValidateStepUpOwner(request.OwnerEmail, request.StepUpToken);
             int expiresDays = Math.Clamp(request.ExpiresDays, 1, 90);
             AgentCreateResult result = _agents.CreateAgent(
                 owner,
@@ -63,6 +57,50 @@ public sealed class AgentController : ControllerBase
                 delegation_id = result.Delegation.DelegationId,
                 scope = result.Delegation.Scope,
                 expires_at = result.Delegation.ExpiresAt
+            });
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    [HttpPost("{agent_id}/secret")]
+    public IActionResult RotateSecret([FromRoute(Name = "agent_id")] string agentId, [FromBody] AgentOwnerStepUpRequest request)
+    {
+        try
+        {
+            ValidateUtil.IndispensableParam(agentId, "agent_id");
+            UserRecord owner = ValidateStepUpOwner(request.OwnerEmail, request.StepUpToken);
+            AgentSecretRotationResult result = _agents.RotateSecret(owner, agentId);
+
+            return Ok(new
+            {
+                agent_id = result.Agent.AgentId,
+                agent_secret = result.AgentSecret,
+                rotated_at = result.Agent.UpdatedAt
+            });
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    [HttpPost("{agent_id}/revoke")]
+    public IActionResult Revoke([FromRoute(Name = "agent_id")] string agentId, [FromBody] AgentOwnerStepUpRequest request)
+    {
+        try
+        {
+            ValidateUtil.IndispensableParam(agentId, "agent_id");
+            UserRecord owner = ValidateStepUpOwner(request.OwnerEmail, request.StepUpToken);
+            AgentRecord agent = _agents.RevokeAgent(owner, agentId);
+
+            return Ok(new
+            {
+                agent_id = agent.AgentId,
+                status = agent.Status,
+                revoked_at = agent.RevokedAt
             });
         }
         catch (ApiException ex)
@@ -92,6 +130,20 @@ public sealed class AgentController : ControllerBase
             return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
         }
     }
+
+    private UserRecord ValidateStepUpOwner(string ownerEmail, string stepUpToken)
+    {
+        ValidateUtil.FormatParam(ownerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+        ValidateUtil.IndispensableParam(stepUpToken, "step_up_token");
+        UserRecord owner = _users.FindByEmail(ownerEmail);
+        StepUpGrant grant = _stepUp.ValidateStepUpToken(stepUpToken);
+        if (!string.Equals(grant.Subject, owner.Subject, StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return owner;
+    }
 }
 
 public sealed record CreateAgentRequest(
@@ -105,6 +157,12 @@ public sealed record CreateAgentRequest(
     string Scope,
     [property: JsonPropertyName("expires_days")]
     int ExpiresDays,
+    [property: JsonPropertyName("step_up_token")]
+    string StepUpToken);
+
+public sealed record AgentOwnerStepUpRequest(
+    [property: JsonPropertyName("owner_email")]
+    string OwnerEmail,
     [property: JsonPropertyName("step_up_token")]
     string StepUpToken);
 
