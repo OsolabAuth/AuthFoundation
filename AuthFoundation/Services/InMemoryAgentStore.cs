@@ -18,13 +18,15 @@ public sealed class InMemoryAgentStore
         string agentId = $"agent_{Helper.GenerateHex(16)}";
         string secret = $"ags_{Helper.GenerateHex(48)}";
         string delegationId = $"del_{Helper.GenerateHex(16)}";
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         var agent = new AgentRecord(
             agentId,
             owner.Subject,
             agentName,
             PasswordUtil.Hash(secret),
             "active",
-            DateTimeOffset.UtcNow);
+            now,
+            now);
         var delegation = new AgentDelegationRecord(
             delegationId,
             agentId,
@@ -32,7 +34,7 @@ public sealed class InMemoryAgentStore
             clientId,
             scope,
             expiresAt,
-            DateTimeOffset.UtcNow);
+            now);
 
         _agents[agentId] = agent;
         _delegations[delegationId] = delegation;
@@ -66,6 +68,49 @@ public sealed class InMemoryAgentStore
 
         return new AgentTokenGrant(agent, delegation, string.Join(' ', requestedScopes));
     }
+
+    public AgentSecretRotationResult RotateSecret(UserRecord owner, string agentId)
+    {
+        AgentRecord agent = FindOwnedAgent(owner, agentId);
+        if (!string.Equals(agent.Status, "active", StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        string secret = $"ags_{Helper.GenerateHex(48)}";
+        AgentRecord rotated = agent with
+        {
+            SecretHash = PasswordUtil.Hash(secret),
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        _agents[agentId] = rotated;
+        return new AgentSecretRotationResult(rotated, secret);
+    }
+
+    public AgentRecord RevokeAgent(UserRecord owner, string agentId)
+    {
+        AgentRecord agent = FindOwnedAgent(owner, agentId);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        AgentRecord revoked = agent with
+        {
+            Status = "revoked",
+            UpdatedAt = now,
+            RevokedAt = now
+        };
+        _agents[agentId] = revoked;
+        return revoked;
+    }
+
+    private AgentRecord FindOwnedAgent(UserRecord owner, string agentId)
+    {
+        if (!_agents.TryGetValue(agentId, out AgentRecord? agent)
+            || !string.Equals(agent.OwnerSubject, owner.Subject, StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return agent;
+    }
 }
 
 public sealed record AgentRecord(
@@ -74,7 +119,9 @@ public sealed record AgentRecord(
     string AgentName,
     string SecretHash,
     string Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? RevokedAt = null);
 
 public sealed record AgentDelegationRecord(
     string DelegationId,
@@ -87,3 +134,4 @@ public sealed record AgentDelegationRecord(
 
 public sealed record AgentCreateResult(AgentRecord Agent, AgentDelegationRecord Delegation, string AgentSecret);
 public sealed record AgentTokenGrant(AgentRecord Agent, AgentDelegationRecord Delegation, string Scope);
+public sealed record AgentSecretRotationResult(AgentRecord Agent, string AgentSecret);
