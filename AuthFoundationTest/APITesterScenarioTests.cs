@@ -77,9 +77,9 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify MFA API Tester scenarios do not rely on email code exposure from API responses.
+    /// Purpose: verify MFA API Tester scenarios do not rely on email code exposure from API responses and chain safe step-up tokens.
     /// Input: MfaStepUp JSON.
-    /// Expected: email verification uses private EmailCode variable, not response.body.code.
+    /// Expected: email verification uses private EmailCode variable, not response.body.code, and setup uses response.body.step_up_token.
     /// </summary>
     [TestMethod]
     public void MfaScenario_UsesPrivateEmailCodeVariable()
@@ -87,6 +87,7 @@ public sealed class APITesterScenarioTests
         HashSet<string> mfa = ReadScenarioValues("MfaStepUp.json");
 
         Assert.IsTrue(mfa.Any(value => value.Contains("${\"EmailCode\"}", StringComparison.Ordinal)));
+        Assert.IsTrue(mfa.Any(value => value.Contains("${\"AuthFoundation - MfaStepUp\".\"02. Verify email MFA challenge\".\"response\".\"body\".\"step_up_token\"}", StringComparison.Ordinal)));
         Assert.IsFalse(mfa.Any(value => value.Contains("\"response\".\"body\".\"code\"", StringComparison.Ordinal)));
     }
 

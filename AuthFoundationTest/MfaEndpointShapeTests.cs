@@ -99,9 +99,13 @@ public sealed class MfaEndpointShapeTests
     [TestMethod]
     public void SetupAuthenticator_ReturnsSecretAndOtpAuthUri()
     {
-        var controller = CreateController(CreateUsers(MfaEmail));
+        var users = CreateUsers(MfaEmail);
+        var stepUp = new StepUpService(users);
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+        StepUpGrant grant = IssueEmailStepUp(stepUp, MfaEmail);
 
-        var ok = EndpointTestHelper.AssertOk(controller.SetupAuthenticator(new EmailRequest(MfaEmail)));
+        var ok = EndpointTestHelper.AssertOk(controller.SetupAuthenticator(
+            new SetupAuthenticatorRequest(MfaEmail, grant.StepUpToken)));
 
         Assert.AreEqual(200, ok.StatusCode ?? 200);
         Assert.AreEqual(MfaEmail, EndpointTestHelper.ReadProperty<string>(ok.Value, "email"));
@@ -119,11 +123,55 @@ public sealed class MfaEndpointShapeTests
     {
         var controller = CreateController();
 
-        ErrorOutput error = EndpointTestHelper.AssertError(controller.SetupAuthenticator(new EmailRequest("invalid")), 400);
+        ErrorOutput error = EndpointTestHelper.AssertError(
+            controller.SetupAuthenticator(new SetupAuthenticatorRequest("invalid", "sup_missing")),
+            400);
 
         Assert.AreEqual("00001", error.ResponseCode);
         Assert.AreEqual("invalid_request", error.Error);
         Assert.AreEqual("email is invalid", error.ErrorDescription);
+    }
+
+    /// <summary>
+    /// Purpose: verify authenticator setup requires a step-up token.
+    /// Input: registered MFA test user email, empty step_up_token.
+    /// Expected: 400 invalid_request with step_up_token validation message.
+    /// </summary>
+    [TestMethod]
+    public void SetupAuthenticator_ReturnsBadRequestForMissingStepUpToken()
+    {
+        var controller = CreateController(CreateUsers(MfaEmail));
+
+        ErrorOutput error = EndpointTestHelper.AssertError(
+            controller.SetupAuthenticator(new SetupAuthenticatorRequest(MfaEmail, string.Empty)),
+            400);
+
+        Assert.AreEqual("00001", error.ResponseCode);
+        Assert.AreEqual("invalid_request", error.Error);
+        Assert.AreEqual("step_up_token is required", error.ErrorDescription);
+    }
+
+    /// <summary>
+    /// Purpose: verify authenticator setup rejects step-up tokens issued for a different user.
+    /// Input: owner email and another user's step_up_token.
+    /// Expected: 401 invalid_token.
+    /// </summary>
+    [TestMethod]
+    public void SetupAuthenticator_ReturnsUnauthorizedForStepUpSubjectMismatch()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("totp-owner@example.com", "Passw0rd!", "Totp Owner", new DateOnly(2000, 1, 1));
+        users.CreateUser("totp-other@example.com", "Passw0rd!", "Totp Other", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "totp-other@example.com");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(
+            controller.SetupAuthenticator(new SetupAuthenticatorRequest("totp-owner@example.com", grant.StepUpToken)),
+            401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
     }
 
     /// <summary>
@@ -137,7 +185,8 @@ public sealed class MfaEndpointShapeTests
         var users = CreateUsers(MfaEmail);
         var stepUp = new StepUpService(users);
         var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
-        AuthenticatorSetup setup = stepUp.SetupAuthenticator(MfaEmail);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, MfaEmail);
+        AuthenticatorSetup setup = stepUp.SetupAuthenticator(MfaEmail, grant.StepUpToken);
         string code = TotpUtil.GenerateCode(setup.Secret, DateTimeOffset.UtcNow);
 
         var ok = EndpointTestHelper.AssertOk(controller.VerifyAuthenticator(new VerifyRequest(MfaEmail, code)));
@@ -176,7 +225,8 @@ public sealed class MfaEndpointShapeTests
         var users = CreateUsers(MfaEmail);
         var stepUp = new StepUpService(users);
         var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
-        stepUp.SetupAuthenticator(MfaEmail);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, MfaEmail);
+        stepUp.SetupAuthenticator(MfaEmail, grant.StepUpToken);
 
         ErrorOutput error = EndpointTestHelper.AssertError(
             controller.VerifyAuthenticator(new VerifyRequest(MfaEmail, "000000")),
@@ -201,5 +251,11 @@ public sealed class MfaEndpointShapeTests
         }
 
         return users;
+    }
+
+    private static StepUpGrant IssueEmailStepUp(StepUpService stepUp, string email)
+    {
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge(email);
+        return stepUp.VerifyEmailChallenge(email, challenge.Code);
     }
 }

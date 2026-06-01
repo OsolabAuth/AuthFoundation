@@ -39,9 +39,15 @@ public sealed class StepUpService
         return CreateGrant(user.Subject, "email_code");
     }
 
-    public AuthenticatorSetup SetupAuthenticator(string email)
+    public AuthenticatorSetup SetupAuthenticator(string email, string stepUpToken)
     {
         UserRecord user = _users.FindByEmail(email);
+        StepUpGrant grant = ValidateStepUpToken(stepUpToken);
+        if (!string.Equals(grant.Subject, user.Subject, StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
         string secret = TotpUtil.GenerateSecret();
         _totpSecrets[user.Email] = secret;
         string issuer = Uri.EscapeDataString("OsolabAuth");

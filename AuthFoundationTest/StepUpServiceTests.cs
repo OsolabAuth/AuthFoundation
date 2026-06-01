@@ -83,6 +83,60 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
+    /// Purpose: verify authenticator setup requires a valid step-up grant for the same user.
+    /// Input: existing user email and email MFA step-up token.
+    /// Expected: authenticator setup returns a secret and otpauth URI.
+    /// </summary>
+    [TestMethod]
+    public void SetupAuthenticator_ReturnsSetupWithValidStepUp()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("totp-setup@example.com", "Passw0rd!", "Totp User", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "totp-setup@example.com");
+
+        AuthenticatorSetup setup = stepUp.SetupAuthenticator("totp-setup@example.com", grant.StepUpToken);
+
+        Assert.AreEqual("totp-setup@example.com", setup.Email);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(setup.Secret));
+        Assert.IsTrue(setup.OtpAuthUri.StartsWith("otpauth://totp/", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Purpose: verify authenticator setup rejects unknown step-up tokens.
+    /// Input: existing user email and token=sup_missing.
+    /// Expected: ApiException.
+    /// </summary>
+    [TestMethod]
+    public void SetupAuthenticator_RejectsUnknownStepUpToken()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("totp-unknown-token@example.com", "Passw0rd!", "Totp User", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+
+        Assert.ThrowsExactly<ApiException>(
+            () => stepUp.SetupAuthenticator("totp-unknown-token@example.com", "sup_missing"));
+    }
+
+    /// <summary>
+    /// Purpose: verify authenticator setup rejects step-up tokens issued for another user.
+    /// Input: setup user email and another user's step-up token.
+    /// Expected: ApiException.
+    /// </summary>
+    [TestMethod]
+    public void SetupAuthenticator_RejectsStepUpSubjectMismatch()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("totp-owner@example.com", "Passw0rd!", "Totp Owner", new DateOnly(2000, 1, 1));
+        users.CreateUser("totp-other@example.com", "Passw0rd!", "Totp Other", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "totp-other@example.com");
+
+        Assert.ThrowsExactly<ApiException>(
+            () => stepUp.SetupAuthenticator("totp-owner@example.com", grant.StepUpToken));
+    }
+
+    /// <summary>
     /// Purpose: verify authenticator verification issues a step-up grant for a valid TOTP code.
     /// Input: generated TOTP secret and current TOTP code.
     /// Expected: step-up grant method is totp.
@@ -93,8 +147,9 @@ public sealed class StepUpServiceTests
         var users = new InMemoryUserStore();
         users.CreateUser("totp@example.com", "Passw0rd!", "Totp User", new DateOnly(2000, 1, 1));
         var stepUp = new StepUpService(users);
+        StepUpGrant setupGrant = IssueEmailStepUp(stepUp, "totp@example.com");
 
-        AuthenticatorSetup setup = stepUp.SetupAuthenticator("totp@example.com");
+        AuthenticatorSetup setup = stepUp.SetupAuthenticator("totp@example.com", setupGrant.StepUpToken);
         string code = AuthFoundation.Common.TotpUtil.GenerateCode(setup.Secret, DateTimeOffset.UtcNow);
         StepUpGrant grant = stepUp.VerifyAuthenticator("totp@example.com", code);
 
@@ -177,6 +232,12 @@ public sealed class StepUpServiceTests
     private static ConcurrentDictionary<string, StepUpGrant> StepUpGrants(StepUpService service)
     {
         return GetField<ConcurrentDictionary<string, StepUpGrant>>(service, "_stepUpGrants");
+    }
+
+    private static StepUpGrant IssueEmailStepUp(StepUpService stepUp, string email)
+    {
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge(email);
+        return stepUp.VerifyEmailChallenge(email, challenge.Code);
     }
 
     private static T GetField<T>(StepUpService service, string name)
