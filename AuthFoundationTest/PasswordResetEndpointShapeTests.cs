@@ -8,9 +8,9 @@ namespace AuthFoundationTest;
 public sealed class PasswordResetEndpointShapeTests
 {
     /// <summary>
-    /// Purpose: verify password reset succeeds only when birth date and email code both match.
-    /// Input: registered email, matching birth_date, valid email_code, and strong new_password.
-    /// Expected: 200 password_reset and the new password authenticates.
+    /// 目的: Reset / Returns Password Reset For Matching Birth Date And Email Code の仕様を検証する。
+    /// 入力値: Reset / Returns Password Reset For Matching Birth Date And Email Code を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsPasswordResetForMatchingBirthDateAndEmailCode()
@@ -30,9 +30,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify password reset rejects malformed birth dates before resetting the password.
-    /// Input: invalid birth_date=2000-13-40 with 6-digit email_code.
-    /// Expected: 400 invalid_request.
+    /// 目的: Reset / Returns Bad Request For Invalid Birth Date Format の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForInvalidBirthDateFormat()
@@ -49,9 +49,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify password reset rejects missing email code.
-    /// Input: matching birth_date, empty email_code, and strong new_password.
-    /// Expected: 400 invalid_request with email_code validation message.
+    /// 目的: Reset / Returns Bad Request For Missing Email Code の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForMissingEmailCode()
@@ -68,9 +68,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify password reset rejects mismatched registered birth date.
-    /// Input: registered email, wrong birth_date, valid email_code, and strong new_password.
-    /// Expected: 401 invalid_token and the old password remains valid.
+    /// 目的: Reset / Returns Unauthorized For Mismatched Birth Date の仕様を検証する。
+    /// 入力値: Reset / Returns Unauthorized For Mismatched Birth Date を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsUnauthorizedForMismatchedBirthDate()
@@ -90,9 +90,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify password reset rejects an incorrect email code.
-    /// Input: registered email, matching birth_date, wrong email_code, and strong new_password.
-    /// Expected: 401 invalid_token and the old password remains valid.
+    /// 目的: Reset / Returns Unauthorized For Wrong Email Code の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsUnauthorizedForWrongEmailCode()
@@ -112,9 +112,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify password reset rejects weak new passwords before changing credentials.
-    /// Input: matching birth_date, valid-looking email_code, and weak new_password.
-    /// Expected: 400 invalid_request with password validation message.
+    /// 目的: Reset / Returns Bad Request For Weak New Password の仕様を検証する。
+    /// 入力値: Reset / Returns Bad Request For Weak New Password を確認するためにテスト内で作成したデータ。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForWeakNewPassword()

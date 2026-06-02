@@ -8,6 +8,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class AgentEndpointShapeTests
 {
+    /// <summary>
+    /// 目的: Create / Returns Agent Secret And Delegation の仕様を検証する。
+    /// 入力値: Create / Returns Agent Secret And Delegation を確認するためにテスト内で作成したデータ。
+    /// 期待値: Create / Returns Agent Secret And Delegation の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Create_ReturnsAgentSecretAndDelegation()
     {
@@ -34,6 +39,11 @@ public sealed class AgentEndpointShapeTests
         Assert.IsTrue(EndpointTestHelper.ReadProperty<DateTimeOffset>(ok.Value, "expires_at") > DateTimeOffset.UtcNow);
     }
 
+    /// <summary>
+    /// 目的: Create / Returns Invalid Client For Unknown Client の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: invalid_client のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Create_ReturnsInvalidClientForUnknownClient()
     {
@@ -57,9 +67,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: /agent作成時にPhase 1許可リスト外のscopeが拒否されることを検証する。
-    /// 入力値: owner_email=agent-create-invalid-scope@example.com, scope=task_read task_delete。
-    /// 期待値: 400、response_code=00009、error=invalid_scope。
+    /// 目的: Create / Returns Invalid Scope For Unsupported Scope の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_scope のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Create_ReturnsInvalidScopeForUnsupportedScope()
@@ -83,6 +93,11 @@ public sealed class AgentEndpointShapeTests
         Assert.AreEqual("invalid_scope", error.Error);
     }
 
+    /// <summary>
+    /// 目的: Create / Returns Unauthorized For Step Up Subject Mismatch の仕様を検証する。
+    /// 入力値: Create / Returns Unauthorized For Step Up Subject Mismatch を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Create_ReturnsUnauthorizedForStepUpSubjectMismatch()
     {
@@ -106,6 +121,11 @@ public sealed class AgentEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Agent Bearer Token の仕様を検証する。
+    /// 入力値: Token / Returns Agent Bearer Token を確認するためにテスト内で作成したデータ。
+    /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
+    /// </summary>
     [TestMethod]
     public void Token_ReturnsAgentBearerToken()
     {
@@ -113,7 +133,8 @@ public sealed class AgentEndpointShapeTests
         UserRecord owner = users.CreateUser("agent-token@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1));
         var agents = new InMemoryAgentStore();
         AgentCreateResult created = agents.CreateAgent(owner, "Issue Triage Agent", AppConfig.DevelopmentClientId, "task_read task_comment", DateTimeOffset.UtcNow.AddDays(7));
-        var controller = CreateController(users, agents, new StepUpService(users));
+        var oidcStore = new InMemoryOidcStore();
+        var controller = CreateController(users, agents, new StepUpService(users), oidcStore);
         var request = new AgentTokenRequest(created.Agent.AgentId, created.AgentSecret, AppConfig.DevelopmentClientId, "task_read");
 
         var ok = EndpointTestHelper.AssertOk(controller.Token(request));
@@ -122,12 +143,24 @@ public sealed class AgentEndpointShapeTests
         var response = ok.Value as AgentTokenResponse;
         Assert.IsNotNull(response);
         Assert.IsTrue(response.access_token.StartsWith("agt_", StringComparison.Ordinal));
+        Assert.AreEqual(1, response.access_token.Split('.').Length);
+        AccessTokenRecord accessToken = oidcStore.FindAccessToken(response.access_token);
+        Assert.AreEqual("ai_agent", accessToken.PrincipalType);
+        Assert.AreEqual(created.Agent.AgentId, accessToken.Subject);
+        Assert.AreEqual(owner.Subject, accessToken.OwnerSubject);
+        Assert.AreEqual(created.Delegation.DelegationId, accessToken.DelegationId);
+        Assert.AreEqual("task_read", accessToken.Scope);
         Assert.AreEqual("Bearer", response.token_type);
         Assert.AreEqual(900, response.expires_in);
         Assert.AreEqual("task_read", response.scope);
         Assert.AreEqual(3, response.id_token.Split('.').Length);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Unauthorized For Wrong Secret の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Token_ReturnsUnauthorizedForWrongSecret()
     {
@@ -144,6 +177,11 @@ public sealed class AgentEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Invalid Scope For Undelegated Scope の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_scope のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Token_ReturnsInvalidScopeForUndelegatedScope()
     {
@@ -161,9 +199,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: /agent/tokenでPhase 1許可リスト外のscope要求が拒否されることを検証する。
-    /// 入力値: agent delegation scope=task_read, requested scope=task_delete。
-    /// 期待値: 400、response_code=00009、error=invalid_scope。
+    /// 目的: Token / Returns Invalid Scope For Unsupported Scope の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_scope のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Token_ReturnsInvalidScopeForUnsupportedScope()
@@ -182,9 +220,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: GET /agent/me でagent資格情報と委譲情報をトークン発行なしで確認できることを検証する。
-    /// 入力値: Basic認証=agent_id:agent_secret, client_id=DevelopmentClientId, scope=task_read。
-    /// 期待値: 200、principal_type=ai_agent、agent_id/owner_sub/delegation_id/scope/statusが返る。
+    /// 目的: Me / Returns Agent Metadata の仕様を検証する。
+    /// 入力値: Me / Returns Agent Metadata を確認するためにテスト内で作成したデータ。
+    /// 期待値: Me / Returns Agent Metadata の期待結果になること。
     /// </summary>
     [TestMethod]
     public void Me_ReturnsAgentMetadata()
@@ -211,9 +249,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: GET /agent/me がBasic認証なしの自己確認を拒否することを検証する。
-    /// 入力値: Authorizationヘッダーなし、client_id=DevelopmentClientId, scope=task_read。
-    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// 目的: Me / Returns Unauthorized For Missing Basic Auth の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Me_ReturnsUnauthorizedForMissingBasicAuth()
@@ -228,9 +266,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: GET /agent/me が誤ったagent_secretを拒否することを検証する。
-    /// 入力値: Basic認証=agent_id:ags_wrong, client_id=DevelopmentClientId, scope=task_read。
-    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// 目的: Me / Returns Unauthorized For Wrong Secret の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Me_ReturnsUnauthorizedForWrongSecret()
@@ -249,9 +287,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: GET /agent/me がBasic認証のagent_id/agent_secret区切り不正を拒否することを検証する。
-    /// 入力値: Basic認証=agent_only、client_id=DevelopmentClientId、scope=task_read。
-    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// 目的: Me / Returns Unauthorized For Malformed Basic Credential の仕様を検証する。
+    /// 入力値: Me / Returns Unauthorized For Malformed Basic Credential を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Me_ReturnsUnauthorizedForMalformedBasicCredential()
@@ -268,9 +306,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: GET /agent/me がbase64として復号できないBasic認証値を拒否することを検証する。
-    /// 入力値: Basic認証=a、client_id=DevelopmentClientId、scope=task_read。
-    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// 目的: Me / Returns Unauthorized For Invalid Basic Base64 の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Me_ReturnsUnauthorizedForInvalidBasicBase64()
@@ -286,9 +324,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: GET /agent/me が委譲されていないscopeを拒否することを検証する。
-    /// 入力値: delegation scope=task_read、requested scope=task_comment。
-    /// 期待値: 400、response_code=00009、error=invalid_scope。
+    /// 目的: Me / Returns Invalid Scope For Undelegated Scope の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_scope のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Me_ReturnsInvalidScopeForUndelegatedScope()
@@ -307,9 +345,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: /agent/{agent_id}/secretでagent_secretを再発行し、旧secretを無効化できることを検証する。
-    /// 入力値: owner_email=agent-rotate-api@example.com, step_up_token, active agent。
-    /// 期待値: 200、agent_secretはags_始まり、旧secretのtoken発行は401、新secretのtoken発行は200。
+    /// 目的: Rotate Secret / Returns New Secret And Invalidates Previous Secret の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: Rotate Secret / Returns New Secret And Invalidates Previous Secret の期待結果になること。
     /// </summary>
     [TestMethod]
     public void RotateSecret_ReturnsNewSecretAndInvalidatesPreviousSecret()
@@ -344,9 +382,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: /agent/{agent_id}/revokeでagentを失効し、以後のtoken発行を拒否できることを検証する。
-    /// 入力値: owner_email=agent-revoke-api@example.com, step_up_token, active agent。
-    /// 期待値: 200、status=revoked、revoked_atあり、token発行は401。
+    /// 目的: Revoke / Returns Revoked And Invalidates Agent の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 対象を失効し、失効後の利用を拒否すること。
     /// </summary>
     [TestMethod]
     public void Revoke_ReturnsRevokedAndInvalidatesAgent()
@@ -375,9 +413,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: step_up_tokenのsubjectがownerと異なる場合にsecret再発行を拒否することを検証する。
-    /// 入力値: owner_email=agent-rotate-owner@example.com, step_up_token=別ユーザー。
-    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// 目的: Rotate Secret / Returns Unauthorized For Step Up Subject Mismatch の仕様を検証する。
+    /// 入力値: Rotate Secret / Returns Unauthorized For Step Up Subject Mismatch を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void RotateSecret_ReturnsUnauthorizedForStepUpSubjectMismatch()
@@ -402,9 +440,9 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: 存在しないagent_idの失効が拒否されることを検証する。
-    /// 入力値: agent_id=agent_missing, owner_email=agent-missing-revoke@example.com, step_up_token。
-    /// 期待値: 401、response_code=00008、error=invalid_token。
+    /// 目的: Revoke / Returns Unauthorized For Unknown Agent の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void Revoke_ReturnsUnauthorizedForUnknownAgent()
@@ -425,10 +463,14 @@ public sealed class AgentEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
-    private static AgentController CreateController(InMemoryUserStore users, InMemoryAgentStore agents, StepUpService stepUp)
+    private static AgentController CreateController(
+        InMemoryUserStore users,
+        InMemoryAgentStore agents,
+        StepUpService stepUp,
+        InMemoryOidcStore? oidcStore = null)
     {
         return EndpointTestHelper.WithHttpContext(
-            new AgentController(users, agents, stepUp, new OidcTokenService(new InMemoryOidcStore())));
+            new AgentController(users, agents, stepUp, TestSigningKeys.CreateTokenService(oidcStore ?? new InMemoryOidcStore())));
     }
 
     private static void SetBasicAgentCredential(AgentController controller, string agentId, string agentSecret)

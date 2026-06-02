@@ -125,6 +125,7 @@ public sealed class AgentController : ControllerBase
                 request.AgentSecret,
                 request.ClientId,
                 request.Scope);
+            SetTokenResponseCacheHeaders();
             return Ok(_tokens.CreateAgentTokenResponse(grant.Agent, grant.Delegation, grant.Scope));
         }
         catch (ApiException ex)
@@ -201,6 +202,12 @@ public sealed class AgentController : ControllerBase
         {
             throw Code.UNAUTHORIZED;
         }
+    }
+
+    private void SetTokenResponseCacheHeaders()
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
     }
 }
 

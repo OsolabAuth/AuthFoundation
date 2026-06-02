@@ -6,12 +6,23 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class AppConfigTests
 {
+    [TestInitialize]
+    public void Initialize()
+    {
+        AppConfig.Initialize(Configuration(DefaultValues()));
+    }
+
     [TestCleanup]
     public void Cleanup()
     {
         AppConfig.Initialize(Configuration(DefaultValues()));
     }
 
+    /// <summary>
+    /// 目的: Initialize / Uses Defaults When Config Is Empty の仕様を検証する。
+    /// 入力値: Initialize / Uses Defaults When Config Is Empty を確認するためにテスト内で作成したデータ。
+    /// 期待値: Initialize / Uses Defaults When Config Is Empty の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Initialize_UsesDefaultsWhenConfigIsEmpty()
     {
@@ -22,8 +33,18 @@ public sealed class AppConfigTests
         Assert.IsFalse(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("00000000000000000000000000000000", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:5700/callback", AppConfig.DevelopmentRedirectUri);
+        Assert.AreEqual(string.Empty, AppConfig.SigningKeyId);
+        Assert.AreEqual(string.Empty, AppConfig.SigningKeyPrivateKeyPem);
+        Assert.AreEqual("task-management-api", AppConfig.AgentAccessTokenAudience);
+        Assert.AreEqual(5, AppConfig.AttemptLimitMaxAttempts);
+        Assert.AreEqual(5, AppConfig.AttemptLimitWindowMinutes);
     }
 
+    /// <summary>
+    /// 目的: Initialize / Normalizes Configured Urls And Overrides Development Client の仕様を検証する。
+    /// 入力値: Initialize / Normalizes Configured Urls And Overrides Development Client を確認するためにテスト内で作成したデータ。
+    /// 期待値: Initialize / Normalizes Configured Urls And Overrides Development Client の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Initialize_NormalizesConfiguredUrlsAndOverridesDevelopmentClient()
     {
@@ -33,7 +54,12 @@ public sealed class AppConfigTests
             ["AuthUiBaseUrl"] = "https://portal.example.com/ui/path",
             ["DisableHttpsRedirection"] = "true",
             ["DevelopmentClient:ClientId"] = "30000000000000000000000000000001",
-            ["DevelopmentClient:RedirectUri"] = "http://localhost:3000/callback"
+            ["DevelopmentClient:RedirectUri"] = "http://localhost:3000/callback",
+            ["SigningKey:KeyId"] = "configured-key",
+            ["SigningKey:PrivateKeyPem"] = TestSigningKeys.PrivateKeyPem,
+            ["AgentAccessToken:Audience"] = "configured-api",
+            ["AttemptLimit:MaxAttempts"] = "3",
+            ["AttemptLimit:WindowMinutes"] = "7"
         }));
 
         Assert.AreEqual("https://issuer.example.com/", AppConfig.Issuer);
@@ -41,8 +67,18 @@ public sealed class AppConfigTests
         Assert.IsTrue(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("30000000000000000000000000000001", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:3000/callback", AppConfig.DevelopmentRedirectUri);
+        Assert.AreEqual("configured-key", AppConfig.SigningKeyId);
+        Assert.AreEqual(TestSigningKeys.PrivateKeyPem, AppConfig.SigningKeyPrivateKeyPem);
+        Assert.AreEqual("configured-api", AppConfig.AgentAccessTokenAudience);
+        Assert.AreEqual(3, AppConfig.AttemptLimitMaxAttempts);
+        Assert.AreEqual(7, AppConfig.AttemptLimitWindowMinutes);
     }
 
+    /// <summary>
+    /// 目的: Initialize / Allows Http Base Url の仕様を検証する。
+    /// 入力値: Initialize / Allows Http Base Url を確認するためにテスト内で作成したデータ。
+    /// 期待値: Initialize / Allows Http Base Url の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Initialize_AllowsHttpBaseUrl()
     {
@@ -56,6 +92,11 @@ public sealed class AppConfigTests
         Assert.AreEqual("http://localhost:3000", AppConfig.AuthUiBaseUrl);
     }
 
+    /// <summary>
+    /// 目的: Initialize / Rejects Invalid Base Url の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void Initialize_RejectsInvalidBaseUrl()
     {
@@ -68,6 +109,11 @@ public sealed class AppConfigTests
         Assert.AreEqual(Code.INTERNAL_SERVER_ERROR.InternalCode, error.InternalCode);
     }
 
+    /// <summary>
+    /// 目的: Initialize / Rejects Malformed Base Url の仕様を検証する。
+    /// 入力値: Initialize / Rejects Malformed Base Url を確認するためにテスト内で作成したデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void Initialize_RejectsMalformedBaseUrl()
     {
@@ -95,7 +141,12 @@ public sealed class AppConfigTests
             ["AuthUiBaseUrl"] = "https://portal.osolab-auth.jp",
             ["DisableHttpsRedirection"] = "false",
             ["DevelopmentClient:ClientId"] = "00000000000000000000000000000000",
-            ["DevelopmentClient:RedirectUri"] = "http://localhost:5700/callback"
+            ["DevelopmentClient:RedirectUri"] = "http://localhost:5700/callback",
+            ["SigningKey:KeyId"] = string.Empty,
+            ["SigningKey:PrivateKeyPem"] = string.Empty,
+            ["AgentAccessToken:Audience"] = "task-management-api",
+            ["AttemptLimit:MaxAttempts"] = "5",
+            ["AttemptLimit:WindowMinutes"] = "5"
         };
     }
 }

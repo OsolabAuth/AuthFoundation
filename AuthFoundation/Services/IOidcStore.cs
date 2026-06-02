@@ -18,6 +18,8 @@ public interface IOidcStore
 
     AccessTokenRecord CreateAccessToken(AuthorizationCodeRecord code);
 
+    AccessTokenRecord CreateAgentAccessToken(AgentRecord agent, AgentDelegationRecord delegation, string scope);
+
     AccessTokenRecord FindAccessToken(string accessToken);
 
     bool RevokeAccessToken(string accessToken);

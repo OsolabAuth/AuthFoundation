@@ -14,6 +14,9 @@ builder.Services.AddSingleton<IOidcStore, InMemoryOidcStore>();
 builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
 builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
+builder.Services.AddSingleton<AttemptLimiter>();
+builder.Services.AddSingleton<IEmailSender, DevelopmentEmailSender>();
+builder.Services.AddSingleton(_ => SigningKeyProvider.FromConfig());
 builder.Services.AddSingleton<StepUpService>();
 builder.Services.AddSingleton<OidcTokenService>();
 

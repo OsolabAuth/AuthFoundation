@@ -42,6 +42,7 @@ public sealed class TokenController : ControllerBase
                     "invalid token request");
             }
 
+            SetTokenResponseCacheHeaders();
             return Ok(_tokenService.CreateTokenResponse(record));
         }
         catch (ApiException ex)
@@ -57,5 +58,11 @@ public sealed class TokenController : ControllerBase
         string value = form[validation.Key].ToString();
         ValidateUtil.FormatParam(value, validation.Key, validation.Regex);
         return value;
+    }
+
+    private void SetTokenResponseCacheHeaders()
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
     }
 }

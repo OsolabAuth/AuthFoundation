@@ -9,10 +9,15 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class DiscoveryUserInfoEndpointShapeTests
 {
+    /// <summary>
+    /// 目的: Discovery / Returns Configured Oidc Metadata Contract の仕様を検証する。
+    /// 入力値: Discovery / Returns Configured Oidc Metadata Contract を確認するためにテスト内で作成したデータ。
+    /// 期待値: Discovery / Returns Configured Oidc Metadata Contract の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Discovery_ReturnsConfiguredOidcMetadataContract()
     {
-        var controller = new DiscoveryController(new OidcTokenService(new InMemoryOidcStore()));
+        var controller = new DiscoveryController(TestSigningKeys.CreateTokenService(new InMemoryOidcStore()));
 
         IActionResult action = controller.Discovery();
 
@@ -34,10 +39,15 @@ public sealed class DiscoveryUserInfoEndpointShapeTests
         CollectionAssert.AreEqual(new[] { "sub", "email", "name" }, ReadProperty<string[]>(ok.Value, "claims_supported"));
     }
 
+    /// <summary>
+    /// 目的: Jwks / Returns Active Rsa Signing Key Contract の仕様を検証する。
+    /// 入力値: Jwks / Returns Active Rsa Signing Key Contract を確認するためにテスト内で作成したデータ。
+    /// 期待値: Jwks / Returns Active Rsa Signing Key Contract の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Jwks_ReturnsActiveRsaSigningKeyContract()
     {
-        var controller = new DiscoveryController(new OidcTokenService(new InMemoryOidcStore()));
+        var controller = new DiscoveryController(TestSigningKeys.CreateTokenService(new InMemoryOidcStore()));
 
         IActionResult action = controller.Jwks();
 
@@ -53,6 +63,11 @@ public sealed class DiscoveryUserInfoEndpointShapeTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(ReadProperty<string>(keys[0], "e")));
     }
 
+    /// <summary>
+    /// 目的: User Info / Returns Claims For Known Bearer Token の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
+    /// </summary>
     [TestMethod]
     public void UserInfo_ReturnsClaimsForKnownBearerToken()
     {
@@ -79,6 +94,11 @@ public sealed class DiscoveryUserInfoEndpointShapeTests
         Assert.AreEqual("Subject One", ReadProperty<string>(ok.Value, "name"));
     }
 
+    /// <summary>
+    /// 目的: User Info / Returns Unauthorized For Missing Bearer Token の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void UserInfo_ReturnsUnauthorizedForMissingBearerToken()
     {

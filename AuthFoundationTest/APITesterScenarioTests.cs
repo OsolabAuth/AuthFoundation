@@ -14,9 +14,9 @@ public sealed class APITesterScenarioTests
     ];
 
     /// <summary>
-    /// Purpose: verify all API Tester scenario files are valid import JSON.
-    /// Input: APITester/*.json.
-    /// Expected: every file parses as JSON and declares version 6.
+    /// 目的: Scenario Files / Are Valid Version6 Json の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: Scenario Files / Are Valid Version6 Json の期待結果になること。
     /// </summary>
     [TestMethod]
     public void ScenarioFiles_AreValidVersion6Json()
@@ -32,9 +32,9 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify each scenario contains a Talend project, scenario, and request tree.
-    /// Input: APITester/*.json.
-    /// Expected: each file has one project with one scenario and at least two requests.
+    /// 目的: Scenario Files / Contain Project Scenario And Requests の仕様を検証する。
+    /// 入力値: Scenario Files / Contain Project Scenario And Requests を確認するためにテスト内で作成したデータ。
+    /// 期待値: Scenario Files / Contain Project Scenario And Requests の期待結果になること。
     /// </summary>
     [TestMethod]
     public void ScenarioFiles_ContainProjectScenarioAndRequests()
@@ -60,9 +60,9 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify scenarios use API Tester response references only when the API safely exposes the value.
-    /// Input: AuthorizationCodeFlow and AgentDelegatedAuth JSON.
-    /// Expected: request bodies or headers include ${"..."} response reference expressions for non-MFA secrets.
+    /// 目的: Scenario Files / Use Response Reference Expressions の仕様を検証する。
+    /// 入力値: Scenario Files / Use Response Reference Expressions を確認するためにテスト内で作成したデータ。
+    /// 期待値: Scenario Files / Use Response Reference Expressions の期待結果になること。
     /// </summary>
     [TestMethod]
     public void ScenarioFiles_UseResponseReferenceExpressions()
@@ -77,9 +77,9 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify MFA API Tester scenarios do not rely on email code exposure from API responses and chain safe step-up tokens.
-    /// Input: MfaStepUp JSON.
-    /// Expected: email verification uses private EmailCode variable, not response.body.code, and setup uses response.body.step_up_token.
+    /// 目的: Mfa Scenario / Uses Private Email Code Variable の仕様を検証する。
+    /// 入力値: Mfa Scenario / Uses Private Email Code Variable を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void MfaScenario_UsesPrivateEmailCodeVariable()
@@ -92,9 +92,9 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify password reset API Tester scenarios require manual email code entry.
-    /// Input: PasswordAccountFlow JSON.
-    /// Expected: password reset request uses private EmailCode variable.
+    /// 目的: Password Scenario / Uses Private Email Code Variable の仕様を検証する。
+    /// 入力値: Password Scenario / Uses Private Email Code Variable を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void PasswordScenario_UsesPrivateEmailCodeVariable()
@@ -106,9 +106,9 @@ public sealed class APITesterScenarioTests
     }
 
     /// <summary>
-    /// Purpose: verify production scenario environments do not expose secrets.
-    /// Input: APITester/*.json production environment variables.
-    /// Expected: sensitive variables are marked private.
+    /// 目的: Scenario Files / Mark Sensitive Production Variables Private の仕様を検証する。
+    /// 入力値: Scenario Files / Mark Sensitive Production Variables Private を確認するためにテスト内で作成したデータ。
+    /// 期待値: Scenario Files / Mark Sensitive Production Variables Private の期待結果になること。
     /// </summary>
     [TestMethod]
     public void ScenarioFiles_MarkSensitiveProductionVariablesPrivate()

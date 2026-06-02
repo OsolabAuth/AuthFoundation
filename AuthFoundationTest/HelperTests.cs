@@ -5,6 +5,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class HelperTests
 {
+    /// <summary>
+    /// 目的: Generate Hex / Returns Requested Length の仕様を検証する。
+    /// 入力値: Generate Hex / Returns Requested Length を確認するためにテスト内で作成したデータ。
+    /// 期待値: Generate Hex / Returns Requested Length の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void GenerateHex_ReturnsRequestedLength()
     {
@@ -14,6 +19,11 @@ public sealed class HelperTests
         StringAssert.Matches(value, new System.Text.RegularExpressions.Regex("^[a-f0-9]+$"));
     }
 
+    /// <summary>
+    /// 目的: Generate Hex / Rejects Non Positive Length の仕様を検証する。
+    /// 入力値: Generate Hex / Rejects Non Positive Length を確認するためにテスト内で作成したデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void GenerateHex_RejectsNonPositiveLength()
     {
@@ -23,9 +33,9 @@ public sealed class HelperTests
     }
 
     /// <summary>
-    /// Purpose: verify numeric verification codes keep the requested fixed width.
-    /// Input: digits=6.
-    /// Expected: generated value has 6 numeric characters.
+    /// 目的: Generate Numeric Code / Returns Requested Digit Length の仕様を検証する。
+    /// 入力値: Generate Numeric Code / Returns Requested Digit Length を確認するためにテスト内で作成したデータ。
+    /// 期待値: Generate Numeric Code / Returns Requested Digit Length の期待結果になること。
     /// </summary>
     [TestMethod]
     public void GenerateNumericCode_ReturnsRequestedDigitLength()
@@ -37,9 +47,9 @@ public sealed class HelperTests
     }
 
     /// <summary>
-    /// Purpose: verify invalid numeric verification code lengths are rejected.
-    /// Input: digits=0.
-    /// Expected: request parameter ApiException.
+    /// 目的: Generate Numeric Code / Rejects Non Positive Length の仕様を検証する。
+    /// 入力値: Generate Numeric Code / Rejects Non Positive Length を確認するためにテスト内で作成したデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void GenerateNumericCode_RejectsNonPositiveLength()
@@ -50,9 +60,9 @@ public sealed class HelperTests
     }
 
     /// <summary>
-    /// Purpose: verify numeric verification code lengths that would overflow the range are rejected.
-    /// Input: digits=10.
-    /// Expected: request parameter ApiException.
+    /// 目的: Generate Numeric Code / Rejects Too Large Length の仕様を検証する。
+    /// 入力値: Generate Numeric Code / Rejects Too Large Length を確認するためにテスト内で作成したデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void GenerateNumericCode_RejectsTooLargeLength()
@@ -62,6 +72,11 @@ public sealed class HelperTests
         Assert.AreEqual(Code.REQUEST_PARAMETER_ERROR.InternalCode, error.InternalCode);
     }
 
+    /// <summary>
+    /// 目的: Parse Scopes / Removes Duplicates And Blanks の仕様を検証する。
+    /// 入力値: Parse Scopes / Removes Duplicates And Blanks を確認するためにテスト内で作成したデータ。
+    /// 期待値: Parse Scopes / Removes Duplicates And Blanks の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void ParseScopes_RemovesDuplicatesAndBlanks()
     {
@@ -70,6 +85,11 @@ public sealed class HelperTests
         CollectionAssert.AreEqual(new[] { "openid", "email" }, scopes);
     }
 
+    /// <summary>
+    /// 目的: Is Json Content Type / Returns Expected Result の仕様を検証する。
+    /// 入力値: Is Json Content Type / Returns Expected Result を確認するためにテスト内で作成したデータ。
+    /// 期待値: Is Json Content Type / Returns Expected Result の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void IsJsonContentType_ReturnsExpectedResult()
     {

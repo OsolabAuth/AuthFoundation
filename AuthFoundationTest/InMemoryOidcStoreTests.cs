@@ -8,6 +8,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class InMemoryOidcStoreTests
 {
+    /// <summary>
+    /// 目的: Take Request / Removes And Returns Known Request の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: 対象データを一度だけ取り出し、再利用を拒否すること。
+    /// </summary>
     [TestMethod]
     public void TakeRequest_RemovesAndReturnsKnownRequest()
     {
@@ -21,6 +26,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.ThrowsExactly<ApiException>(() => store.TakeRequest(request.RequestId));
     }
 
+    /// <summary>
+    /// 目的: Take Request / Rejects Unknown Request の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void TakeRequest_RejectsUnknownRequest()
     {
@@ -31,6 +41,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
     }
 
+    /// <summary>
+    /// 目的: Take Request / Rejects Expired Request の仕様を検証する。
+    /// 入力値: 期限切れに変更したテストデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void TakeRequest_RejectsExpiredRequest()
     {
@@ -43,6 +58,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
     }
 
+    /// <summary>
+    /// 目的: Take Code / Removes And Returns Known Code の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: 対象データを一度だけ取り出し、再利用を拒否すること。
+    /// </summary>
     [TestMethod]
     public void TakeCode_RemovesAndReturnsKnownCode()
     {
@@ -56,6 +76,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.ThrowsExactly<ApiException>(() => store.TakeCode(code.Code));
     }
 
+    /// <summary>
+    /// 目的: Take Code / Rejects Unknown Code の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void TakeCode_RejectsUnknownCode()
     {
@@ -67,6 +92,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual("invalid authorization code", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Take Code / Rejects Expired Code の仕様を検証する。
+    /// 入力値: 期限切れに変更したテストデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void TakeCode_RejectsExpiredCode()
     {
@@ -80,6 +110,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual("invalid authorization code", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Find Access Token / Returns Known Access Token の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
+    /// </summary>
     [TestMethod]
     public void FindAccessToken_ReturnsKnownAccessToken()
     {
@@ -95,8 +130,16 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual("subject_1", actual.Subject);
         Assert.AreEqual("subject@example.com", actual.Email);
         Assert.AreEqual("Subject One", actual.Name);
+        Assert.AreEqual("user", actual.PrincipalType);
+        Assert.AreEqual(string.Empty, actual.OwnerSubject);
+        Assert.AreEqual(string.Empty, actual.DelegationId);
     }
 
+    /// <summary>
+    /// 目的: Find Access Token / Rejects Unknown Access Token の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void FindAccessToken_RejectsUnknownAccessToken()
     {
@@ -107,6 +150,11 @@ public sealed class InMemoryOidcStoreTests
         Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
     }
 
+    /// <summary>
+    /// 目的: Find Access Token / Rejects Expired Access Token の仕様を検証する。
+    /// 入力値: 期限切れに変更したテストデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
+    /// </summary>
     [TestMethod]
     public void FindAccessToken_RejectsExpiredAccessToken()
     {

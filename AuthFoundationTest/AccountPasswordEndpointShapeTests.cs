@@ -7,6 +7,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class AccountPasswordEndpointShapeTests
 {
+    /// <summary>
+    /// 目的: Change Password / Returns Password Changed With Valid Step Up の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: Change Password / Returns Password Changed With Valid Step Up の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void ChangePassword_ReturnsPasswordChangedWithValidStepUp()
     {
@@ -24,6 +29,11 @@ public sealed class AccountPasswordEndpointShapeTests
         Assert.AreEqual("change_subject", users.Authenticate("change-endpoint@example.com", "Newpass1!").Subject);
     }
 
+    /// <summary>
+    /// 目的: Change Password / Returns Unauthorized For Missing Step Up Grant の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void ChangePassword_ReturnsUnauthorizedForMissingStepUpGrant()
     {
@@ -38,6 +48,11 @@ public sealed class AccountPasswordEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
+    /// <summary>
+    /// 目的: Change Password / Returns Unauthorized For Wrong Current Password の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void ChangePassword_ReturnsUnauthorizedForWrongCurrentPassword()
     {
@@ -54,6 +69,11 @@ public sealed class AccountPasswordEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
+    /// <summary>
+    /// 目的: Change Password / Returns Unauthorized For Step Up Subject Mismatch の仕様を検証する。
+    /// 入力値: Change Password / Returns Unauthorized For Step Up Subject Mismatch を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void ChangePassword_ReturnsUnauthorizedForStepUpSubjectMismatch()
     {
@@ -71,6 +91,11 @@ public sealed class AccountPasswordEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
+    /// <summary>
+    /// 目的: Change Password / Returns Bad Request For Weak New Password の仕様を検証する。
+    /// 入力値: Change Password / Returns Bad Request For Weak New Password を確認するためにテスト内で作成したデータ。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void ChangePassword_ReturnsBadRequestForWeakNewPassword()
     {
