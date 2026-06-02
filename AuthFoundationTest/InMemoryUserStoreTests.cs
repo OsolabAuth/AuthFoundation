@@ -7,9 +7,9 @@ namespace AuthFoundationTest;
 public sealed class InMemoryUserStoreTests
 {
     /// <summary>
-    /// Purpose: verify a user registered by the test can authenticate.
-    /// Input: email=new@example.com, password=Passw0rd!, name=New User, birth_date=2000-01-01.
-    /// Expected: Authenticate returns the same subject, name, and created_at is not in the future.
+    /// 目的: Authenticate / Returns Created User の仕様を検証する。
+    /// 入力値: Authenticate / Returns Created User を確認するためにテスト内で作成したデータ。
+    /// 期待値: Authenticate / Returns Created User の期待結果になること。
     /// </summary>
     [TestMethod]
     public void Authenticate_ReturnsCreatedUser()
@@ -25,9 +25,9 @@ public sealed class InMemoryUserStoreTests
     }
 
     /// <summary>
-    /// Purpose: verify authentication rejects a mismatched password.
-    /// Input: registered email=reject@example.com, password=WrongPassw0rd!.
-    /// Expected: ApiException unauthorized.
+    /// 目的: Authenticate / Rejects Wrong Password の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void Authenticate_RejectsWrongPassword()
@@ -39,9 +39,9 @@ public sealed class InMemoryUserStoreTests
     }
 
     /// <summary>
-    /// Purpose: verify authentication rejects an unknown email.
-    /// Input: missing email=missing@example.com.
-    /// Expected: ApiException unauthorized.
+    /// 目的: Authenticate / Rejects Unknown Email の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void Authenticate_RejectsUnknownEmail()
@@ -52,9 +52,9 @@ public sealed class InMemoryUserStoreTests
     }
 
     /// <summary>
-    /// Purpose: verify duplicate email registration is rejected case-insensitively.
-    /// Input: duplicate email values duplicate@example.com and DUPLICATE@example.com.
-    /// Expected: ApiException invalid_request with duplicate email message.
+    /// 目的: Create User / Rejects Duplicate Email の仕様を検証する。
+    /// 入力値: Create User / Rejects Duplicate Email を確認するためにテスト内で作成したデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void CreateUser_RejectsDuplicateEmail()
@@ -71,9 +71,9 @@ public sealed class InMemoryUserStoreTests
     }
 
     /// <summary>
-    /// Purpose: verify direct lookup rejects an unknown email.
-    /// Input: missing email=missing@example.com.
-    /// Expected: ApiException unauthorized.
+    /// 目的: Find By Email / Rejects Unknown Email の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void FindByEmail_RejectsUnknownEmail()

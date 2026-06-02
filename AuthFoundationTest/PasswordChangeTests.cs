@@ -5,6 +5,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class PasswordChangeTests
 {
+    /// <summary>
+    /// 目的: Change Password / Updates Password Hash の仕様を検証する。
+    /// 入力値: Change Password / Updates Password Hash を確認するためにテスト内で作成したデータ。
+    /// 期待値: Change Password / Updates Password Hash の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void ChangePassword_UpdatesPasswordHash()
     {

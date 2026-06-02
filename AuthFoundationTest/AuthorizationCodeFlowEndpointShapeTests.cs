@@ -15,6 +15,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
     private const string LoginEmail = "login-flow@example.com";
     private const string LoginPassword = "Passw0rd!";
 
+    /// <summary>
+    /// 目的: Authorize / Returns Json Login Redirect And Request Cookie の仕様を検証する。
+    /// 入力値: Authorize / Returns Json Login Redirect And Request Cookie を確認するためにテスト内で作成したデータ。
+    /// 期待値: Authorize / Returns Json Login Redirect And Request Cookie の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Authorize_ReturnsJsonLoginRedirectAndRequestCookie()
     {
@@ -31,6 +36,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.IsTrue(controller.Response.Headers.SetCookie.ToString().Contains("AuthRequestId=", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// 目的: Authorize / Returns Invalid Client For Unknown Client の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: invalid_client のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Authorize_ReturnsInvalidClientForUnknownClient()
     {
@@ -47,6 +57,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("illegal client", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Authorize / Redirects To Login When Json Mode Is Not Requested の仕様を検証する。
+    /// 入力値: Authorize / Redirects To Login When Json Mode Is Not Requested を確認するためにテスト内で作成したデータ。
+    /// 期待値: Authorize / Redirects To Login When Json Mode Is Not Requested の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Authorize_RedirectsToLoginWhenJsonModeIsNotRequested()
     {
@@ -60,6 +75,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual($"{AppConfig.AuthUiBaseUrl}/login", redirect.Url);
     }
 
+    /// <summary>
+    /// 目的: Authorize / Returns Invalid Scope When Open Id Is Missing の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_scope のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Authorize_ReturnsInvalidScopeWhenOpenIdIsMissing()
     {
@@ -80,6 +100,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("invalid scope", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Login / Returns Authorization Code Redirect Url の仕様を検証する。
+    /// 入力値: Login / Returns Authorization Code Redirect Url を確認するためにテスト内で作成したデータ。
+    /// 期待値: Login / Returns Authorization Code Redirect Url の期待結果になること。
+    /// </summary>
     [TestMethod]
     public async Task Login_ReturnsAuthorizationCodeRedirectUrl()
     {
@@ -111,6 +136,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual(redirectUrl, controller.Response.Headers.Location.ToString());
     }
 
+    /// <summary>
+    /// 目的: Login / Returns Unauthorized For Invalid Password の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Login_ReturnsUnauthorizedForInvalidPassword()
     {
@@ -141,6 +171,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("unauthorized", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Login / Returns Unauthorized For Unknown Email の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Login_ReturnsUnauthorizedForUnknownEmail()
     {
@@ -166,6 +201,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("00008", error.ResponseCode);
     }
 
+    /// <summary>
+    /// 目的: Login / Uses Request Cookie When Form Request Id Is Missing の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: Login / Uses Request Cookie When Form Request Id Is Missing の期待結果になること。
+    /// </summary>
     [TestMethod]
     public async Task Login_UsesRequestCookieWhenFormRequestIdIsMissing()
     {
@@ -194,6 +234,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.IsTrue(redirectUrl.StartsWith($"{redirectUri}&code=", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// 目的: Login / Returns Bad Request When Request Id Is Missing の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Login_ReturnsBadRequestWhenRequestIdIsMissing()
     {
@@ -210,6 +255,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("request_id is required", error.Message);
     }
 
+    /// <summary>
+    /// 目的: Login / Returns Bad Request For Invalid Email の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Login_ReturnsBadRequestForInvalidEmail()
     {
@@ -227,6 +277,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("email is invalid", error.Message);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Bearer Tokens For Valid Code And Verifier の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
+    /// </summary>
     [TestMethod]
     public async Task Token_ReturnsBearerTokensForValidCodeAndVerifier()
     {
@@ -256,6 +311,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual(3, response.id_token.Split('.').Length);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Invalid Grant And No Store For Bad Verifier の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_grant のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Token_ReturnsInvalidGrantAndNoStoreForBadVerifier()
     {
@@ -283,6 +343,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("no-cache", controller.Response.Headers.Pragma.ToString());
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Bad Request For Unsupported Grant Type の仕様を検証する。
+    /// 入力値: Token / Returns Bad Request For Unsupported Grant Type を確認するためにテスト内で作成したデータ。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Token_ReturnsBadRequestForUnsupportedGrantType()
     {
@@ -306,6 +371,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("no-cache", controller.Response.Headers.Pragma.ToString());
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Invalid Grant For Client Mismatch の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_grant のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Token_ReturnsInvalidGrantForClientMismatch()
     {
@@ -328,6 +398,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("invalid token request", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Invalid Grant For Redirect Uri Mismatch の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: invalid_grant のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Token_ReturnsInvalidGrantForRedirectUriMismatch()
     {
@@ -350,6 +425,11 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("invalid token request", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Token / Returns Bad Request For Missing Grant Type の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public async Task Token_ReturnsBadRequestForMissingGrantType()
     {
@@ -393,7 +473,7 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
 
     private static TokenController CreateTokenController(InMemoryOidcStore store)
     {
-        return new TokenController(store, new OidcTokenService(store))
+        return new TokenController(store, TestSigningKeys.CreateTokenService(store))
         {
             ControllerContext = new ControllerContext
             {

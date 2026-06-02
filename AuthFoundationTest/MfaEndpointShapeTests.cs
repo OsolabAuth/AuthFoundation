@@ -11,9 +11,9 @@ public sealed class MfaEndpointShapeTests
     private const string MfaPassword = "Passw0rd!";
 
     /// <summary>
-    /// Purpose: verify email MFA challenge start does not expose the verification code in the response.
-    /// Input: registered MFA test user email.
-    /// Expected: 200 response with delivery=email, expires_at, and no code property.
+    /// 目的: Start Email / Returns Challenge Without Code Exposure の仕様を検証する。
+    /// 入力値: Start Email / Returns Challenge Without Code Exposure を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void StartEmail_ReturnsChallengeWithoutCodeExposure()
@@ -32,9 +32,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify email MFA challenge start rejects malformed email.
-    /// Input: email=invalid.
-    /// Expected: 400 invalid_request with email validation message.
+    /// 目的: Start Email / Returns Bad Request For Invalid Email の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void StartEmail_ReturnsBadRequestForInvalidEmail()
@@ -49,9 +49,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify email MFA code verification issues a step-up token.
-    /// Input: registered email and generated challenge code.
-    /// Expected: 200 response with step_up_token and method=email_code.
+    /// 目的: Verify Email / Returns Step Up Token For Challenge Code の仕様を検証する。
+    /// 入力値: Verify Email / Returns Step Up Token For Challenge Code を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void VerifyEmail_ReturnsStepUpTokenForChallengeCode()
@@ -71,9 +71,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify email MFA verification rejects an incorrect code.
-    /// Input: registered email with active challenge, code=000000.
-    /// Expected: 401 invalid_token.
+    /// 目的: Verify Email / Returns Unauthorized For Wrong Code の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void VerifyEmail_ReturnsUnauthorizedForWrongCode()
@@ -92,9 +92,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup returns a TOTP secret and otpauth URI.
-    /// Input: registered MFA test user email.
-    /// Expected: 200 response with non-empty secret and otpauth URI.
+    /// 目的: Setup Authenticator / Returns Secret And Otp Auth Uri の仕様を検証する。
+    /// 入力値: Setup Authenticator / Returns Secret And Otp Auth Uri を確認するためにテスト内で作成したデータ。
+    /// 期待値: Setup Authenticator / Returns Secret And Otp Auth Uri の期待結果になること。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_ReturnsSecretAndOtpAuthUri()
@@ -114,9 +114,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup rejects malformed email.
-    /// Input: email=invalid.
-    /// Expected: 400 invalid_request with email validation message.
+    /// 目的: Setup Authenticator / Returns Bad Request For Invalid Email の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_ReturnsBadRequestForInvalidEmail()
@@ -133,9 +133,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup requires a step-up token.
-    /// Input: registered MFA test user email, empty step_up_token.
-    /// Expected: 400 invalid_request with step_up_token validation message.
+    /// 目的: Setup Authenticator / Returns Bad Request For Missing Step Up Token の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_ReturnsBadRequestForMissingStepUpToken()
@@ -152,9 +152,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup rejects step-up tokens issued for a different user.
-    /// Input: owner email and another user's step_up_token.
-    /// Expected: 401 invalid_token.
+    /// 目的: Setup Authenticator / Returns Unauthorized For Step Up Subject Mismatch の仕様を検証する。
+    /// 入力値: Setup Authenticator / Returns Unauthorized For Step Up Subject Mismatch を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_ReturnsUnauthorizedForStepUpSubjectMismatch()
@@ -175,9 +175,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator verification issues a step-up token for a valid TOTP code.
-    /// Input: generated TOTP secret and current code.
-    /// Expected: 200 response with method=totp.
+    /// 目的: Verify Authenticator / Returns Step Up Token For Valid Totp の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_ReturnsStepUpTokenForValidTotp()
@@ -197,9 +197,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator verification rejects users without a TOTP setup.
-    /// Input: registered MFA test user email without authenticator setup, code=000000.
-    /// Expected: 401 invalid_token.
+    /// 目的: Verify Authenticator / Returns Unauthorized When Not Setup の仕様を検証する。
+    /// 入力値: Verify Authenticator / Returns Unauthorized When Not Setup を確認するためにテスト内で作成したデータ。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_ReturnsUnauthorizedWhenNotSetup()
@@ -215,9 +215,9 @@ public sealed class MfaEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator verification rejects an incorrect TOTP code.
-    /// Input: registered email with TOTP setup, code=000000.
-    /// Expected: 401 invalid_token.
+    /// 目的: Verify Authenticator / Returns Unauthorized For Wrong Code の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
     /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_ReturnsUnauthorizedForWrongCode()

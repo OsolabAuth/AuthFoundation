@@ -7,6 +7,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class TermsEndpointShapeTests
 {
+    /// <summary>
+    /// 目的: Current / Returns Current Terms Contract の仕様を検証する。
+    /// 入力値: Current / Returns Current Terms Contract を確認するためにテスト内で作成したデータ。
+    /// 期待値: Current / Returns Current Terms Contract の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Current_ReturnsCurrentTermsContract()
     {
@@ -22,6 +27,11 @@ public sealed class TermsEndpointShapeTests
         Assert.AreEqual(AppConfig.DevelopmentClientId, EndpointTestHelper.ReadProperty<string>(ok.Value, "client_id"));
     }
 
+    /// <summary>
+    /// 目的: Signup / Returns Accepted Terms Id When Terms Are Accepted の仕様を検証する。
+    /// 入力値: Signup / Returns Accepted Terms Id When Terms Are Accepted を確認するためにテスト内で作成したデータ。
+    /// 期待値: Signup / Returns Accepted Terms Id When Terms Are Accepted の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Signup_ReturnsAcceptedTermsIdWhenTermsAreAccepted()
     {
@@ -40,6 +50,11 @@ public sealed class TermsEndpointShapeTests
         Assert.AreEqual(TermsService.CurrentTermsId, EndpointTestHelper.ReadProperty<string>(ok.Value, "accepted_terms_id"));
     }
 
+    /// <summary>
+    /// 目的: Signup / Returns Bad Request When Terms Are Not Accepted の仕様を検証する。
+    /// 入力値: Signup / Returns Bad Request When Terms Are Not Accepted を確認するためにテスト内で作成したデータ。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Signup_ReturnsBadRequestWhenTermsAreNotAccepted()
     {

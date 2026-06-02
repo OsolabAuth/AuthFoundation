@@ -6,6 +6,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class VersionEndpointShapeTests
 {
+    /// <summary>
+    /// 目的: Get / Returns Service Version Status の仕様を検証する。
+    /// 入力値: Get / Returns Service Version Status を確認するためにテスト内で作成したデータ。
+    /// 期待値: Get / Returns Service Version Status の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Get_ReturnsServiceVersionStatus()
     {

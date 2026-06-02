@@ -7,6 +7,11 @@ namespace AuthFoundationTest;
 [TestClass]
 public sealed class SignupEndpointShapeTests
 {
+    /// <summary>
+    /// 目的: Post / Returns Created User Profile の仕様を検証する。
+    /// 入力値: Post / Returns Created User Profile を確認するためにテスト内で作成したデータ。
+    /// 期待値: Post / Returns Created User Profile の期待結果になること。
+    /// </summary>
     [TestMethod]
     public void Post_ReturnsCreatedUserProfile()
     {
@@ -30,6 +35,11 @@ public sealed class SignupEndpointShapeTests
         Assert.AreEqual(sub, users.Authenticate("signup-success@example.com", "Passw0rd!").Subject);
     }
 
+    /// <summary>
+    /// 目的: Post / Returns Bad Request For Invalid Email の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Post_ReturnsBadRequestForInvalidEmail()
     {
@@ -43,6 +53,11 @@ public sealed class SignupEndpointShapeTests
         Assert.AreEqual("email is invalid", error.ErrorDescription);
     }
 
+    /// <summary>
+    /// 目的: Post / Returns Bad Request For Invalid Birth Date の仕様を検証する。
+    /// 入力値: フォーマット不正または権限外の入力値。
+    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// </summary>
     [TestMethod]
     public void Post_ReturnsBadRequestForInvalidBirthDate()
     {

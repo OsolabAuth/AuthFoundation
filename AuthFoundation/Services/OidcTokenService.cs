@@ -7,13 +7,13 @@ namespace AuthFoundation.Services;
 
 public sealed class OidcTokenService
 {
-    private readonly RSA _rsa = RSA.Create(2048);
-    private readonly string _kid = Helper.GenerateHex(16);
     private readonly IOidcStore _store;
+    private readonly SigningKeyProvider _signingKey;
 
-    public OidcTokenService(IOidcStore store)
+    public OidcTokenService(IOidcStore store, SigningKeyProvider signingKey)
     {
         _store = store;
+        _signingKey = signingKey;
     }
 
     public TokenResponse CreateTokenResponse(AuthorizationCodeRecord code)
@@ -26,6 +26,7 @@ public sealed class OidcTokenService
     public AgentTokenResponse CreateAgentTokenResponse(AgentRecord agent, AgentDelegationRecord delegation, string scope)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        AccessTokenRecord accessToken = _store.CreateAgentAccessToken(agent, delegation, scope);
         var payload = new Dictionary<string, object>
         {
             ["iss"] = AppConfig.Issuer.TrimEnd('/'),
@@ -44,7 +45,7 @@ public sealed class OidcTokenService
         };
 
         return new AgentTokenResponse(
-            $"agt_{Helper.GenerateHex(48)}",
+            accessToken.AccessToken,
             CreateSignedJwt(payload),
             "Bearer",
             900,
@@ -53,7 +54,7 @@ public sealed class OidcTokenService
 
     public object CreateJwksResponse()
     {
-        RSAParameters parameters = _rsa.ExportParameters(false);
+        RSAParameters parameters = _signingKey.ExportPublicParameters();
         return new
         {
             keys = new[]
@@ -62,7 +63,7 @@ public sealed class OidcTokenService
                 {
                     kty = "RSA",
                     use = "sig",
-                    kid = _kid,
+                    kid = _signingKey.KeyId,
                     alg = "RS256",
                     n = PkceUtil.Base64UrlEncode(parameters.Modulus!),
                     e = PkceUtil.Base64UrlEncode(parameters.Exponent!)
@@ -95,16 +96,13 @@ public sealed class OidcTokenService
         {
             alg = "RS256",
             typ = "JWT",
-            kid = _kid
+            kid = _signingKey.KeyId
         });
         string payloadJson = JsonSerializer.Serialize(payload);
         string header = PkceUtil.Base64UrlEncode(Encoding.UTF8.GetBytes(headerJson));
         string body = PkceUtil.Base64UrlEncode(Encoding.UTF8.GetBytes(payloadJson));
         string signingInput = $"{header}.{body}";
-        byte[] signature = _rsa.SignData(
-            Encoding.UTF8.GetBytes(signingInput),
-            HashAlgorithmName.SHA256,
-            RSASignaturePadding.Pkcs1);
+        byte[] signature = _signingKey.SignData(Encoding.UTF8.GetBytes(signingInput));
         return $"{signingInput}.{PkceUtil.Base64UrlEncode(signature)}";
     }
 }

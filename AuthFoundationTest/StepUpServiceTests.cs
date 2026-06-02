@@ -9,9 +9,9 @@ namespace AuthFoundationTest;
 public sealed class StepUpServiceTests
 {
     /// <summary>
-    /// Purpose: verify email MFA challenge creation generates a fixed-width verification code.
-    /// Input: existing user email.
-    /// Expected: generated code has 6 numeric characters.
+    /// 目的: Start Email Challenge / Returns Six Digit Code の仕様を検証する。
+    /// 入力値: Start Email Challenge / Returns Six Digit Code を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void StartEmailChallenge_ReturnsSixDigitCode()
@@ -27,9 +27,30 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify email MFA challenge verification issues a step-up grant.
-    /// Input: generated email challenge code.
-    /// Expected: step-up grant method is email_code and token starts with sup_.
+    /// 目的: Start Email Challenge / Sends Mfa Code の仕様を検証する。
+    /// 入力値: Start Email Challenge / Sends Mfa Code を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
+    /// </summary>
+    [TestMethod]
+    public void StartEmailChallenge_SendsMfaCode()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("mfa-send@example.com", "Passw0rd!", "Mfa User", new DateOnly(2000, 1, 1));
+        var sender = new RecordingEmailSender();
+        var stepUp = new StepUpService(users, sender, new AttemptLimiter());
+
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("mfa-send@example.com");
+
+        Assert.AreEqual(1, sender.SentMessages.Count);
+        Assert.AreEqual(challenge.Email, sender.SentMessages[0].Email);
+        Assert.AreEqual(challenge.Code, sender.SentMessages[0].Code);
+        Assert.AreEqual(challenge.ExpiresAt, sender.SentMessages[0].ExpiresAt);
+    }
+
+    /// <summary>
+    /// 目的: Verify Email Challenge / Returns Step Up Grant の仕様を検証する。
+    /// 入力値: Verify Email Challenge / Returns Step Up Grant を確認するためにテスト内で作成したデータ。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void VerifyEmailChallenge_ReturnsStepUpGrant()
@@ -46,9 +67,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify email MFA challenge verification rejects an incorrect code.
-    /// Input: generated challenge, code=000000.
-    /// Expected: ApiException.
+    /// 目的: Verify Email Challenge / Rejects Wrong Code の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void VerifyEmailChallenge_RejectsWrongCode()
@@ -63,9 +84,31 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify expired email MFA challenge is rejected.
-    /// Input: challenge with expires_at in the past.
-    /// Expected: ApiException.
+    /// 目的: Verify Email Challenge / Blocks After Repeated Wrong Codes の仕様を検証する。
+    /// 入力値: 正しい主体に紐づかない誤った認証情報。
+    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
+    /// </summary>
+    [TestMethod]
+    public void VerifyEmailChallenge_BlocksAfterRepeatedWrongCodes()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("mfa-limit@example.com", "Passw0rd!", "Mfa User", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users, new RecordingEmailSender(), new AttemptLimiter(1, TimeSpan.FromMinutes(5)));
+        stepUp.StartEmailChallenge("mfa-limit@example.com");
+        Assert.ThrowsExactly<ApiException>(
+            () => stepUp.VerifyEmailChallenge("mfa-limit@example.com", "000000"));
+        MfaEmailChallenge secondChallenge = stepUp.StartEmailChallenge("mfa-limit@example.com");
+
+        ApiException error = Assert.ThrowsExactly<ApiException>(
+            () => stepUp.VerifyEmailChallenge("mfa-limit@example.com", secondChallenge.Code));
+
+        Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
+    }
+
+    /// <summary>
+    /// 目的: Verify Email Challenge / Rejects Expired Code の仕様を検証する。
+    /// 入力値: 期限切れに変更したテストデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void VerifyEmailChallenge_RejectsExpiredCode()
@@ -83,9 +126,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup requires a valid step-up grant for the same user.
-    /// Input: existing user email and email MFA step-up token.
-    /// Expected: authenticator setup returns a secret and otpauth URI.
+    /// 目的: Setup Authenticator / Returns Setup With Valid Step Up の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: Setup Authenticator / Returns Setup With Valid Step Up の期待結果になること。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_ReturnsSetupWithValidStepUp()
@@ -103,9 +146,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup rejects unknown step-up tokens.
-    /// Input: existing user email and token=sup_missing.
-    /// Expected: ApiException.
+    /// 目的: Setup Authenticator / Rejects Unknown Step Up Token の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_RejectsUnknownStepUpToken()
@@ -119,9 +162,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator setup rejects step-up tokens issued for another user.
-    /// Input: setup user email and another user's step-up token.
-    /// Expected: ApiException.
+    /// 目的: Setup Authenticator / Rejects Step Up Subject Mismatch の仕様を検証する。
+    /// 入力値: Setup Authenticator / Rejects Step Up Subject Mismatch を確認するためにテスト内で作成したデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void SetupAuthenticator_RejectsStepUpSubjectMismatch()
@@ -137,9 +180,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator verification issues a step-up grant for a valid TOTP code.
-    /// Input: generated TOTP secret and current TOTP code.
-    /// Expected: step-up grant method is totp.
+    /// 目的: Verify Authenticator / Returns Step Up Grant の仕様を検証する。
+    /// 入力値: Verify Authenticator / Returns Step Up Grant を確認するためにテスト内で作成したデータ。
+    /// 期待値: Verify Authenticator / Returns Step Up Grant の期待結果になること。
     /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_ReturnsStepUpGrant()
@@ -157,9 +200,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify authenticator verification rejects users without setup.
-    /// Input: existing user without TOTP secret.
-    /// Expected: ApiException.
+    /// 目的: Verify Authenticator / Rejects Missing Setup の仕様を検証する。
+    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void VerifyAuthenticator_RejectsMissingSetup()
@@ -173,9 +216,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify known step-up token can be retrieved.
-    /// Input: token issued by email MFA verification.
-    /// Expected: same token is returned by ValidateStepUpToken.
+    /// 目的: Validate Step Up Token / Returns Known Grant の仕様を検証する。
+    /// 入力値: テスト内で登録した正常な対象データ。
+    /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
     /// </summary>
     [TestMethod]
     public void ValidateStepUpToken_ReturnsKnownGrant()
@@ -192,9 +235,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify unknown step-up token is rejected.
-    /// Input: token=sup_missing.
-    /// Expected: ApiException.
+    /// 目的: Validate Step Up Token / Rejects Unknown Token の仕様を検証する。
+    /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void ValidateStepUpToken_RejectsUnknownToken()
@@ -206,9 +249,9 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
-    /// Purpose: verify expired step-up token is rejected.
-    /// Input: token with expires_at in the past.
-    /// Expected: ApiException.
+    /// 目的: Validate Step Up Token / Rejects Expired Token の仕様を検証する。
+    /// 入力値: 期限切れに変更したテストデータ。
+    /// 期待値: 不正または期限切れの入力を拒否すること。
     /// </summary>
     [TestMethod]
     public void ValidateStepUpToken_RejectsExpiredToken()
@@ -248,4 +291,16 @@ public sealed class StepUpServiceTests
         Assert.IsInstanceOfType<T>(value);
         return (T)value;
     }
+
+    private sealed class RecordingEmailSender : IEmailSender
+    {
+        public List<SentMfaCode> SentMessages { get; } = new();
+
+        public void SendMfaCode(string email, string code, DateTimeOffset expiresAt)
+        {
+            SentMessages.Add(new SentMfaCode(email, code, expiresAt));
+        }
+    }
+
+    private sealed record SentMfaCode(string Email, string Code, DateTimeOffset ExpiresAt);
 }

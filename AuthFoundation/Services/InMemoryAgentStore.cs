@@ -14,6 +14,17 @@ public sealed class InMemoryAgentStore : IAgentStore
 
     private readonly ConcurrentDictionary<string, AgentRecord> _agents = new();
     private readonly ConcurrentDictionary<string, AgentDelegationRecord> _delegations = new();
+    private readonly AttemptLimiter _attempts;
+
+    public InMemoryAgentStore()
+        : this(new AttemptLimiter())
+    {
+    }
+
+    public InMemoryAgentStore(AttemptLimiter attempts)
+    {
+        _attempts = attempts;
+    }
 
     public AgentCreateResult CreateAgent(
         UserRecord owner,
@@ -53,14 +64,23 @@ public sealed class InMemoryAgentStore : IAgentStore
     public AgentTokenGrant VerifyTokenRequest(string agentId, string agentSecret, string clientId, string requestedScope)
     {
         string[] requestedScopes = ValidateDelegatedScopes(requestedScope);
+        string attemptKey = $"agent_secret:{agentId}";
+        _attempts.EnsureAllowed(attemptKey);
 
         if (!_agents.TryGetValue(agentId, out AgentRecord? agent)
-            || !string.Equals(agent.Status, "active", StringComparison.Ordinal)
-            || !PasswordUtil.Verify(agentSecret, agent.SecretHash))
+            || !string.Equals(agent.Status, "active", StringComparison.Ordinal))
         {
+            _attempts.RecordFailure(attemptKey);
             throw Code.UNAUTHORIZED;
         }
 
+        if (!PasswordUtil.Verify(agentSecret, agent.SecretHash))
+        {
+            _attempts.RecordFailure(attemptKey);
+            throw Code.UNAUTHORIZED;
+        }
+
+        _attempts.Reset(attemptKey);
         AgentDelegationRecord? delegation = _delegations.Values.FirstOrDefault(item =>
             string.Equals(item.AgentId, agentId, StringComparison.Ordinal)
             && string.Equals(item.ClientId, clientId, StringComparison.Ordinal)

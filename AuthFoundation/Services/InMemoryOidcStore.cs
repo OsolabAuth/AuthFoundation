@@ -88,6 +88,27 @@ public sealed class InMemoryOidcStore : IOidcStore
             code.Subject,
             code.Email,
             code.Name,
+            "user",
+            string.Empty,
+            string.Empty,
+            DateTimeOffset.UtcNow.Add(AccessTokenLifetime));
+        _accessTokens[accessToken] = record;
+        return record;
+    }
+
+    public AccessTokenRecord CreateAgentAccessToken(AgentRecord agent, AgentDelegationRecord delegation, string scope)
+    {
+        string accessToken = $"agt_{Helper.GenerateHex(48)}";
+        var record = new AccessTokenRecord(
+            accessToken,
+            delegation.ClientId,
+            scope,
+            agent.AgentId,
+            string.Empty,
+            agent.AgentName,
+            "ai_agent",
+            agent.OwnerSubject,
+            delegation.DelegationId,
             DateTimeOffset.UtcNow.Add(AccessTokenLifetime));
         _accessTokens[accessToken] = record;
         return record;
@@ -139,4 +160,7 @@ public sealed record AccessTokenRecord(
     string Subject,
     string Email,
     string Name,
+    string PrincipalType,
+    string OwnerSubject,
+    string DelegationId,
     DateTimeOffset ExpiresAt);

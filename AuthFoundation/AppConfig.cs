@@ -9,6 +9,11 @@ public static class AppConfig
     public static bool DisableHttpsRedirection { get; private set; }
     public static string DevelopmentClientId { get; private set; } = "00000000000000000000000000000000";
     public static string DevelopmentRedirectUri { get; private set; } = "http://localhost:5700/callback";
+    public static string SigningKeyId { get; private set; } = string.Empty;
+    public static string SigningKeyPrivateKeyPem { get; private set; } = string.Empty;
+    public static string AgentAccessTokenAudience { get; private set; } = "task-management-api";
+    public static int AttemptLimitMaxAttempts { get; private set; } = 5;
+    public static int AttemptLimitWindowMinutes { get; private set; } = 5;
 
     public static void Initialize(IConfiguration config)
     {
@@ -17,6 +22,11 @@ public static class AppConfig
         DisableHttpsRedirection = config.GetValue("DisableHttpsRedirection", false);
         DevelopmentClientId = config["DevelopmentClient:ClientId"] ?? DevelopmentClientId;
         DevelopmentRedirectUri = config["DevelopmentClient:RedirectUri"] ?? DevelopmentRedirectUri;
+        SigningKeyId = config["SigningKey:KeyId"] ?? SigningKeyId;
+        SigningKeyPrivateKeyPem = config["SigningKey:PrivateKeyPem"] ?? SigningKeyPrivateKeyPem;
+        AgentAccessTokenAudience = config["AgentAccessToken:Audience"] ?? AgentAccessTokenAudience;
+        AttemptLimitMaxAttempts = config.GetValue("AttemptLimit:MaxAttempts", AttemptLimitMaxAttempts);
+        AttemptLimitWindowMinutes = config.GetValue("AttemptLimit:WindowMinutes", AttemptLimitWindowMinutes);
     }
 
     private static string NormalizeIssuer(string value)
