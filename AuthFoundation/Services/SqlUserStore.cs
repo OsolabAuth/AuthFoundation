@@ -5,7 +5,7 @@ namespace AuthFoundation.Services;
 
 public sealed class SqlUserStore : IUserStore
 {
-    private const string PasswordNonce = "PBKDF2";
+    private const string PasswordNonce = "ARGON2ID";
     private readonly string _connectionString;
 
     public SqlUserStore(string connectionString)
@@ -14,7 +14,7 @@ public sealed class SqlUserStore : IUserStore
     }
 
     /// <summary>
-    /// SQL Server上にユーザー本体、共通UserInfo、規約同意を作成する。
+    /// SQL Serverにユーザー本体、共通user_info、規約同意を作成する。
     /// </summary>
     public UserRecord CreateUser(
         string email,
@@ -93,7 +93,9 @@ public sealed class SqlUserStore : IUserStore
             throw Code.UNAUTHORIZED;
         }
 
-        return user;
+        return PasswordUtil.NeedsRehash(user.PasswordHash)
+            ? UpdatePasswordHash(user, PasswordUtil.Hash(password))
+            : user;
     }
 
     /// <summary>
@@ -104,24 +106,7 @@ public sealed class SqlUserStore : IUserStore
         UserRecord user = Authenticate(email, currentPassword);
         string passwordHash = PasswordUtil.Hash(newPassword);
 
-        using var connection = OpenConnection();
-        using SqlCommand command = CreateCommand(
-            connection,
-            null,
-            """
-            UPDATE [auth].[osolab_user]
-               SET [password] = @password,
-                   [nonce] = @nonce,
-                   [update_datetime] = SYSUTCDATETIME()
-             WHERE [osolab_id] = @osolab_id
-               AND [status] = 1;
-            """);
-        command.Parameters.AddWithValue("@password", passwordHash);
-        command.Parameters.AddWithValue("@nonce", PasswordNonce);
-        command.Parameters.AddWithValue("@osolab_id", user.Subject);
-        command.ExecuteNonQuery();
-
-        return user with { PasswordHash = passwordHash };
+        return UpdatePasswordHash(user, passwordHash);
     }
 
     /// <summary>
@@ -136,24 +121,7 @@ public sealed class SqlUserStore : IUserStore
         }
 
         string passwordHash = PasswordUtil.Hash(newPassword);
-        using var connection = OpenConnection();
-        using SqlCommand command = CreateCommand(
-            connection,
-            null,
-            """
-            UPDATE [auth].[osolab_user]
-               SET [password] = @password,
-                   [nonce] = @nonce,
-                   [update_datetime] = SYSUTCDATETIME()
-             WHERE [osolab_id] = @osolab_id
-               AND [status] = 1;
-            """);
-        command.Parameters.AddWithValue("@password", passwordHash);
-        command.Parameters.AddWithValue("@nonce", PasswordNonce);
-        command.Parameters.AddWithValue("@osolab_id", user.Subject);
-        command.ExecuteNonQuery();
-
-        return user with { PasswordHash = passwordHash };
+        return UpdatePasswordHash(user, passwordHash);
     }
 
     /// <summary>
@@ -198,6 +166,27 @@ public sealed class SqlUserStore : IUserStore
         var connection = new SqlConnection(_connectionString);
         connection.Open();
         return connection;
+    }
+
+    private UserRecord UpdatePasswordHash(UserRecord user, string passwordHash)
+    {
+        using var connection = OpenConnection();
+        using SqlCommand command = CreateCommand(
+            connection,
+            null,
+            """
+            UPDATE [auth].[osolab_user]
+               SET [password] = @password,
+                   [nonce] = @nonce,
+                   [update_datetime] = SYSUTCDATETIME()
+             WHERE [osolab_id] = @osolab_id
+               AND [status] = 1;
+            """);
+        command.Parameters.AddWithValue("@password", passwordHash);
+        command.Parameters.AddWithValue("@nonce", PasswordNonce);
+        command.Parameters.AddWithValue("@osolab_id", user.Subject);
+        command.ExecuteNonQuery();
+        return user with { PasswordHash = passwordHash };
     }
 
     private static DbUserRecord? FindByEmail(SqlConnection connection, SqlTransaction? transaction, string email)
