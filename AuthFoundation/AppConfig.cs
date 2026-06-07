@@ -10,6 +10,8 @@ public static class AppConfig
     public static bool DisableHttpsRedirection { get; private set; }
     public static string DevelopmentClientId { get; private set; } = "00000000000000000000000000000000";
     public static string DevelopmentRedirectUri { get; private set; } = "http://localhost:5700/callback";
+    public static string SharedUserInfoClientId { get; private set; } = "00000000000000000000000000000000";
+    public static string AuthDbConnectionString { get; private set; } = string.Empty;
     public static string SigningKeyId { get; private set; } = string.Empty;
     public static string SigningKeyPrivateKeyPem { get; private set; } = string.Empty;
     public static string AgentAccessTokenAudience { get; private set; } = "task-management-api";
@@ -31,6 +33,8 @@ public static class AppConfig
         DisableHttpsRedirection = config.GetValue("DisableHttpsRedirection", false);
         DevelopmentClientId = config["DevelopmentClient:ClientId"] ?? DevelopmentClientId;
         DevelopmentRedirectUri = config["DevelopmentClient:RedirectUri"] ?? DevelopmentRedirectUri;
+        SharedUserInfoClientId = config["UserInfo:SharedClientId"] ?? SharedUserInfoClientId;
+        AuthDbConnectionString = config.GetConnectionString("AuthDb") ?? config["AuthDb:ConnectionString"] ?? AuthDbConnectionString;
         SigningKeyId = config["SigningKey:KeyId"] ?? SigningKeyId;
         SigningKeyPrivateKeyPem = config["SigningKey:PrivateKeyPem"] ?? SigningKeyPrivateKeyPem;
         AgentAccessTokenAudience = config["AgentAccessToken:Audience"] ?? AgentAccessTokenAudience;
@@ -51,6 +55,11 @@ public static class AppConfig
             && !string.IsNullOrWhiteSpace(GmailSmtpHost)
             && !string.IsNullOrWhiteSpace(GmailSmtpUsername)
             && !string.IsNullOrWhiteSpace(GmailSmtpAppPassword);
+    }
+
+    public static bool IsAuthDbConfigured()
+    {
+        return !string.IsNullOrWhiteSpace(AuthDbConnectionString);
     }
 
     private static string NormalizeIssuer(string value)

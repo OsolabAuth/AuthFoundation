@@ -34,6 +34,9 @@ public sealed class AppConfigTests
         Assert.IsFalse(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("00000000000000000000000000000000", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:5700/callback", AppConfig.DevelopmentRedirectUri);
+        Assert.AreEqual("00000000000000000000000000000000", AppConfig.SharedUserInfoClientId);
+        Assert.AreEqual(string.Empty, AppConfig.AuthDbConnectionString);
+        Assert.IsFalse(AppConfig.IsAuthDbConfigured());
         Assert.AreEqual(string.Empty, AppConfig.SigningKeyId);
         Assert.AreEqual(string.Empty, AppConfig.SigningKeyPrivateKeyPem);
         Assert.AreEqual("task-management-api", AppConfig.AgentAccessTokenAudience);
@@ -65,6 +68,8 @@ public sealed class AppConfigTests
             ["DisableHttpsRedirection"] = "true",
             ["DevelopmentClient:ClientId"] = "30000000000000000000000000000001",
             ["DevelopmentClient:RedirectUri"] = "http://localhost:3000/callback",
+            ["UserInfo:SharedClientId"] = "00000000000000000000000000000002",
+            ["ConnectionStrings:AuthDb"] = "Server=localhost;Database=Auth;",
             ["SigningKey:KeyId"] = "configured-key",
             ["SigningKey:PrivateKeyPem"] = TestSigningKeys.PrivateKeyPem,
             ["AgentAccessToken:Audience"] = "configured-api",
@@ -87,6 +92,9 @@ public sealed class AppConfigTests
         Assert.IsTrue(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("30000000000000000000000000000001", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:3000/callback", AppConfig.DevelopmentRedirectUri);
+        Assert.AreEqual("00000000000000000000000000000002", AppConfig.SharedUserInfoClientId);
+        Assert.AreEqual("Server=localhost;Database=Auth;", AppConfig.AuthDbConnectionString);
+        Assert.IsTrue(AppConfig.IsAuthDbConfigured());
         Assert.AreEqual("configured-key", AppConfig.SigningKeyId);
         Assert.AreEqual(TestSigningKeys.PrivateKeyPem, AppConfig.SigningKeyPrivateKeyPem);
         Assert.AreEqual("configured-api", AppConfig.AgentAccessTokenAudience);
@@ -199,6 +207,8 @@ public sealed class AppConfigTests
             ["DisableHttpsRedirection"] = "false",
             ["DevelopmentClient:ClientId"] = "00000000000000000000000000000000",
             ["DevelopmentClient:RedirectUri"] = "http://localhost:5700/callback",
+            ["UserInfo:SharedClientId"] = "00000000000000000000000000000000",
+            ["ConnectionStrings:AuthDb"] = string.Empty,
             ["SigningKey:KeyId"] = string.Empty,
             ["SigningKey:PrivateKeyPem"] = string.Empty,
             ["AgentAccessToken:Audience"] = "task-management-api",

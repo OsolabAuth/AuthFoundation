@@ -23,7 +23,10 @@ builder.Services.AddCors(options =>
             .WithExposedHeaders("Location", "WWW-Authenticate"));
 });
 builder.Services.AddSingleton<IOidcStore, InMemoryOidcStore>();
-builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
+builder.Services.AddSingleton<IUserStore>(_ =>
+    AppConfig.IsAuthDbConfigured()
+        ? new SqlUserStore(AppConfig.AuthDbConnectionString)
+        : new InMemoryUserStore());
 builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
 builder.Services.AddSingleton<AttemptLimiter>();
