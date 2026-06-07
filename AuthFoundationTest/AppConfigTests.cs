@@ -30,6 +30,7 @@ public sealed class AppConfigTests
 
         Assert.AreEqual("https://auth.osolab-auth.jp/", AppConfig.Issuer);
         Assert.AreEqual("https://portal.osolab-auth.jp", AppConfig.AuthUiBaseUrl);
+        CollectionAssert.AreEqual(new[] { "https://portal.osolab-auth.jp" }, AppConfig.CorsAllowedOrigins);
         Assert.IsFalse(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("00000000000000000000000000000000", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:5700/callback", AppConfig.DevelopmentRedirectUri);
@@ -52,6 +53,7 @@ public sealed class AppConfigTests
         {
             ["Issuer"] = "https://issuer.example.com/auth/path",
             ["AuthUiBaseUrl"] = "https://portal.example.com/ui/path",
+            ["Cors:AllowedOrigins"] = "https://portal.example.com/ui/path, http://localhost:3000/dev, https://portal.example.com/other",
             ["DisableHttpsRedirection"] = "true",
             ["DevelopmentClient:ClientId"] = "30000000000000000000000000000001",
             ["DevelopmentClient:RedirectUri"] = "http://localhost:3000/callback",
@@ -64,6 +66,9 @@ public sealed class AppConfigTests
 
         Assert.AreEqual("https://issuer.example.com/", AppConfig.Issuer);
         Assert.AreEqual("https://portal.example.com", AppConfig.AuthUiBaseUrl);
+        CollectionAssert.AreEqual(
+            new[] { "https://portal.example.com", "http://localhost:3000" },
+            AppConfig.CorsAllowedOrigins);
         Assert.IsTrue(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("30000000000000000000000000000001", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:3000/callback", AppConfig.DevelopmentRedirectUri);
@@ -90,6 +95,35 @@ public sealed class AppConfigTests
 
         Assert.AreEqual("http://localhost:5700/", AppConfig.Issuer);
         Assert.AreEqual("http://localhost:3000", AppConfig.AuthUiBaseUrl);
+    }
+
+    /// <summary>
+    /// CORS許可Origin未指定時に画面URLを許可Originとして使うことを検証する。
+    /// </summary>
+    [TestMethod]
+    public void Initialize_UsesAuthUiBaseUrlAsDefaultCorsOrigin()
+    {
+        AppConfig.Initialize(Configuration(new Dictionary<string, string?>
+        {
+            ["AuthUiBaseUrl"] = "https://portal.example.com/login"
+        }));
+
+        CollectionAssert.AreEqual(new[] { "https://portal.example.com" }, AppConfig.CorsAllowedOrigins);
+    }
+
+    /// <summary>
+    /// CORS許可Originに不正なURLが含まれる場合は起動時設定エラーにすることを検証する。
+    /// </summary>
+    [TestMethod]
+    public void Initialize_RejectsInvalidCorsOrigin()
+    {
+        ApiException error = Assert.ThrowsExactly<ApiException>(() =>
+            AppConfig.Initialize(Configuration(new Dictionary<string, string?>
+            {
+                ["Cors:AllowedOrigins"] = "https://portal.example.com, javascript:alert(1)"
+            })));
+
+        Assert.AreEqual(Code.INTERNAL_SERVER_ERROR.InternalCode, error.InternalCode);
     }
 
     /// <summary>

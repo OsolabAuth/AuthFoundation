@@ -3,6 +3,7 @@ using AuthFoundation.Services;
 using System.Diagnostics.CodeAnalysis;
 
 var builder = WebApplication.CreateBuilder(args);
+const string PortalCorsPolicy = "PortalCorsPolicy";
 
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
@@ -10,6 +11,16 @@ builder.Logging.AddJsonConsole();
 AppConfig.Initialize(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(
+        PortalCorsPolicy,
+        policy => policy
+            .WithOrigins(AppConfig.CorsAllowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials());
+});
 builder.Services.AddSingleton<IOidcStore, InMemoryOidcStore>();
 builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
 builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
@@ -27,6 +38,7 @@ if (!AppConfig.DisableHttpsRedirection)
     app.UseHttpsRedirection();
 }
 
+app.UseCors(PortalCorsPolicy);
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

@@ -6,6 +6,7 @@ public static class AppConfig
 {
     public static string Issuer { get; private set; } = "https://auth.osolab-auth.jp/";
     public static string AuthUiBaseUrl { get; private set; } = "https://portal.osolab-auth.jp";
+    public static string[] CorsAllowedOrigins { get; private set; } = ["https://portal.osolab-auth.jp"];
     public static bool DisableHttpsRedirection { get; private set; }
     public static string DevelopmentClientId { get; private set; } = "00000000000000000000000000000000";
     public static string DevelopmentRedirectUri { get; private set; } = "http://localhost:5700/callback";
@@ -19,6 +20,7 @@ public static class AppConfig
     {
         Issuer = NormalizeIssuer(config["Issuer"] ?? Issuer);
         AuthUiBaseUrl = NormalizeBaseUrl(config["AuthUiBaseUrl"] ?? AuthUiBaseUrl);
+        CorsAllowedOrigins = ParseCorsOrigins(config["Cors:AllowedOrigins"], AuthUiBaseUrl);
         DisableHttpsRedirection = config.GetValue("DisableHttpsRedirection", false);
         DevelopmentClientId = config["DevelopmentClient:ClientId"] ?? DevelopmentClientId;
         DevelopmentRedirectUri = config["DevelopmentClient:RedirectUri"] ?? DevelopmentRedirectUri;
@@ -48,5 +50,18 @@ public static class AppConfig
         }
 
         return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+    }
+
+    /// <summary>
+    /// CORSで許可する画面側Originを設定文字列から構築する。
+    /// </summary>
+    private static string[] ParseCorsOrigins(string? value, string fallbackOrigin)
+    {
+        string source = string.IsNullOrWhiteSpace(value) ? fallbackOrigin : value;
+        return source
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormalizeBaseUrl)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 }
