@@ -27,7 +27,10 @@ builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
 builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
 builder.Services.AddSingleton<AttemptLimiter>();
-builder.Services.AddSingleton<IEmailSender, DevelopmentEmailSender>();
+builder.Services.AddSingleton<IEmailSender>(_ =>
+    AppConfig.IsGmailSmtpConfigured()
+        ? new GmailSmtpEmailSender()
+        : new DevelopmentEmailSender());
 builder.Services.AddSingleton<SignupSessionService>();
 builder.Services.AddSingleton(_ => SigningKeyProvider.FromConfig());
 builder.Services.AddSingleton<StepUpService>();

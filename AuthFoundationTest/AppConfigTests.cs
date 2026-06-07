@@ -39,6 +39,14 @@ public sealed class AppConfigTests
         Assert.AreEqual("task-management-api", AppConfig.AgentAccessTokenAudience);
         Assert.AreEqual(5, AppConfig.AttemptLimitMaxAttempts);
         Assert.AreEqual(5, AppConfig.AttemptLimitWindowMinutes);
+        Assert.AreEqual("AuthFoundation", AppConfig.MailFromName);
+        Assert.AreEqual(string.Empty, AppConfig.MailFromEmail);
+        Assert.AreEqual("smtp.gmail.com", AppConfig.GmailSmtpHost);
+        Assert.AreEqual(587, AppConfig.GmailSmtpPort);
+        Assert.IsTrue(AppConfig.GmailSmtpEnableSsl);
+        Assert.AreEqual(string.Empty, AppConfig.GmailSmtpUsername);
+        Assert.AreEqual(string.Empty, AppConfig.GmailSmtpAppPassword);
+        Assert.IsFalse(AppConfig.IsGmailSmtpConfigured());
     }
 
     /// <summary>
@@ -61,7 +69,14 @@ public sealed class AppConfigTests
             ["SigningKey:PrivateKeyPem"] = TestSigningKeys.PrivateKeyPem,
             ["AgentAccessToken:Audience"] = "configured-api",
             ["AttemptLimit:MaxAttempts"] = "3",
-            ["AttemptLimit:WindowMinutes"] = "7"
+            ["AttemptLimit:WindowMinutes"] = "7",
+            ["Mail:FromName"] = "Configured Auth",
+            ["Mail:FromEmail"] = "auth@example.com",
+            ["GmailSmtp:Host"] = "smtp.example.com",
+            ["GmailSmtp:Port"] = "2525",
+            ["GmailSmtp:EnableSsl"] = "false",
+            ["GmailSmtp:Username"] = "smtp-user",
+            ["GmailSmtp:AppPassword"] = "smtp-password"
         }));
 
         Assert.AreEqual("https://issuer.example.com/", AppConfig.Issuer);
@@ -77,6 +92,14 @@ public sealed class AppConfigTests
         Assert.AreEqual("configured-api", AppConfig.AgentAccessTokenAudience);
         Assert.AreEqual(3, AppConfig.AttemptLimitMaxAttempts);
         Assert.AreEqual(7, AppConfig.AttemptLimitWindowMinutes);
+        Assert.AreEqual("Configured Auth", AppConfig.MailFromName);
+        Assert.AreEqual("auth@example.com", AppConfig.MailFromEmail);
+        Assert.AreEqual("smtp.example.com", AppConfig.GmailSmtpHost);
+        Assert.AreEqual(2525, AppConfig.GmailSmtpPort);
+        Assert.IsFalse(AppConfig.GmailSmtpEnableSsl);
+        Assert.AreEqual("smtp-user", AppConfig.GmailSmtpUsername);
+        Assert.AreEqual("smtp-password", AppConfig.GmailSmtpAppPassword);
+        Assert.IsTrue(AppConfig.IsGmailSmtpConfigured());
     }
 
     /// <summary>
@@ -180,7 +203,14 @@ public sealed class AppConfigTests
             ["SigningKey:PrivateKeyPem"] = string.Empty,
             ["AgentAccessToken:Audience"] = "task-management-api",
             ["AttemptLimit:MaxAttempts"] = "5",
-            ["AttemptLimit:WindowMinutes"] = "5"
+            ["AttemptLimit:WindowMinutes"] = "5",
+            ["Mail:FromName"] = "AuthFoundation",
+            ["Mail:FromEmail"] = string.Empty,
+            ["GmailSmtp:Host"] = "smtp.gmail.com",
+            ["GmailSmtp:Port"] = "587",
+            ["GmailSmtp:EnableSsl"] = "true",
+            ["GmailSmtp:Username"] = string.Empty,
+            ["GmailSmtp:AppPassword"] = string.Empty
         };
     }
 }

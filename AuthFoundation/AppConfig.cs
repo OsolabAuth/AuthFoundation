@@ -15,6 +15,13 @@ public static class AppConfig
     public static string AgentAccessTokenAudience { get; private set; } = "task-management-api";
     public static int AttemptLimitMaxAttempts { get; private set; } = 5;
     public static int AttemptLimitWindowMinutes { get; private set; } = 5;
+    public static string MailFromName { get; private set; } = "AuthFoundation";
+    public static string MailFromEmail { get; private set; } = string.Empty;
+    public static string GmailSmtpHost { get; private set; } = "smtp.gmail.com";
+    public static int GmailSmtpPort { get; private set; } = 587;
+    public static bool GmailSmtpEnableSsl { get; private set; } = true;
+    public static string GmailSmtpUsername { get; private set; } = string.Empty;
+    public static string GmailSmtpAppPassword { get; private set; } = string.Empty;
 
     public static void Initialize(IConfiguration config)
     {
@@ -29,6 +36,21 @@ public static class AppConfig
         AgentAccessTokenAudience = config["AgentAccessToken:Audience"] ?? AgentAccessTokenAudience;
         AttemptLimitMaxAttempts = config.GetValue("AttemptLimit:MaxAttempts", AttemptLimitMaxAttempts);
         AttemptLimitWindowMinutes = config.GetValue("AttemptLimit:WindowMinutes", AttemptLimitWindowMinutes);
+        MailFromName = config["Mail:FromName"] ?? MailFromName;
+        MailFromEmail = config["Mail:FromEmail"] ?? MailFromEmail;
+        GmailSmtpHost = config["GmailSmtp:Host"] ?? GmailSmtpHost;
+        GmailSmtpPort = config.GetValue("GmailSmtp:Port", GmailSmtpPort);
+        GmailSmtpEnableSsl = config.GetValue("GmailSmtp:EnableSsl", GmailSmtpEnableSsl);
+        GmailSmtpUsername = config["GmailSmtp:Username"] ?? GmailSmtpUsername;
+        GmailSmtpAppPassword = config["GmailSmtp:AppPassword"] ?? GmailSmtpAppPassword;
+    }
+
+    public static bool IsGmailSmtpConfigured()
+    {
+        return !string.IsNullOrWhiteSpace(MailFromEmail)
+            && !string.IsNullOrWhiteSpace(GmailSmtpHost)
+            && !string.IsNullOrWhiteSpace(GmailSmtpUsername)
+            && !string.IsNullOrWhiteSpace(GmailSmtpAppPassword);
     }
 
     private static string NormalizeIssuer(string value)
