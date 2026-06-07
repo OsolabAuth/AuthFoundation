@@ -1,6 +1,7 @@
 using AuthFoundation.Common;
 using AuthFoundation.Controllers.Auth;
 using AuthFoundation.Services;
+using Microsoft.Extensions.Primitives;
 
 namespace AuthFoundationTest;
 
@@ -69,5 +70,137 @@ public sealed class SignupEndpointShapeTests
         Assert.AreEqual("00001", error.ResponseCode);
         Assert.AreEqual("invalid_request", error.Error);
         Assert.AreEqual("some of the input values are incorrect", error.ErrorDescription);
+    }
+
+    /// <summary>
+    /// Portal本番の3段階登録フローがメール送信、コード確認、アカウント作成の順に完了することを検証する。
+    /// </summary>
+    [TestMethod]
+    public async Task PortalSignupFlow_CreatesUserAfterEmailVerification()
+    {
+        var users = new InMemoryUserStore();
+        var emailSender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(emailSender, new AttemptLimiter());
+        var terms = new TermsService();
+        var emailController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        EndpointTestHelper.SetForm(emailController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["email"] = "portal-signup@example.com"
+        });
+
+        var emailOk = EndpointTestHelper.AssertOk(await emailController.Email());
+        string signupCookie = ReadCookie(emailController.Response.Headers.SetCookie.ToString());
+        Assert.AreEqual("verification_code_sent", EndpointTestHelper.ReadProperty<string>(emailOk.Value, "result"));
+        Assert.AreEqual("portal-signup@example.com", emailSender.LastEmail);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(emailSender.LastCode));
+
+        var verifyController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        verifyController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(verifyController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["code"] = emailSender.LastCode
+        });
+
+        var verifyOk = EndpointTestHelper.AssertOk(await verifyController.Verify());
+        Assert.AreEqual("verified", EndpointTestHelper.ReadProperty<string>(verifyOk.Value, "result"));
+
+        var accountController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        accountController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(accountController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["password"] = "Passw0rd!",
+            ["name"] = "Portal Signup",
+            ["birthdate"] = "2000-01-02"
+        });
+
+        var accountOk = EndpointTestHelper.AssertOk(await accountController.Account());
+
+        Assert.AreEqual("redirect", EndpointTestHelper.ReadProperty<string>(accountOk.Value, "result"));
+        Assert.AreEqual($"{AppConfig.AuthUiBaseUrl}/login", EndpointTestHelper.ReadProperty<string>(accountOk.Value, "redirect_url"));
+        Assert.AreEqual($"{AppConfig.AuthUiBaseUrl}/login", accountController.Response.Headers.Location.ToString());
+        Assert.AreEqual("Portal Signup", users.Authenticate("portal-signup@example.com", "Passw0rd!").Name);
+    }
+
+    /// <summary>
+    /// メール認証が未完了の登録セッションではアカウント作成を拒否することを検証する。
+    /// </summary>
+    [TestMethod]
+    public async Task PortalSignupAccount_ReturnsUnauthorizedBeforeEmailVerification()
+    {
+        var users = new InMemoryUserStore();
+        var emailSender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(emailSender, new AttemptLimiter());
+        var terms = new TermsService();
+        var emailController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        EndpointTestHelper.SetForm(emailController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["email"] = "portal-unverified@example.com"
+        });
+        _ = await emailController.Email();
+        string signupCookie = ReadCookie(emailController.Response.Headers.SetCookie.ToString());
+
+        var accountController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        accountController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(accountController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["password"] = "Passw0rd!",
+            ["name"] = "Portal Signup",
+            ["birthdate"] = "2000-01-02"
+        });
+
+        ErrorOutput error = EndpointTestHelper.AssertError(await accountController.Account(), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// Portal互換のコード確認で誤った認証コードを拒否することを検証する。
+    /// </summary>
+    [TestMethod]
+    public async Task PortalSignupVerify_ReturnsUnauthorizedForWrongCode()
+    {
+        var users = new InMemoryUserStore();
+        var emailSender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(emailSender, new AttemptLimiter());
+        var terms = new TermsService();
+        var emailController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        EndpointTestHelper.SetForm(emailController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["email"] = "portal-wrong-code@example.com"
+        });
+        _ = await emailController.Email();
+        string signupCookie = ReadCookie(emailController.Response.Headers.SetCookie.ToString());
+
+        var verifyController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        verifyController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(verifyController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["code"] = "000000"
+        });
+
+        ErrorOutput error = EndpointTestHelper.AssertError(await verifyController.Verify(), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    private static string ReadCookie(string setCookie)
+    {
+        int separator = setCookie.IndexOf(';', StringComparison.Ordinal);
+        Assert.IsTrue(separator > 0);
+        return setCookie[..separator];
+    }
+
+    private sealed class CapturingEmailSender : IEmailSender
+    {
+        public string LastEmail { get; private set; } = string.Empty;
+        public string LastCode { get; private set; } = string.Empty;
+
+        public void SendMfaCode(string email, string code, DateTimeOffset expiresAt)
+        {
+            LastEmail = email;
+            LastCode = code;
+        }
     }
 }
