@@ -27,12 +27,22 @@ public sealed class UserInfoController : ControllerBase
                 throw Code.UNAUTHORIZED;
             }
 
-            return Ok(new
+            var claims = new Dictionary<string, string>
             {
-                sub = token.Subject,
-                email = token.Email,
-                name = token.Name
-            });
+                ["sub"] = token.Subject
+            };
+
+            if (HasScope(token.Scope, Code.Scope.EMAIL))
+            {
+                claims["email"] = token.Email;
+            }
+
+            if (HasScope(token.Scope, Code.Scope.PROFILE))
+            {
+                claims["name"] = token.Name;
+            }
+
+            return Ok(claims);
         }
         catch (ApiException ex)
         {

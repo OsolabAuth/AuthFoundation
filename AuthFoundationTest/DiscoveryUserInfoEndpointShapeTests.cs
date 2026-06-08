@@ -89,9 +89,39 @@ public sealed class DiscoveryUserInfoEndpointShapeTests
 
         var ok = AssertOk(action);
         Assert.AreEqual(200, ok.StatusCode ?? 200);
-        Assert.AreEqual("subject_1", ReadProperty<string>(ok.Value, "sub"));
-        Assert.AreEqual("subject@example.com", ReadProperty<string>(ok.Value, "email"));
-        Assert.AreEqual("Subject One", ReadProperty<string>(ok.Value, "name"));
+        IReadOnlyDictionary<string, string> claims = ReadClaims(ok.Value);
+        Assert.AreEqual("subject_1", claims["sub"]);
+        Assert.AreEqual("subject@example.com", claims["email"]);
+        Assert.AreEqual("Subject One", claims["name"]);
+    }
+
+    /// <summary>
+    /// UserInfoがopenidのみのaccess tokenに対してemail/profile claimを返さないことを確認する。
+    /// </summary>
+    [TestMethod]
+    public void UserInfo_ReturnsOnlySubjectForOpenIdOnlyScope()
+    {
+        var store = new InMemoryOidcStore();
+        AccessTokenRecord token = store.CreateAccessToken(new AuthorizationCodeRecord(
+            "code",
+            AppConfig.DevelopmentClientId,
+            AppConfig.DevelopmentRedirectUri,
+            "openid",
+            "nonce",
+            "challenge",
+            "subject_1",
+            "subject@example.com",
+            "Subject One",
+            DateTimeOffset.UtcNow.AddMinutes(5)));
+        var controller = CreateUserInfoController(store, $"Bearer {token.AccessToken}");
+
+        IActionResult action = controller.Get();
+
+        var ok = AssertOk(action);
+        IReadOnlyDictionary<string, string> claims = ReadClaims(ok.Value);
+        Assert.AreEqual("subject_1", claims["sub"]);
+        Assert.IsFalse(claims.ContainsKey("email"));
+        Assert.IsFalse(claims.ContainsKey("name"));
     }
 
     /// <summary>
@@ -211,5 +241,12 @@ public sealed class DiscoveryUserInfoEndpointShapeTests
         object? value = property.GetValue(target);
         Assert.IsInstanceOfType<T>(value);
         return (T)value;
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadClaims(object? target)
+    {
+        Assert.IsNotNull(target);
+        Assert.IsInstanceOfType<Dictionary<string, string>>(target);
+        return (Dictionary<string, string>)target;
     }
 }

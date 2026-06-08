@@ -47,7 +47,7 @@
                   }
                 },
                 "headers": [
-                  { "enabled": true, "name": "x-auth-ui-response", "value": "json" }
+                  { "enabled": true, "name": "x-auth-ui-response-mode", "value": "json" }
                 ],
                 "body": {
                   "bodyType": "Text",
