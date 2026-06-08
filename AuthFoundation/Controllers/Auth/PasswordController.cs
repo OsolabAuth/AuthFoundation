@@ -32,13 +32,14 @@ public sealed class PasswordController : ControllerBase
                 throw Code.REQUEST_PARAMETER_ERROR;
             }
 
+            _stepUp.VerifyEmailChallenge(request.Email, request.EmailCode);
+
             UserRecord user = _users.FindByEmail(request.Email);
             if (user.BirthDate != birthDate)
             {
                 throw Code.UNAUTHORIZED;
             }
 
-            _stepUp.VerifyEmailChallenge(request.Email, request.EmailCode);
             _users.ResetPassword(request.Email, birthDate, request.NewPassword);
             return Ok(new { result = "password_reset" });
         }

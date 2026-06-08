@@ -90,6 +90,32 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
+    /// Purpose: verify password reset consumes the email code before rejecting a mismatched birth date.
+    /// Input: registered email, wrong birth_date with valid email_code, then matching birth_date with the same email_code.
+    /// Expected: both attempts return 401 and the old password remains valid.
+    /// </summary>
+    [TestMethod]
+    public void Reset_ConsumesEmailCodeBeforeRejectingMismatchedBirthDate()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-consume-code@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var stepUp = new StepUpService(users);
+        var controller = CreateController(users, stepUp);
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-consume-code@example.com");
+        var wrongBirthDateRequest = new ResetPasswordRequest("reset-consume-code@example.com", "2001-01-02", challenge.Code, "Newpass1!");
+        var matchingBirthDateRetry = new ResetPasswordRequest("reset-consume-code@example.com", "2000-01-02", challenge.Code, "Newpass1!");
+
+        ErrorOutput firstError = EndpointTestHelper.AssertError(controller.Reset(wrongBirthDateRequest), 401);
+        ErrorOutput retryError = EndpointTestHelper.AssertError(controller.Reset(matchingBirthDateRetry), 401);
+
+        Assert.AreEqual("00008", firstError.ResponseCode);
+        Assert.AreEqual("invalid_token", firstError.Error);
+        Assert.AreEqual("00008", retryError.ResponseCode);
+        Assert.AreEqual("invalid_token", retryError.Error);
+        Assert.AreEqual("Reset User", users.Authenticate("reset-consume-code@example.com", "Passw0rd!").Name);
+    }
+
+    /// <summary>
     /// Purpose: verify password reset rejects an incorrect email code.
     /// Input: registered email, matching birth_date, wrong email_code, and strong new_password.
     /// Expected: 401 invalid_token and the old password remains valid.
