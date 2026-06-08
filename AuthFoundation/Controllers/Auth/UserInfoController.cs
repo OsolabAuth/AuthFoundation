@@ -21,6 +21,12 @@ public sealed class UserInfoController : ControllerBase
         try
         {
             AccessTokenRecord token = _store.FindAccessToken(ReadBearerToken());
+            if (!string.Equals(token.PrincipalType, "user", StringComparison.Ordinal)
+                || !HasScope(token.Scope, "openid"))
+            {
+                throw Code.UNAUTHORIZED;
+            }
+
             return Ok(new
             {
                 sub = token.Subject,
@@ -47,5 +53,12 @@ public sealed class UserInfoController : ControllerBase
         string token = header[prefix.Length..].Trim();
         ValidateUtil.IndispensableParam(token, "access_token");
         return token;
+    }
+
+    private static bool HasScope(string scope, string requiredScope)
+    {
+        return scope
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(value => string.Equals(value, requiredScope, StringComparison.Ordinal));
     }
 }

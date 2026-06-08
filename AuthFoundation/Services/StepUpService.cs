@@ -73,12 +73,16 @@ public sealed class StepUpService
     public StepUpGrant VerifyAuthenticator(string email, string code)
     {
         UserRecord user = _users.FindByEmail(email);
+        string attemptKey = $"mfa_totp:{user.Email}";
+        _attempts.EnsureAllowed(attemptKey);
         if (!_totpSecrets.TryGetValue(user.Email, out string? secret)
             || !TotpUtil.VerifyCode(secret, code, DateTimeOffset.UtcNow))
         {
+            _attempts.RecordFailure(attemptKey);
             throw Code.UNAUTHORIZED;
         }
 
+        _attempts.Reset(attemptKey);
         return CreateGrant(user.Subject, "totp");
     }
 

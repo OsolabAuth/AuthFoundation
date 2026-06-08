@@ -95,6 +95,68 @@ public sealed class DiscoveryUserInfoEndpointShapeTests
     }
 
     /// <summary>
+    /// UserInfoがopenid scopeを持たないuser access tokenを拒否することを確認する。
+    /// </summary>
+    [TestMethod]
+    public void UserInfo_ReturnsUnauthorizedForUserTokenWithoutOpenIdScope()
+    {
+        var store = new InMemoryOidcStore();
+        AccessTokenRecord token = store.CreateAccessToken(new AuthorizationCodeRecord(
+            "code",
+            AppConfig.DevelopmentClientId,
+            AppConfig.DevelopmentRedirectUri,
+            "profile email",
+            "nonce",
+            "challenge",
+            "subject_1",
+            "subject@example.com",
+            "Subject One",
+            DateTimeOffset.UtcNow.AddMinutes(5)));
+        var controller = CreateUserInfoController(store, $"Bearer {token.AccessToken}");
+
+        IActionResult action = controller.Get();
+
+        var error = action as ObjectResult;
+        Assert.IsNotNull(error);
+        Assert.AreEqual(401, error.StatusCode);
+        Assert.AreEqual("Bearer", controller.Response.Headers.WWWAuthenticate.ToString());
+    }
+
+    /// <summary>
+    /// UserInfoがagent access tokenをOIDC user tokenとして扱わないことを確認する。
+    /// </summary>
+    [TestMethod]
+    public void UserInfo_ReturnsUnauthorizedForAgentAccessToken()
+    {
+        var store = new InMemoryOidcStore();
+        var agent = new AgentRecord(
+            "agent_1",
+            "owner_1",
+            "Issue Agent",
+            "secret",
+            "active",
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+        var delegation = new AgentDelegationRecord(
+            "delegation_1",
+            agent.AgentId,
+            agent.OwnerSubject,
+            AppConfig.DevelopmentClientId,
+            "task.read",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            DateTimeOffset.UtcNow);
+        AccessTokenRecord token = store.CreateAgentAccessToken(agent, delegation, "task.read");
+        var controller = CreateUserInfoController(store, $"Bearer {token.AccessToken}");
+
+        IActionResult action = controller.Get();
+
+        var error = action as ObjectResult;
+        Assert.IsNotNull(error);
+        Assert.AreEqual(401, error.StatusCode);
+        Assert.AreEqual("Bearer", controller.Response.Headers.WWWAuthenticate.ToString());
+    }
+
+    /// <summary>
     /// 目的: User Info / Returns Unauthorized For Missing Bearer Token の仕様を検証する。
     /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
     /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。

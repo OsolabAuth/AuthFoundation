@@ -70,7 +70,8 @@ public sealed class APITesterScenarioTests
         HashSet<string> authorization = ReadScenarioValues("AuthorizationCodeFlow.json");
         HashSet<string> agent = ReadScenarioValues("AgentDelegatedAuth.json");
 
-        Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"body\".\"response_code\"}", StringComparison.Ordinal)));
+        Assert.IsFalse(authorization.Any(value => value.Contains("\"response\".\"body\".\"response_code\"", StringComparison.Ordinal)));
+        Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"02. Login for authorize session\".\"response\".\"body\".\"authorization_code\"}", StringComparison.Ordinal)));
         Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"headers\".\"set-cookie\"}", StringComparison.Ordinal)));
         Assert.IsTrue(agent.Any(value => value.Contains("${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_id\"}", StringComparison.Ordinal)));
         Assert.IsTrue(agent.Any(value => value.Contains("${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_secret\"}", StringComparison.Ordinal)));
@@ -88,6 +89,7 @@ public sealed class APITesterScenarioTests
 
         Assert.IsTrue(mfa.Any(value => value.Contains("${\"EmailCode\"}", StringComparison.Ordinal)));
         Assert.IsTrue(mfa.Any(value => value.Contains("${\"AuthFoundation - MfaStepUp\".\"02. Verify email MFA challenge\".\"response\".\"body\".\"step_up_token\"}", StringComparison.Ordinal)));
+        Assert.IsFalse(mfa.Any(value => value.Contains("\"01. Start email MFA challenge\".\"response\"", StringComparison.Ordinal)));
         Assert.IsFalse(mfa.Any(value => value.Contains("\"response\".\"body\".\"code\"", StringComparison.Ordinal)));
     }
 

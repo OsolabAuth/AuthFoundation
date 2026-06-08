@@ -17,7 +17,12 @@ public sealed class SignupEndpointShapeTests
     public void Post_ReturnsCreatedUserProfile()
     {
         var users = new InMemoryUserStore();
-        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, new TermsService()));
+        var emailSender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(emailSender, new AttemptLimiter());
+        SignupEmailChallenge challenge = signupSessions.StartEmailChallenge("signup-success@example.com");
+        SignupVerifiedSession verified = signupSessions.VerifyEmailChallenge(challenge.SessionId, emailSender.LastCode);
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, new TermsService(), signupSessions));
+        controller.Request.Headers.Cookie = $"AuthSignupSessionId={verified.SessionId}";
         var request = new SignupRequest(
             "signup-success@example.com",
             "Passw0rd!",
@@ -34,6 +39,28 @@ public sealed class SignupEndpointShapeTests
         Assert.AreEqual("Signup User", EndpointTestHelper.ReadProperty<string>(ok.Value, "name"));
         Assert.AreEqual("2001-02-03", EndpointTestHelper.ReadProperty<string>(ok.Value, "birth_date"));
         Assert.AreEqual(sub, users.Authenticate("signup-success@example.com", "Passw0rd!").Subject);
+    }
+
+    /// <summary>
+    /// 旧POST /signupがメール検証済みsignup sessionなしではアカウントを作成しないことを確認する。
+    /// </summary>
+    [TestMethod]
+    public void Post_ReturnsUnauthorizedWithoutVerifiedSignupSession()
+    {
+        var users = new InMemoryUserStore();
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, new TermsService()));
+        var request = new SignupRequest(
+            "signup-direct@example.com",
+            "Passw0rd!",
+            "Signup User",
+            "2001-02-03",
+            true);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Post(request), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+        Assert.ThrowsExactly<ApiException>(() => users.FindByEmail("signup-direct@example.com"));
     }
 
     /// <summary>

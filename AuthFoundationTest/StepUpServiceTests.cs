@@ -216,6 +216,27 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
+    /// TOTP検証が連続失敗後に正しいコードも拒否することを確認する。
+    /// </summary>
+    [TestMethod]
+    public void VerifyAuthenticator_BlocksAfterRepeatedWrongCodes()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("totp-limit@example.com", "Passw0rd!", "Totp User", new DateOnly(2000, 1, 1));
+        var stepUp = new StepUpService(users, new RecordingEmailSender(), new AttemptLimiter(1, TimeSpan.FromMinutes(5)));
+        StepUpGrant setupGrant = IssueEmailStepUp(stepUp, "totp-limit@example.com");
+        AuthenticatorSetup setup = stepUp.SetupAuthenticator("totp-limit@example.com", setupGrant.StepUpToken);
+        Assert.ThrowsExactly<ApiException>(
+            () => stepUp.VerifyAuthenticator("totp-limit@example.com", "000000"));
+        string validCode = TotpUtil.GenerateCode(setup.Secret, DateTimeOffset.UtcNow);
+
+        ApiException error = Assert.ThrowsExactly<ApiException>(
+            () => stepUp.VerifyAuthenticator("totp-limit@example.com", validCode));
+
+        Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
+    }
+
+    /// <summary>
     /// 目的: Validate Step Up Token / Returns Known Grant の仕様を検証する。
     /// 入力値: テスト内で登録した正常な対象データ。
     /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。

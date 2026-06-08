@@ -35,8 +35,13 @@ public sealed class TermsEndpointShapeTests
     [TestMethod]
     public void Signup_ReturnsAcceptedTermsIdWhenTermsAreAccepted()
     {
+        var sender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(sender, new AttemptLimiter());
+        SignupEmailChallenge challenge = signupSessions.StartEmailChallenge("terms-signup@example.com");
+        SignupVerifiedSession verified = signupSessions.VerifyEmailChallenge(challenge.SessionId, sender.LastCode);
         var controller = EndpointTestHelper.WithHttpContext(
-            new SignupController(new InMemoryUserStore(), new TermsService()));
+            new SignupController(new InMemoryUserStore(), new TermsService(), signupSessions));
+        controller.Request.Headers.Cookie = $"AuthSignupSessionId={verified.SessionId}";
         var request = new SignupRequest(
             "terms-signup@example.com",
             "Passw0rd!",
@@ -72,5 +77,15 @@ public sealed class TermsEndpointShapeTests
         Assert.AreEqual("00001", error.ResponseCode);
         Assert.AreEqual("invalid_request", error.Error);
         Assert.AreEqual("terms consent is required", error.ErrorDescription);
+    }
+
+    private sealed class CapturingEmailSender : IEmailSender
+    {
+        public string LastCode { get; private set; } = string.Empty;
+
+        public void SendMfaCode(string email, string code, DateTimeOffset expiresAt)
+        {
+            LastCode = code;
+        }
     }
 }

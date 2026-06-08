@@ -43,8 +43,15 @@ public sealed class SignupController : ControllerBase
                     "terms consent is required");
             }
 
+            string verifiedEmail = _signupSessions.ConsumeVerifiedEmail(ReadSignupSessionId());
+            if (!string.Equals(verifiedEmail, request.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                throw Code.UNAUTHORIZED;
+            }
+
             TermsDocument terms = _terms.Current();
-            UserRecord user = _users.CreateUser(request.Email, request.Password, request.Name, birthDate, acceptedTermsId: terms.TermsId);
+            UserRecord user = _users.CreateUser(verifiedEmail, request.Password, request.Name, birthDate, acceptedTermsId: terms.TermsId);
+            Response.Cookies.Delete(SignupSessionCookieName, SignupCookieOptions(DateTimeOffset.UtcNow));
             return Ok(new
             {
                 sub = user.Subject,
@@ -157,7 +164,11 @@ public sealed class SignupController : ControllerBase
     private string ReadSignupSessionId()
     {
         string sessionId = Request.Cookies[SignupSessionCookieName] ?? string.Empty;
-        ValidateUtil.IndispensableParam(sessionId, "signup_session_id");
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
         return sessionId;
     }
 
