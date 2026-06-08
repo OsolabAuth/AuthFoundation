@@ -47,7 +47,7 @@ public sealed class LoginController : ControllerBase
             string separator = request.RedirectUri.Contains('?') ? "&" : "?";
             string redirectUrl = $"{request.RedirectUri}{separator}code={Uri.EscapeDataString(code.Code)}&state={Uri.EscapeDataString(request.State)}";
             Response.Headers.Location = redirectUrl;
-            return Ok(new { result = "redirect", redirect_url = redirectUrl });
+            return Ok(new { result = "redirect", redirect_url = redirectUrl, authorization_code = code.Code });
         }
         catch (ApiException ex)
         {

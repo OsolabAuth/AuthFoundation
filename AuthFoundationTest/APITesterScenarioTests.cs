@@ -71,7 +71,10 @@ public sealed class APITesterScenarioTests
         HashSet<string> mfa = ReadScenarioValues("MfaStepUp.json");
         HashSet<string> agent = ReadScenarioValues("AgentDelegatedAuth.json");
 
-        Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"body\".\"response_code\"}", StringComparison.Ordinal)));
+        Assert.IsFalse(authorization.Any(value => value.Contains("\"response\".\"body\".\"response_code\"", StringComparison.Ordinal)));
+        Assert.IsTrue(authorization.Contains("x-auth-ui-response-mode"));
+        Assert.IsFalse(authorization.Contains("x-auth-ui-response"));
+        Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"02. Login for authorize session\".\"response\".\"body\".\"authorization_code\"}", StringComparison.Ordinal)));
         Assert.IsTrue(authorization.Any(value => value.Contains("${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"headers\".\"set-cookie\"}", StringComparison.Ordinal)));
         Assert.IsTrue(mfa.Any(value => value.Contains("${\"AuthFoundation - MfaStepUp\".\"01. Start email MFA challenge\".\"response\".\"body\".\"code\"}", StringComparison.Ordinal)));
         Assert.IsTrue(agent.Any(value => value.Contains("${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_id\"}", StringComparison.Ordinal)));

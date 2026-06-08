@@ -47,7 +47,7 @@
                   }
                 },
                 "headers": [
-                  { "enabled": true, "name": "x-auth-ui-response", "value": "json" }
+                  { "enabled": true, "name": "x-auth-ui-response-mode", "value": "json" }
                 ],
                 "body": {
                   "bodyType": "Text",
@@ -134,7 +134,7 @@
                       { "enabled": true, "type": "Text", "name": "grant_type", "value": "authorization_code" },
                       { "enabled": true, "type": "Text", "name": "client_id", "value": "${\"ClientId\"}" },
                       { "enabled": true, "type": "Text", "name": "redirect_uri", "value": "${\"RedirectUri\"}" },
-                      { "enabled": true, "type": "Text", "name": "code", "value": "${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"body\".\"response_code\"}" },
+                      { "enabled": true, "type": "Text", "name": "code", "value": "${\"AuthFoundation - AuthorizationCodeFlow\".\"02. Login for authorize session\".\"response\".\"body\".\"authorization_code\"}" },
                       { "enabled": true, "type": "Text", "name": "code_verifier", "value": "${\"CodeVerifier\"}" }
                     ]
                   }

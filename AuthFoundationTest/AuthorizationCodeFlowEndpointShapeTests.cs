@@ -106,7 +106,10 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual(200, ok.StatusCode ?? 200);
         Assert.AreEqual("redirect", ReadProperty<string>(ok.Value, "result"));
         string redirectUrl = ReadProperty<string>(ok.Value, "redirect_url");
+        string authorizationCode = ReadProperty<string>(ok.Value, "authorization_code");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(authorizationCode));
         Assert.IsTrue(redirectUrl.StartsWith($"{AppConfig.DevelopmentRedirectUri}?code=", StringComparison.Ordinal));
+        Assert.IsTrue(redirectUrl.Contains($"code={authorizationCode}", StringComparison.Ordinal));
         Assert.IsTrue(redirectUrl.Contains("&state=state_1", StringComparison.Ordinal));
         Assert.AreEqual(redirectUrl, controller.Response.Headers.Location.ToString());
     }
