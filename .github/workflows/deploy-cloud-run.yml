@@ -202,10 +202,9 @@ jobs:
             done
 
             required_secret_keys=(
-              "ConnectionStrings__DefaultConnection"
-              "ConnectionStrings__Redis"
-              "PasswordHashKey"
-              "JwkPrivateKeyEncryptionKey"
+              "ConnectionStrings__AuthDb"
+              "SigningKey__KeyId"
+              "SigningKey__PrivateKeyPem"
               "Mail__FromEmail"
               "GmailSmtp__Username"
               "GmailSmtp__AppPassword"
