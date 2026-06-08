@@ -21,12 +21,22 @@ public sealed class UserInfoController : ControllerBase
         try
         {
             AccessTokenRecord token = _store.FindAccessToken(ReadBearerToken());
-            return Ok(new
+            var claims = new Dictionary<string, string>
             {
-                sub = token.Subject,
-                email = token.Email,
-                name = token.Name
-            });
+                ["sub"] = token.Subject
+            };
+
+            if (HasScope(token.Scope, Code.Scope.EMAIL))
+            {
+                claims["email"] = token.Email;
+            }
+
+            if (HasScope(token.Scope, Code.Scope.PROFILE))
+            {
+                claims["name"] = token.Name;
+            }
+
+            return Ok(claims);
         }
         catch (ApiException ex)
         {
@@ -47,5 +57,12 @@ public sealed class UserInfoController : ControllerBase
         string token = header[prefix.Length..].Trim();
         ValidateUtil.IndispensableParam(token, "access_token");
         return token;
+    }
+
+    private static bool HasScope(string scope, string requiredScope)
+    {
+        return scope
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(value => string.Equals(value, requiredScope, StringComparison.Ordinal));
     }
 }
