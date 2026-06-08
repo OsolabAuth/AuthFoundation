@@ -85,9 +85,13 @@ public sealed class APITesterScenarioTests
     public void MfaScenario_UsesPrivateEmailCodeVariable()
     {
         HashSet<string> mfa = ReadScenarioValues("MfaStepUp.json");
+        string startBody = ReadRequestTextBody("MfaStepUp.json", "01. Start email MFA challenge");
+        string setupBody = ReadRequestTextBody("MfaStepUp.json", "03. Setup authenticator MFA");
 
         Assert.IsTrue(mfa.Any(value => value.Contains("${\"EmailCode\"}", StringComparison.Ordinal)));
         Assert.IsTrue(mfa.Any(value => value.Contains("${\"AuthFoundation - MfaStepUp\".\"02. Verify email MFA challenge\".\"response\".\"body\".\"step_up_token\"}", StringComparison.Ordinal)));
+        Assert.IsFalse(startBody.Contains("\"step_up_token\"", StringComparison.Ordinal));
+        Assert.IsTrue(setupBody.Contains("\"step_up_token\"", StringComparison.Ordinal));
         Assert.IsFalse(mfa.Any(value => value.Contains("\"response\".\"body\".\"code\"", StringComparison.Ordinal)));
     }
 
@@ -145,6 +149,27 @@ public sealed class APITesterScenarioTests
         HashSet<string> values = [];
         CollectStringValues(document.RootElement, values);
         return values;
+    }
+
+    private static string ReadRequestTextBody(string fileName, string requestName)
+    {
+        using JsonDocument document = ReadScenario(fileName);
+        JsonElement requests = document.RootElement
+            .GetProperty("entities")[0]
+            .GetProperty("children")[0]
+            .GetProperty("children");
+
+        foreach (JsonElement request in requests.EnumerateArray())
+        {
+            JsonElement entity = request.GetProperty("entity");
+            if (string.Equals(entity.GetProperty("name").GetString(), requestName, StringComparison.Ordinal))
+            {
+                return entity.GetProperty("body").GetProperty("textBody").GetString() ?? string.Empty;
+            }
+        }
+
+        Assert.Fail($"Request was not found: {requestName}");
+        return string.Empty;
     }
 
     private static void CollectStringValues(JsonElement element, HashSet<string> values)
