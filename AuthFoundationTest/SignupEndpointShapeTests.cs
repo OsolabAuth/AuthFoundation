@@ -137,7 +137,8 @@ public sealed class SignupEndpointShapeTests
         {
             ["password"] = "Passw0rd!",
             ["name"] = "Portal Signup",
-            ["birthdate"] = "2000-01-02"
+            ["birthdate"] = "2000-01-02",
+            ["terms_accepted"] = "true"
         });
 
         var accountOk = EndpointTestHelper.AssertOk(await accountController.Account());
@@ -172,13 +173,60 @@ public sealed class SignupEndpointShapeTests
         {
             ["password"] = "Passw0rd!",
             ["name"] = "Portal Signup",
-            ["birthdate"] = "2000-01-02"
+            ["birthdate"] = "2000-01-02",
+            ["terms_accepted"] = "true"
         });
 
         ErrorOutput error = EndpointTestHelper.AssertError(await accountController.Account(), 401);
 
         Assert.AreEqual("00008", error.ResponseCode);
         Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
+    /// Purpose: verify portal-compatible signup account creation requires explicit terms consent.
+    /// Input: verified signup session, password, name, birthdate, and terms_accepted=false.
+    /// Expected: 400 invalid_request and no user is created.
+    /// </summary>
+    [TestMethod]
+    public async Task PortalSignupAccount_ReturnsBadRequestWhenTermsAreNotAccepted()
+    {
+        var users = new InMemoryUserStore();
+        var emailSender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(emailSender, new AttemptLimiter());
+        var terms = new TermsService();
+        var emailController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        EndpointTestHelper.SetForm(emailController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["email"] = "portal-no-terms@example.com"
+        });
+        _ = await emailController.Email();
+        string signupCookie = ReadCookie(emailController.Response.Headers.SetCookie.ToString());
+
+        var verifyController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        verifyController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(verifyController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["code"] = emailSender.LastCode
+        });
+        _ = EndpointTestHelper.AssertOk(await verifyController.Verify());
+
+        var accountController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        accountController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(accountController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["password"] = "Passw0rd!",
+            ["name"] = "Portal Signup",
+            ["birthdate"] = "2000-01-02",
+            ["terms_accepted"] = "false"
+        });
+
+        ErrorOutput error = EndpointTestHelper.AssertError(await accountController.Account(), 400);
+
+        Assert.AreEqual("00001", error.ResponseCode);
+        Assert.AreEqual("invalid_request", error.Error);
+        Assert.AreEqual("terms consent is required", error.ErrorDescription);
+        Assert.ThrowsExactly<ApiException>(() => users.FindByEmail("portal-no-terms@example.com"));
     }
 
     /// <summary>

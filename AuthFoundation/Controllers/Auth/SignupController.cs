@@ -34,14 +34,7 @@ public sealed class SignupController : ControllerBase
             {
                 throw Code.REQUEST_PARAMETER_ERROR;
             }
-            if (!request.TermsAccepted)
-            {
-                throw new ApiException(
-                    Code.REQUEST_PARAMETER_ERROR.InternalCode,
-                    Code.REQUEST_PARAMETER_ERROR.StatusCode,
-                    "invalid_request",
-                    "terms consent is required");
-            }
+            RequireTermsConsent(request.TermsAccepted);
 
             string verifiedEmail = _signupSessions.ConsumeVerifiedEmail(ReadSignupSessionId());
             if (!string.Equals(verifiedEmail, request.Email, StringComparison.OrdinalIgnoreCase))
@@ -130,6 +123,7 @@ public sealed class SignupController : ControllerBase
             string password = form["password"].ToString();
             string name = form["name"].ToString();
             string birthDateValue = form["birthdate"].ToString();
+            string termsAcceptedValue = form["terms_accepted"].ToString();
             ValidateUtil.FormatParam(password, Code.HttpBodies.PASSWORD.Key, Code.HttpBodies.PASSWORD.Regex);
             ValidateUtil.FormatParam(name, Code.HttpBodies.NAME.Key, Code.HttpBodies.NAME.Regex);
             ValidateUtil.FormatParam(birthDateValue, Code.HttpBodies.BIRTH_DATE.Key, Code.HttpBodies.BIRTH_DATE.Regex);
@@ -137,6 +131,7 @@ public sealed class SignupController : ControllerBase
             {
                 throw Code.REQUEST_PARAMETER_ERROR;
             }
+            RequireTermsConsent(IsTermsAccepted(termsAcceptedValue));
 
             string email = _signupSessions.ConsumeVerifiedEmail(ReadSignupSessionId());
             TermsDocument terms = _terms.Current();
@@ -170,6 +165,25 @@ public sealed class SignupController : ControllerBase
         }
 
         return sessionId;
+    }
+
+    private static bool IsTermsAccepted(string value)
+    {
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "1", StringComparison.Ordinal)
+            || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void RequireTermsConsent(bool termsAccepted)
+    {
+        if (!termsAccepted)
+        {
+            throw new ApiException(
+                Code.REQUEST_PARAMETER_ERROR.InternalCode,
+                Code.REQUEST_PARAMETER_ERROR.StatusCode,
+                "invalid_request",
+                "terms consent is required");
+        }
     }
 
     private static CookieOptions SignupCookieOptions(DateTimeOffset expiresAt)
