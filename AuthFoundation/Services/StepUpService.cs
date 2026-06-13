@@ -29,11 +29,29 @@ public sealed class StepUpService
     public MfaEmailChallenge StartEmailChallenge(string email)
     {
         UserRecord user = _users.FindByEmail(email);
-        string code = Helper.GenerateNumericCode(6);
-        var challenge = new MfaEmailChallenge(user.Email, code, DateTimeOffset.UtcNow.Add(ChallengeLifetime));
-        _emailChallenges[user.Email] = challenge;
-        _emailSender.SendMfaCode(challenge.Email, challenge.Code, challenge.ExpiresAt);
-        return challenge;
+        return CreateEmailChallenge(user);
+    }
+
+    /// <summary>
+    /// メールアドレスと生年月日が登録情報と一致する場合だけ、パスワードリセット用メールコードを発行する。
+    /// </summary>
+    public bool TryStartPasswordResetChallenge(string email, DateOnly birthDate)
+    {
+        try
+        {
+            UserRecord user = _users.FindByEmail(email);
+            if (user.BirthDate != birthDate)
+            {
+                return false;
+            }
+
+            _ = CreateEmailChallenge(user);
+            return true;
+        }
+        catch (ApiException)
+        {
+            return false;
+        }
     }
 
     public StepUpGrant VerifyEmailChallenge(string email, string code)
@@ -106,6 +124,15 @@ public sealed class StepUpService
         var grant = new StepUpGrant($"sup_{Helper.GenerateHex(48)}", subject, method, DateTimeOffset.UtcNow.Add(StepUpLifetime));
         _stepUpGrants[grant.StepUpToken] = grant;
         return grant;
+    }
+
+    private MfaEmailChallenge CreateEmailChallenge(UserRecord user)
+    {
+        string code = Helper.GenerateNumericCode(6);
+        var challenge = new MfaEmailChallenge(user.Email, code, DateTimeOffset.UtcNow.Add(ChallengeLifetime));
+        _emailChallenges[user.Email] = challenge;
+        _emailSender.SendMfaCode(challenge.Email, challenge.Code, challenge.ExpiresAt);
+        return challenge;
     }
 }
 

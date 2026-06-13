@@ -18,6 +18,33 @@ public sealed class PasswordController : ControllerBase
         _stepUp = stepUp;
     }
 
+    /// <summary>
+    /// メールアドレスと生年月日を確認し、条件が一致する場合だけパスワードリセット用メールコードを送信する。
+    /// </summary>
+    [HttpPost("reset/start")]
+    public IActionResult StartReset([FromBody] ResetPasswordStartRequest request)
+    {
+        try
+        {
+            ValidateUtil.FormatParam(request.Email, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+            ValidateUtil.FormatParam(request.BirthDate, Code.HttpBodies.BIRTH_DATE.Key, Code.HttpBodies.BIRTH_DATE.Regex);
+            if (!DateOnly.TryParseExact(request.BirthDate, "yyyy-MM-dd", out DateOnly birthDate))
+            {
+                throw Code.REQUEST_PARAMETER_ERROR;
+            }
+
+            _ = _stepUp.TryStartPasswordResetChallenge(request.Email, birthDate);
+            return Ok(new { result = "reset_challenge_started", delivery = "email" });
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    /// <summary>
+    /// メールコード、生年月日、新しいパスワードを検証してパスワードを再設定する。
+    /// </summary>
     [HttpPost("reset")]
     public IActionResult Reset([FromBody] ResetPasswordRequest request)
     {
@@ -32,13 +59,14 @@ public sealed class PasswordController : ControllerBase
                 throw Code.REQUEST_PARAMETER_ERROR;
             }
 
+            _stepUp.VerifyEmailChallenge(request.Email, request.EmailCode);
+
             UserRecord user = _users.FindByEmail(request.Email);
             if (user.BirthDate != birthDate)
             {
                 throw Code.UNAUTHORIZED;
             }
 
-            _stepUp.VerifyEmailChallenge(request.Email, request.EmailCode);
             _users.ResetPassword(request.Email, birthDate, request.NewPassword);
             return Ok(new { result = "password_reset" });
         }
@@ -48,6 +76,12 @@ public sealed class PasswordController : ControllerBase
         }
     }
 }
+
+public sealed record ResetPasswordStartRequest(
+    [property: JsonPropertyName("email")]
+    string Email,
+    [property: JsonPropertyName("birth_date")]
+    string BirthDate);
 
 public sealed record ResetPasswordRequest(
     [property: JsonPropertyName("email")]

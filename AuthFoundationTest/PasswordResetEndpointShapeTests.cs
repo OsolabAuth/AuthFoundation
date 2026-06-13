@@ -8,9 +8,93 @@ namespace AuthFoundationTest;
 public sealed class PasswordResetEndpointShapeTests
 {
     /// <summary>
-    /// 目的: Reset / Returns Password Reset For Matching Birth Date And Email Code の仕様を検証する。
-    /// 入力値: Reset / Returns Password Reset For Matching Birth Date And Email Code を確認するためにテスト内で作成したデータ。
-    /// 期待値: メールコード関連のレスポンスと状態が仕様どおりになること。
+    /// 目的: パスワードリセット開始時に、メールアドレスと生年月日が一致する利用者へ認証コードを送信することを検証する。
+    /// 入力値: 登録済みメールアドレス、登録済み生年月日。
+    /// 期待値: 200 OK と reset_challenge_started を返し、認証コードを1通だけ送信すること。
+    /// </summary>
+    [TestMethod]
+    public void StartReset_SendsEmailCodeWhenEmailAndBirthDateMatch()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-start@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var emailSender = new RecordingEmailSender();
+        var controller = CreateController(users, new StepUpService(users, emailSender, new AttemptLimiter()));
+        var request = new ResetPasswordStartRequest("reset-start@example.com", "2000-01-02");
+
+        var ok = EndpointTestHelper.AssertOk(controller.StartReset(request));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual("reset_challenge_started", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
+        Assert.AreEqual("email", EndpointTestHelper.ReadProperty<string>(ok.Value, "delivery"));
+        Assert.AreEqual(1, emailSender.SentCodes.Count);
+        Assert.AreEqual("reset-start@example.com", emailSender.SentCodes[0].Email);
+        Assert.IsTrue(emailSender.SentCodes[0].ExpiresAt > DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// 目的: 生年月日が一致しないパスワードリセット開始要求で、アカウント状態を露出しないことを検証する。
+    /// 入力値: 登録済みメールアドレス、不一致の生年月日。
+    /// 期待値: 200 OK と通常の開始レスポンスを返すが、認証コードを送信しないこと。
+    /// </summary>
+    [TestMethod]
+    public void StartReset_DoesNotSendEmailCodeForMismatchedBirthDate()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-start-mismatch@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var emailSender = new RecordingEmailSender();
+        var controller = CreateController(users, new StepUpService(users, emailSender, new AttemptLimiter()));
+        var request = new ResetPasswordStartRequest("reset-start-mismatch@example.com", "2001-01-02");
+
+        var ok = EndpointTestHelper.AssertOk(controller.StartReset(request));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual("reset_challenge_started", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
+        Assert.AreEqual(0, emailSender.SentCodes.Count);
+    }
+
+    /// <summary>
+    /// 目的: 存在しないメールアドレスのパスワードリセット開始要求で、アカウント有無を露出しないことを検証する。
+    /// 入力値: 未登録メールアドレス、生年月日。
+    /// 期待値: 200 OK と通常の開始レスポンスを返すが、認証コードを送信しないこと。
+    /// </summary>
+    [TestMethod]
+    public void StartReset_DoesNotRevealUnknownEmail()
+    {
+        var users = new InMemoryUserStore();
+        var emailSender = new RecordingEmailSender();
+        var controller = CreateController(users, new StepUpService(users, emailSender, new AttemptLimiter()));
+        var request = new ResetPasswordStartRequest("unknown-reset@example.com", "2001-01-02");
+
+        var ok = EndpointTestHelper.AssertOk(controller.StartReset(request));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual("reset_challenge_started", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
+        Assert.AreEqual(0, emailSender.SentCodes.Count);
+    }
+
+    /// <summary>
+    /// 目的: パスワードリセット開始要求の生年月日形式検証を確認する。
+    /// 入力値: yyyy-MM-dd ではない生年月日。
+    /// 期待値: 400 Bad Request と invalid_request を返すこと。
+    /// </summary>
+    [TestMethod]
+    public void StartReset_ReturnsBadRequestForInvalidBirthDateFormat()
+    {
+        var users = new InMemoryUserStore();
+        var controller = CreateController(users, new StepUpService(users));
+        var request = new ResetPasswordStartRequest("reset-format@example.com", "2000-13-40");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.StartReset(request), 400);
+
+        Assert.AreEqual("00001", error.ResponseCode);
+        Assert.AreEqual("invalid_request", error.Error);
+        Assert.AreEqual("some of the input values are incorrect", error.ErrorDescription);
+    }
+
+    /// <summary>
+    /// 目的: メールコードと生年月日が一致する場合に、パスワードリセットが完了することを検証する。
+    /// 入力値: 登録済みメールアドレス、登録済み生年月日、発行済みメールコード、新しいパスワード。
+    /// 期待値: 200 OK と password_reset を返し、新しいパスワードで認証できること。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsPasswordResetForMatchingBirthDateAndEmailCode()
@@ -30,9 +114,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: Reset / Returns Bad Request For Invalid Birth Date Format の仕様を検証する。
-    /// 入力値: フォーマット不正または権限外の入力値。
-    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// 目的: パスワードリセット完了要求の生年月日形式検証を確認する。
+    /// 入力値: yyyy-MM-dd ではない生年月日。
+    /// 期待値: 400 Bad Request と invalid_request を返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForInvalidBirthDateFormat()
@@ -49,9 +133,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: Reset / Returns Bad Request For Missing Email Code の仕様を検証する。
-    /// 入力値: 必須項目または認証ヘッダーを欠落させた入力値。
-    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// 目的: パスワードリセット完了要求でメールコードが必須であることを検証する。
+    /// 入力値: 空のメールコード。
+    /// 期待値: 400 Bad Request と email_code is required を返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForMissingEmailCode()
@@ -68,9 +152,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: Reset / Returns Unauthorized For Mismatched Birth Date の仕様を検証する。
-    /// 入力値: Reset / Returns Unauthorized For Mismatched Birth Date を確認するためにテスト内で作成したデータ。
-    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// 目的: 生年月日が一致しない場合に、パスワードが変更されないことを検証する。
+    /// 入力値: 登録済みメールアドレス、不一致の生年月日、正しいメールコード、新しいパスワード。
+    /// 期待値: 401 Unauthorized を返し、旧パスワードで引き続き認証できること。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsUnauthorizedForMismatchedBirthDate()
@@ -90,9 +174,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: Reset / Returns Unauthorized For Wrong Email Code の仕様を検証する。
-    /// 入力値: 正しい主体に紐づかない誤った認証情報。
-    /// 期待値: 401 Unauthorized と invalid_token 系のエラーを返すこと。
+    /// 目的: メールコードが一致しない場合に、パスワードが変更されないことを検証する。
+    /// 入力値: 登録済みメールアドレス、登録済み生年月日、不一致のメールコード、新しいパスワード。
+    /// 期待値: 401 Unauthorized を返し、旧パスワードで引き続き認証できること。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsUnauthorizedForWrongEmailCode()
@@ -112,9 +196,9 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
-    /// 目的: Reset / Returns Bad Request For Weak New Password の仕様を検証する。
-    /// 入力値: Reset / Returns Bad Request For Weak New Password を確認するためにテスト内で作成したデータ。
-    /// 期待値: 400 Bad Request 相当のエラーを返すこと。
+    /// 目的: 新しいパスワードがポリシーを満たさない場合に、パスワードリセットを拒否することを検証する。
+    /// 入力値: 弱い新パスワード。
+    /// 期待値: 400 Bad Request と password is invalid を返すこと。
     /// </summary>
     [TestMethod]
     public void Reset_ReturnsBadRequestForWeakNewPassword()
@@ -139,4 +223,16 @@ public sealed class PasswordResetEndpointShapeTests
     {
         return string.Equals(code, "000000", StringComparison.Ordinal) ? "000001" : "000000";
     }
+
+    private sealed class RecordingEmailSender : IEmailSender
+    {
+        public List<SentEmailCode> SentCodes { get; } = [];
+
+        public void SendMfaCode(string email, string code, DateTimeOffset expiresAt)
+        {
+            SentCodes.Add(new SentEmailCode(email, code, expiresAt));
+        }
+    }
+
+    private sealed record SentEmailCode(string Email, string Code, DateTimeOffset ExpiresAt);
 }
