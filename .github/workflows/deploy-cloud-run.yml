@@ -1,0 +1,180 @@
+name: Build and Deploy Auth to Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to Cloud Run after pushing the image
+        required: true
+        default: true
+        type: boolean
+      image_tag:
+        description: Optional image tag. Defaults to the commit SHA.
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DOTNET_VERSION: "10.0.x"
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'us-west1' }}
+      ARTIFACT_REGISTRY_REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY || 'auth' }}
+      CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'authfoundation-api' }}
+      CLOUD_RUN_IMAGE_NAME: ${{ vars.CLOUD_RUN_IMAGE_NAME || 'authfoundation-api' }}
+      CLOUD_RUN_ALLOW_UNAUTHENTICATED: ${{ vars.CLOUD_RUN_ALLOW_UNAUTHENTICATED || 'true' }}
+      CLOUD_RUN_CPU: ${{ vars.CLOUD_RUN_CPU || '1' }}
+      CLOUD_RUN_MEMORY: ${{ vars.CLOUD_RUN_MEMORY || '512Mi' }}
+      CLOUD_RUN_INGRESS: ${{ vars.CLOUD_RUN_INGRESS || 'all' }}
+      CLOUD_RUN_NETWORK: ${{ vars.CLOUD_RUN_NETWORK }}
+      CLOUD_RUN_SUBNET: ${{ vars.CLOUD_RUN_SUBNET }}
+      CLOUD_RUN_NETWORK_TAGS: ${{ vars.CLOUD_RUN_NETWORK_TAGS }}
+      CLOUD_RUN_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_SERVICE_ACCOUNT }}
+      CLOUD_RUN_UPDATE_ENV_VARS: ${{ vars.CLOUD_RUN_UPDATE_ENV_VARS }}
+      CLOUD_RUN_UPDATE_SECRETS: ${{ vars.CLOUD_RUN_UPDATE_SECRETS }}
+      CLOUD_RUN_VPC_EGRESS: ${{ vars.CLOUD_RUN_VPC_EGRESS || 'private-ranges-only' }}
+      AUTH_ISSUER: ${{ vars.AUTH_ISSUER }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate workflow configuration
+        shell: bash
+        run: |
+          missing=0
+          for name in GCP_PROJECT_ID GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT; do
+            if [ -z "${!name}" ]; then
+              echo "${name} is required." >&2
+              missing=1
+            fi
+          done
+
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: |
+          dotnet restore ./AuthFoundation/AuthFoundation.csproj
+          dotnet restore ./AuthFoundationTest/AuthFoundationTest.csproj
+
+      - name: Test
+        run: dotnet test --project ./AuthFoundationTest/AuthFoundationTest.csproj --configuration Release --no-restore
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Resolve image URI
+        id: image
+        shell: bash
+        run: |
+          tag="${{ inputs.image_tag }}"
+          if [ -z "${tag}" ]; then
+            tag="${GITHUB_SHA}"
+          fi
+
+          image_base="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPOSITORY}/${CLOUD_RUN_IMAGE_NAME}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "image_uri=${image_base}:${tag}" >> "${GITHUB_OUTPUT}"
+          echo "short_image_uri=${image_base}:${GITHUB_SHA::7}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build container image
+        run: |
+          docker build \
+            --file ./AuthFoundation/Dockerfile \
+            --tag "${{ steps.image.outputs.image_uri }}" \
+            --tag "${{ steps.image.outputs.short_image_uri }}" \
+            ./AuthFoundation
+
+      - name: Push container image
+        run: |
+          docker push "${{ steps.image.outputs.image_uri }}"
+          docker push "${{ steps.image.outputs.short_image_uri }}"
+
+      - name: Deploy to Cloud Run
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          env_updates="ASPNETCORE_ENVIRONMENT=Production,DisableHttpsRedirection=true"
+          if [ -n "${AUTH_ISSUER}" ]; then
+            env_updates="${env_updates},Issuer=${AUTH_ISSUER}"
+          fi
+          if [ -n "${CLOUD_RUN_UPDATE_ENV_VARS}" ]; then
+            env_updates="${env_updates},${CLOUD_RUN_UPDATE_ENV_VARS}"
+          fi
+
+          deploy_args=(
+            run deploy "${CLOUD_RUN_SERVICE}"
+            --project "${GCP_PROJECT_ID}"
+            --region "${GCP_REGION}"
+            --image "${{ steps.image.outputs.image_uri }}"
+            --platform managed
+            --port 8080
+            --cpu "${CLOUD_RUN_CPU}"
+            --memory "${CLOUD_RUN_MEMORY}"
+            --ingress "${CLOUD_RUN_INGRESS}"
+            --update-env-vars "${env_updates}"
+          )
+
+          case "${CLOUD_RUN_ALLOW_UNAUTHENTICATED,,}" in
+            true|1|yes)
+              deploy_args+=(--allow-unauthenticated)
+              ;;
+            false|0|no)
+              deploy_args+=(--no-allow-unauthenticated)
+              ;;
+            *)
+              echo "CLOUD_RUN_ALLOW_UNAUTHENTICATED must be true or false." >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -n "${CLOUD_RUN_UPDATE_SECRETS}" ]; then
+            deploy_args+=(--update-secrets "${CLOUD_RUN_UPDATE_SECRETS}")
+          fi
+
+          if [ -n "${CLOUD_RUN_SERVICE_ACCOUNT}" ]; then
+            deploy_args+=(--service-account "${CLOUD_RUN_SERVICE_ACCOUNT}")
+          fi
+
+          if [ -n "${CLOUD_RUN_NETWORK}" ]; then
+            deploy_args+=(--network "${CLOUD_RUN_NETWORK}")
+          fi
+
+          if [ -n "${CLOUD_RUN_SUBNET}" ]; then
+            deploy_args+=(--subnet "${CLOUD_RUN_SUBNET}")
+          fi
+
+          if [ -n "${CLOUD_RUN_NETWORK}" ] || [ -n "${CLOUD_RUN_SUBNET}" ]; then
+            deploy_args+=(--vpc-egress "${CLOUD_RUN_VPC_EGRESS}")
+          fi
+
+          if [ -n "${CLOUD_RUN_NETWORK_TAGS}" ]; then
+            deploy_args+=(--network-tags "${CLOUD_RUN_NETWORK_TAGS}")
+          fi
+
+          gcloud "${deploy_args[@]}"
+
+      - name: Show image URI
+        run: echo "Built image ${{ steps.image.outputs.image_uri }}"
