@@ -22,7 +22,10 @@ builder.Services.AddCors(options =>
             .AllowCredentials()
             .WithExposedHeaders("Location", "WWW-Authenticate"));
 });
-builder.Services.AddSingleton<IOidcStore, InMemoryOidcStore>();
+builder.Services.AddSingleton<IOidcStore>(_ =>
+    AppConfig.IsRedisConfigured()
+        ? new RedisOidcStore(AppConfig.RedisConnectionString)
+        : new InMemoryOidcStore());
 builder.Services.AddSingleton<IUserStore>(_ =>
     AppConfig.IsAuthDbConfigured()
         ? new SqlUserStore(AppConfig.AuthDbConnectionString)

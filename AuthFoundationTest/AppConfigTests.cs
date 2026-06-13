@@ -37,6 +37,8 @@ public sealed class AppConfigTests
         Assert.AreEqual("00000000000000000000000000000000", AppConfig.SharedUserInfoClientId);
         Assert.AreEqual(string.Empty, AppConfig.AuthDbConnectionString);
         Assert.IsFalse(AppConfig.IsAuthDbConfigured());
+        Assert.AreEqual(string.Empty, AppConfig.RedisConnectionString);
+        Assert.IsFalse(AppConfig.IsRedisConfigured());
         Assert.AreEqual(string.Empty, AppConfig.SigningKeyId);
         Assert.AreEqual(string.Empty, AppConfig.SigningKeyPrivateKeyPem);
         Assert.AreEqual("task-management-api", AppConfig.AgentAccessTokenAudience);
@@ -70,6 +72,7 @@ public sealed class AppConfigTests
             ["DevelopmentClient:RedirectUri"] = "http://localhost:3000/callback",
             ["UserInfo:SharedClientId"] = "00000000000000000000000000000002",
             ["ConnectionStrings:AuthDb"] = "Server=localhost;Database=Auth;",
+            ["ConnectionStrings:Redis"] = "localhost:6379,password=redis-password,abortConnect=false",
             ["SigningKey:KeyId"] = "configured-key",
             ["SigningKey:PrivateKeyPem"] = TestSigningKeys.PrivateKeyPem,
             ["AgentAccessToken:Audience"] = "configured-api",
@@ -95,6 +98,8 @@ public sealed class AppConfigTests
         Assert.AreEqual("00000000000000000000000000000002", AppConfig.SharedUserInfoClientId);
         Assert.AreEqual("Server=localhost;Database=Auth;", AppConfig.AuthDbConnectionString);
         Assert.IsTrue(AppConfig.IsAuthDbConfigured());
+        Assert.AreEqual("localhost:6379,password=redis-password,abortConnect=false", AppConfig.RedisConnectionString);
+        Assert.IsTrue(AppConfig.IsRedisConfigured());
         Assert.AreEqual("configured-key", AppConfig.SigningKeyId);
         Assert.AreEqual(TestSigningKeys.PrivateKeyPem, AppConfig.SigningKeyPrivateKeyPem);
         Assert.AreEqual("configured-api", AppConfig.AgentAccessTokenAudience);
@@ -209,6 +214,7 @@ public sealed class AppConfigTests
             ["DevelopmentClient:RedirectUri"] = "http://localhost:5700/callback",
             ["UserInfo:SharedClientId"] = "00000000000000000000000000000000",
             ["ConnectionStrings:AuthDb"] = string.Empty,
+            ["ConnectionStrings:Redis"] = string.Empty,
             ["SigningKey:KeyId"] = string.Empty,
             ["SigningKey:PrivateKeyPem"] = string.Empty,
             ["AgentAccessToken:Audience"] = "task-management-api",
