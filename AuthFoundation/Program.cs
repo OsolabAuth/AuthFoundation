@@ -40,10 +40,20 @@ builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
 builder.Services.AddSingleton(services => new AttemptLimiter(services.GetService<IRedisStringStore>()));
 builder.Services.AddSingleton(services => new EmailSendCooldown(services.GetService<IRedisStringStore>()));
-builder.Services.AddSingleton<IEmailSender>(_ =>
-    AppConfig.IsGmailSmtpConfigured()
-        ? new GmailSmtpEmailSender()
-        : new DevelopmentEmailSender());
+builder.Services.AddSingleton<IEmailSender>(services =>
+{
+    if (AppConfig.IsGmailSmtpConfigured())
+    {
+        return new GmailSmtpEmailSender();
+    }
+
+    if (builder.Environment.IsDevelopment())
+    {
+        return new DevelopmentEmailSender(services.GetRequiredService<ILogger<DevelopmentEmailSender>>());
+    }
+
+    throw new InvalidOperationException("Gmail SMTP configuration is required outside Development.");
+});
 builder.Services.AddSingleton(services => new SignupSessionService(
     services.GetRequiredService<IEmailSender>(),
     services.GetRequiredService<AttemptLimiter>(),

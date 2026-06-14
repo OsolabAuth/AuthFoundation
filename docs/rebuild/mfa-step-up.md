@@ -9,7 +9,8 @@ Add a short-lived strong authorization token that can protect high-risk account 
 - Email-code MFA challenge.
 - Authenticator app TOTP setup and verification.
 - `step_up_token` valid for 5 minutes.
-- Development email delivery returns the code in the API response until a mail sender is migrated.
+- Development email delivery writes the code to the application log so local screen-based scenarios can be completed without a real mailbox.
+- Non-development environments must configure a real mail sender.
 
 ## Endpoints
 
