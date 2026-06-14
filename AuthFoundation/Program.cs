@@ -22,10 +22,15 @@ builder.Services.AddCors(options =>
             .AllowCredentials()
             .WithExposedHeaders("Location", "WWW-Authenticate"));
 });
-builder.Services.AddSingleton<IOidcStore>(_ =>
-    AppConfig.IsRedisConfigured()
-        ? new RedisOidcStore(AppConfig.RedisConnectionString)
-        : new InMemoryOidcStore());
+if (AppConfig.IsRedisConfigured())
+{
+    builder.Services.AddSingleton<IRedisStringStore>(_ => new StackExchangeRedisStringStore(AppConfig.RedisConnectionString));
+    builder.Services.AddSingleton<IOidcStore>(services => new RedisOidcStore(services.GetRequiredService<IRedisStringStore>()));
+}
+else
+{
+    builder.Services.AddSingleton<IOidcStore, InMemoryOidcStore>();
+}
 builder.Services.AddSingleton<IUserStore>(_ =>
     AppConfig.IsAuthDbConfigured()
         ? new SqlUserStore(AppConfig.AuthDbConnectionString)
@@ -39,7 +44,17 @@ builder.Services.AddSingleton<IEmailSender>(_ =>
         : new DevelopmentEmailSender());
 builder.Services.AddSingleton<SignupSessionService>();
 builder.Services.AddSingleton(_ => SigningKeyProvider.FromConfig());
-builder.Services.AddSingleton<StepUpService>();
+builder.Services.AddSingleton(services =>
+{
+    IRedisStringStore? redisStore = AppConfig.IsRedisConfigured()
+        ? services.GetRequiredService<IRedisStringStore>()
+        : null;
+    return new StepUpService(
+        services.GetRequiredService<IUserStore>(),
+        services.GetRequiredService<IEmailSender>(),
+        services.GetRequiredService<AttemptLimiter>(),
+        redisStore);
+});
 builder.Services.AddSingleton<OidcTokenService>();
 
 var app = builder.Build();

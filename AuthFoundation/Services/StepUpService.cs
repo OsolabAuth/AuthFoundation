@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using AuthFoundation.Common;
 
 namespace AuthFoundation.Services;
@@ -7,9 +8,11 @@ public sealed class StepUpService
 {
     private static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan StepUpLifetime = TimeSpan.FromMinutes(5);
+    private static readonly JsonSerializerOptions JsonOptions = new();
     private readonly ConcurrentDictionary<string, MfaEmailChallenge> _emailChallenges = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _totpSecrets = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, StepUpGrant> _stepUpGrants = new();
+    private readonly IRedisStringStore? _redisStore;
     private readonly IUserStore _users;
     private readonly IEmailSender _emailSender;
     private readonly AttemptLimiter _attempts;
@@ -20,10 +23,16 @@ public sealed class StepUpService
     }
 
     public StepUpService(IUserStore users, IEmailSender emailSender, AttemptLimiter attempts)
+        : this(users, emailSender, attempts, null)
+    {
+    }
+
+    internal StepUpService(IUserStore users, IEmailSender emailSender, AttemptLimiter attempts, IRedisStringStore? redisStore)
     {
         _users = users;
         _emailSender = emailSender;
         _attempts = attempts;
+        _redisStore = redisStore;
     }
 
     public MfaEmailChallenge StartEmailChallenge(string email)
@@ -59,7 +68,8 @@ public sealed class StepUpService
         UserRecord user = _users.FindByEmail(email);
         string attemptKey = $"mfa_email:{user.Email}";
         _attempts.EnsureAllowed(attemptKey);
-        if (!_emailChallenges.TryRemove(user.Email, out MfaEmailChallenge? challenge)
+        MfaEmailChallenge? challenge = TakeEmailChallenge(user.Email);
+        if (challenge is null
             || challenge.ExpiresAt <= DateTimeOffset.UtcNow
             || !string.Equals(challenge.Code, code, StringComparison.Ordinal))
         {
@@ -108,7 +118,8 @@ public sealed class StepUpService
     {
         string attemptKey = $"step_up:{token}";
         _attempts.EnsureAllowed(attemptKey);
-        if (!_stepUpGrants.TryGetValue(token, out StepUpGrant? grant)
+        StepUpGrant? grant = GetStepUpGrant(token);
+        if (grant is null
             || grant.ExpiresAt <= DateTimeOffset.UtcNow)
         {
             _attempts.RecordFailure(attemptKey);
@@ -122,7 +133,15 @@ public sealed class StepUpService
     private StepUpGrant CreateGrant(string subject, string method)
     {
         var grant = new StepUpGrant($"sup_{Helper.GenerateHex(48)}", subject, method, DateTimeOffset.UtcNow.Add(StepUpLifetime));
-        _stepUpGrants[grant.StepUpToken] = grant;
+        if (_redisStore is null)
+        {
+            _stepUpGrants[grant.StepUpToken] = grant;
+        }
+        else
+        {
+            _redisStore.SetString(StepUpGrantKey(grant.StepUpToken), JsonSerializer.Serialize(grant, JsonOptions), StepUpLifetime);
+        }
+
         return grant;
     }
 
@@ -130,9 +149,49 @@ public sealed class StepUpService
     {
         string code = Helper.GenerateNumericCode(6);
         var challenge = new MfaEmailChallenge(user.Email, code, DateTimeOffset.UtcNow.Add(ChallengeLifetime));
-        _emailChallenges[user.Email] = challenge;
+        if (_redisStore is null)
+        {
+            _emailChallenges[user.Email] = challenge;
+        }
+        else
+        {
+            _redisStore.SetString(EmailChallengeKey(user.Email), JsonSerializer.Serialize(challenge, JsonOptions), ChallengeLifetime);
+        }
+
         _emailSender.SendMfaCode(challenge.Email, challenge.Code, challenge.ExpiresAt);
         return challenge;
+    }
+
+    private MfaEmailChallenge? TakeEmailChallenge(string email)
+    {
+        if (_redisStore is null)
+        {
+            return _emailChallenges.TryRemove(email, out MfaEmailChallenge? challenge) ? challenge : null;
+        }
+
+        string? value = _redisStore.TakeString(EmailChallengeKey(email));
+        return string.IsNullOrWhiteSpace(value) ? null : JsonSerializer.Deserialize<MfaEmailChallenge>(value, JsonOptions);
+    }
+
+    private StepUpGrant? GetStepUpGrant(string token)
+    {
+        if (_redisStore is null)
+        {
+            return _stepUpGrants.TryGetValue(token, out StepUpGrant? grant) ? grant : null;
+        }
+
+        string? value = _redisStore.GetString(StepUpGrantKey(token));
+        return string.IsNullOrWhiteSpace(value) ? null : JsonSerializer.Deserialize<StepUpGrant>(value, JsonOptions);
+    }
+
+    private static string EmailChallengeKey(string email)
+    {
+        return $"auth:step_up:email_challenge:{email.ToLowerInvariant()}";
+    }
+
+    private static string StepUpGrantKey(string token)
+    {
+        return $"auth:step_up:grant:{token}";
     }
 }
 

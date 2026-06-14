@@ -114,6 +114,28 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
+    /// パスワードリセット開始と完了が別アプリケーションインスタンスで処理されても、Redis共有状態によりメールコードを検証できることを確認する。
+    /// </summary>
+    [TestMethod]
+    public void Reset_UsesSharedRedisEmailChallengeAcrossInstances()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-redis@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var redis = new FakeRedisStringStore();
+        var sender = new RecordingEmailSender();
+        var startController = CreateController(users, new StepUpService(users, sender, new AttemptLimiter(), redis));
+        var resetController = CreateController(users, new StepUpService(users, sender, new AttemptLimiter(), redis));
+
+        _ = EndpointTestHelper.AssertOk(startController.StartReset(new ResetPasswordStartRequest("reset-redis@example.com", "2000-01-02")));
+        var request = new ResetPasswordRequest("reset-redis@example.com", "2000-01-02", sender.SentCodes[0].Code, "Newpass1!");
+
+        var ok = EndpointTestHelper.AssertOk(resetController.Reset(request));
+
+        Assert.AreEqual("password_reset", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
+        Assert.AreEqual("Reset User", users.Authenticate("reset-redis@example.com", "Newpass1!").Name);
+    }
+
+    /// <summary>
     /// 目的: パスワードリセット完了要求の生年月日形式検証を確認する。
     /// 入力値: yyyy-MM-dd ではない生年月日。
     /// 期待値: 400 Bad Request と invalid_request を返すこと。
@@ -235,4 +257,38 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     private sealed record SentEmailCode(string Email, string Code, DateTimeOffset ExpiresAt);
+
+    private sealed class FakeRedisStringStore : IRedisStringStore
+    {
+        private readonly Dictionary<string, StoredValue> _values = new();
+
+        public void SetString(string key, string value, TimeSpan expiresIn)
+        {
+            _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public string? GetString(string key)
+        {
+            if (!_values.TryGetValue(key, out StoredValue? stored) || stored.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                return null;
+            }
+
+            return stored.Value;
+        }
+
+        public string? TakeString(string key)
+        {
+            string? value = GetString(key);
+            _ = _values.Remove(key);
+            return value;
+        }
+
+        public bool DeleteString(string key)
+        {
+            return _values.Remove(key);
+        }
+    }
+
+    private sealed record StoredValue(string Value, DateTimeOffset ExpiresAt);
 }

@@ -256,6 +256,28 @@ public sealed class StepUpServiceTests
     }
 
     /// <summary>
+    /// メールコード検証で発行した強化認可トークンを、別アプリケーションインスタンスからRedis共有状態で検証できることを確認する。
+    /// </summary>
+    [TestMethod]
+    public void ValidateStepUpToken_UsesSharedRedisGrantAcrossInstances()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("mfa-redis-token@example.com", "Passw0rd!", "Mfa User", new DateOnly(2000, 1, 1));
+        var redis = new FakeRedisStringStore();
+        var sender = new RecordingEmailSender();
+        var issuer = new StepUpService(users, sender, new AttemptLimiter(), redis);
+        var verifier = new StepUpService(users, sender, new AttemptLimiter(), redis);
+
+        MfaEmailChallenge challenge = issuer.StartEmailChallenge("mfa-redis-token@example.com");
+        StepUpGrant grant = issuer.VerifyEmailChallenge("mfa-redis-token@example.com", challenge.Code);
+        StepUpGrant found = verifier.ValidateStepUpToken(grant.StepUpToken);
+
+        Assert.AreEqual(grant.StepUpToken, found.StepUpToken);
+        Assert.AreEqual(grant.Subject, found.Subject);
+        Assert.AreEqual("email_code", found.Method);
+    }
+
+    /// <summary>
     /// 目的: Validate Step Up Token / Rejects Unknown Token の仕様を検証する。
     /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
     /// 期待値: 不正または期限切れの入力を拒否すること。
@@ -324,4 +346,38 @@ public sealed class StepUpServiceTests
     }
 
     private sealed record SentMfaCode(string Email, string Code, DateTimeOffset ExpiresAt);
+
+    private sealed class FakeRedisStringStore : IRedisStringStore
+    {
+        private readonly Dictionary<string, StoredValue> _values = new();
+
+        public void SetString(string key, string value, TimeSpan expiresIn)
+        {
+            _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public string? GetString(string key)
+        {
+            if (!_values.TryGetValue(key, out StoredValue? stored) || stored.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                return null;
+            }
+
+            return stored.Value;
+        }
+
+        public string? TakeString(string key)
+        {
+            string? value = GetString(key);
+            _ = _values.Remove(key);
+            return value;
+        }
+
+        public bool DeleteString(string key)
+        {
+            return _values.Remove(key);
+        }
+    }
+
+    private sealed record StoredValue(string Value, DateTimeOffset ExpiresAt);
 }
