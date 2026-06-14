@@ -39,6 +39,7 @@ builder.Services.AddSingleton<IUserStore>(_ =>
 builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
 builder.Services.AddSingleton(services => new AttemptLimiter(services.GetService<IRedisStringStore>()));
+builder.Services.AddSingleton(services => new EmailSendCooldown(services.GetService<IRedisStringStore>()));
 builder.Services.AddSingleton<IEmailSender>(_ =>
     AppConfig.IsGmailSmtpConfigured()
         ? new GmailSmtpEmailSender()
@@ -46,6 +47,7 @@ builder.Services.AddSingleton<IEmailSender>(_ =>
 builder.Services.AddSingleton(services => new SignupSessionService(
     services.GetRequiredService<IEmailSender>(),
     services.GetRequiredService<AttemptLimiter>(),
+    services.GetRequiredService<EmailSendCooldown>(),
     services.GetService<IRedisStringStore>()));
 builder.Services.AddSingleton(_ => SigningKeyProvider.FromConfig());
 builder.Services.AddSingleton(services =>
@@ -57,6 +59,7 @@ builder.Services.AddSingleton(services =>
         services.GetRequiredService<IUserStore>(),
         services.GetRequiredService<IEmailSender>(),
         services.GetRequiredService<AttemptLimiter>(),
+        services.GetRequiredService<EmailSendCooldown>(),
         redisStore);
 });
 builder.Services.AddSingleton<OidcTokenService>();

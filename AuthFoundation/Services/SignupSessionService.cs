@@ -12,17 +12,24 @@ public sealed class SignupSessionService
     private readonly ConcurrentDictionary<string, SignupSession> _sessions = new();
     private readonly IEmailSender _emailSender;
     private readonly AttemptLimiter _attempts;
+    private readonly EmailSendCooldown _sendCooldown;
     private readonly IRedisStringStore? _redisStore;
 
     public SignupSessionService(IEmailSender emailSender, AttemptLimiter attempts)
-        : this(emailSender, attempts, null)
+        : this(emailSender, attempts, new EmailSendCooldown(), null)
     {
     }
 
     internal SignupSessionService(IEmailSender emailSender, AttemptLimiter attempts, IRedisStringStore? redisStore)
+        : this(emailSender, attempts, new EmailSendCooldown(redisStore), redisStore)
+    {
+    }
+
+    internal SignupSessionService(IEmailSender emailSender, AttemptLimiter attempts, EmailSendCooldown sendCooldown, IRedisStringStore? redisStore)
     {
         _emailSender = emailSender;
         _attempts = attempts;
+        _sendCooldown = sendCooldown;
         _redisStore = redisStore;
     }
 
@@ -31,6 +38,7 @@ public sealed class SignupSessionService
     /// </summary>
     public SignupEmailChallenge StartEmailChallenge(string email)
     {
+        _sendCooldown.EnsureCanSend("signup", email);
         string sessionId = $"sgn_{Helper.GenerateHex(32)}";
         string code = Helper.GenerateNumericCode(6);
         DateTimeOffset expiresAt = DateTimeOffset.UtcNow.Add(ChallengeLifetime);

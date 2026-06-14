@@ -128,6 +128,17 @@ public sealed class RedisOidcStoreTests
             _entries[key] = new Entry(value, DateTimeOffset.UtcNow.Add(expiresIn));
         }
 
+        public bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn)
+        {
+            if (GetString(key) is not null)
+            {
+                return false;
+            }
+
+            SetString(key, value, expiresIn);
+            return true;
+        }
+
         public string? GetString(string key)
         {
             if (!_entries.TryGetValue(key, out Entry? entry))

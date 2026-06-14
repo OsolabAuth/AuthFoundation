@@ -150,6 +150,37 @@ public sealed class SignupEndpointShapeTests
     }
 
     /// <summary>
+    /// Purpose: prevent repeated signup verification email sends within the cooldown window.
+    /// Input: the same email is submitted to the signup email endpoint twice.
+    /// Expected: the second request returns 429 slow_down and no second email is sent.
+    /// </summary>
+    [TestMethod]
+    public async Task PortalSignupEmail_ReturnsTooManyRequestsWhenRepeated()
+    {
+        var users = new InMemoryUserStore();
+        var emailSender = new CapturingEmailSender();
+        var signupSessions = new SignupSessionService(
+            emailSender,
+            new AttemptLimiter(),
+            new EmailSendCooldown(TimeSpan.FromMinutes(1)),
+            null);
+        var terms = new TermsService();
+        var controller = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, signupSessions));
+        EndpointTestHelper.SetForm(controller.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["email"] = "portal-repeat@example.com"
+        });
+
+        _ = EndpointTestHelper.AssertOk(await controller.Email());
+        ErrorOutput error = EndpointTestHelper.AssertError(await controller.Email(), 429);
+
+        Assert.AreEqual("00010", error.ResponseCode);
+        Assert.AreEqual("slow_down", error.Error);
+        Assert.AreEqual("portal-repeat@example.com", emailSender.LastEmail);
+        Assert.AreEqual(1, emailSender.SendCount);
+    }
+
+    /// <summary>
     /// サインアップのメール送信、コード検証、アカウント作成が別アプリケーションインスタンスで処理されても、Redis共有状態により完了できることを確認する。
     /// </summary>
     [TestMethod]
@@ -316,9 +347,11 @@ public sealed class SignupEndpointShapeTests
     {
         public string LastEmail { get; private set; } = string.Empty;
         public string LastCode { get; private set; } = string.Empty;
+        public int SendCount { get; private set; }
 
         public void SendMfaCode(string email, string code, DateTimeOffset expiresAt)
         {
+            SendCount++;
             LastEmail = email;
             LastCode = code;
         }
@@ -331,6 +364,17 @@ public sealed class SignupEndpointShapeTests
         public void SetString(string key, string value, TimeSpan expiresIn)
         {
             _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn)
+        {
+            if (GetString(key) is not null)
+            {
+                return false;
+            }
+
+            SetString(key, value, expiresIn);
+            return true;
         }
 
         public string? GetString(string key)

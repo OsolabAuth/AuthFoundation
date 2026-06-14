@@ -9,6 +9,7 @@ public static class Code
     public static readonly ApiException ILLEGAL_CLIENT = Define("00002", HttpStatusCode.BadRequest, "invalid_client", "illegal client");
     public static readonly ApiException UNAUTHORIZED = Define("00008", HttpStatusCode.Unauthorized, "invalid_token", "unauthorized");
     public static readonly ApiException INVALID_SCOPE = Define("00009", HttpStatusCode.BadRequest, "invalid_scope", "invalid scope");
+    public static readonly ApiException TOO_MANY_REQUESTS = Define("00010", HttpStatusCode.TooManyRequests, "slow_down", "too many requests");
     public static readonly ApiException INTERNAL_SERVER_ERROR = Define("90000", HttpStatusCode.InternalServerError, "server_error", "Unhandled server error");
 
     public sealed record RequestValidation(string Key, string Regex);

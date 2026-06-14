@@ -93,10 +93,13 @@ public sealed class StepUpServiceTests
     {
         var users = new InMemoryUserStore();
         users.CreateUser("mfa-limit@example.com", "Passw0rd!", "Mfa User", new DateOnly(2000, 1, 1));
-        var stepUp = new StepUpService(users, new RecordingEmailSender(), new AttemptLimiter(1, TimeSpan.FromMinutes(5)));
+        var clock = new ManualTimeProvider(DateTimeOffset.UtcNow);
+        var sendCooldown = new EmailSendCooldown(TimeSpan.FromMinutes(1), clock, null);
+        var stepUp = new StepUpService(users, new RecordingEmailSender(), new AttemptLimiter(1, TimeSpan.FromMinutes(5)), sendCooldown, null);
         stepUp.StartEmailChallenge("mfa-limit@example.com");
         Assert.ThrowsExactly<ApiException>(
             () => stepUp.VerifyEmailChallenge("mfa-limit@example.com", "000000"));
+        clock.Advance(TimeSpan.FromMinutes(1));
         MfaEmailChallenge secondChallenge = stepUp.StartEmailChallenge("mfa-limit@example.com");
 
         ApiException error = Assert.ThrowsExactly<ApiException>(
@@ -347,6 +350,26 @@ public sealed class StepUpServiceTests
 
     private sealed record SentMfaCode(string Email, string Code, DateTimeOffset ExpiresAt);
 
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _utcNow;
+
+        public ManualTimeProvider(DateTimeOffset utcNow)
+        {
+            _utcNow = utcNow;
+        }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            return _utcNow;
+        }
+
+        public void Advance(TimeSpan duration)
+        {
+            _utcNow = _utcNow.Add(duration);
+        }
+    }
+
     private sealed class FakeRedisStringStore : IRedisStringStore
     {
         private readonly Dictionary<string, StoredValue> _values = new();
@@ -354,6 +377,17 @@ public sealed class StepUpServiceTests
         public void SetString(string key, string value, TimeSpan expiresIn)
         {
             _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn)
+        {
+            if (GetString(key) is not null)
+            {
+                return false;
+            }
+
+            SetString(key, value, expiresIn);
+            return true;
         }
 
         public string? GetString(string key)

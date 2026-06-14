@@ -73,6 +73,34 @@ public sealed class PasswordResetEndpointShapeTests
     }
 
     /// <summary>
+    /// Purpose: prevent repeated password reset email sends within the cooldown window.
+    /// Input: the same login email and matching birth date are submitted twice.
+    /// Expected: the second request returns 429 slow_down and no second email is sent.
+    /// </summary>
+    [TestMethod]
+    public void StartReset_ReturnsTooManyRequestsWhenRepeated()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-repeat@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var emailSender = new RecordingEmailSender();
+        var stepUp = new StepUpService(
+            users,
+            emailSender,
+            new AttemptLimiter(),
+            new EmailSendCooldown(TimeSpan.FromMinutes(1)),
+            null);
+        var controller = CreateController(users, stepUp);
+        var request = new ResetPasswordStartRequest("reset-repeat@example.com", "2000-01-02");
+
+        _ = EndpointTestHelper.AssertOk(controller.StartReset(request));
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.StartReset(request), 429);
+
+        Assert.AreEqual("00010", error.ResponseCode);
+        Assert.AreEqual("slow_down", error.Error);
+        Assert.AreEqual(1, emailSender.SentCodes.Count);
+    }
+
+    /// <summary>
     /// 目的: パスワードリセット開始要求の生年月日形式検証を確認する。
     /// 入力値: yyyy-MM-dd ではない生年月日。
     /// 期待値: 400 Bad Request と invalid_request を返すこと。
@@ -290,6 +318,17 @@ public sealed class PasswordResetEndpointShapeTests
         public void SetString(string key, string value, TimeSpan expiresIn)
         {
             _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn)
+        {
+            if (GetString(key) is not null)
+            {
+                return false;
+            }
+
+            SetString(key, value, expiresIn);
+            return true;
         }
 
         public string? GetString(string key)

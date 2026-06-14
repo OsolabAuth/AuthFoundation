@@ -16,28 +16,36 @@ public sealed class StepUpService
     private readonly IUserStore _users;
     private readonly IEmailSender _emailSender;
     private readonly AttemptLimiter _attempts;
+    private readonly EmailSendCooldown _sendCooldown;
 
     public StepUpService(IUserStore users)
-        : this(users, new DevelopmentEmailSender(), new AttemptLimiter())
+        : this(users, new DevelopmentEmailSender(), new AttemptLimiter(), new EmailSendCooldown(), null)
     {
     }
 
     public StepUpService(IUserStore users, IEmailSender emailSender, AttemptLimiter attempts)
-        : this(users, emailSender, attempts, null)
+        : this(users, emailSender, attempts, new EmailSendCooldown(), null)
     {
     }
 
     internal StepUpService(IUserStore users, IEmailSender emailSender, AttemptLimiter attempts, IRedisStringStore? redisStore)
+        : this(users, emailSender, attempts, new EmailSendCooldown(redisStore), redisStore)
+    {
+    }
+
+    internal StepUpService(IUserStore users, IEmailSender emailSender, AttemptLimiter attempts, EmailSendCooldown sendCooldown, IRedisStringStore? redisStore)
     {
         _users = users;
         _emailSender = emailSender;
         _attempts = attempts;
+        _sendCooldown = sendCooldown;
         _redisStore = redisStore;
     }
 
     public MfaEmailChallenge StartEmailChallenge(string email)
     {
         UserRecord user = _users.FindByEmail(email);
+        _sendCooldown.EnsureCanSend("mfa", user.Email);
         return CreateEmailChallenge(user, EmailChallengeKey(user.Email));
     }
 
@@ -54,10 +62,11 @@ public sealed class StepUpService
                 return false;
             }
 
+            _sendCooldown.EnsureCanSend("password_reset", user.Email);
             _ = CreateEmailChallenge(user, PasswordResetEmailChallengeKey(user.Email));
             return true;
         }
-        catch (ApiException)
+        catch (ApiException ex) when (ex.InternalCode != Code.TOO_MANY_REQUESTS.InternalCode)
         {
             return false;
         }

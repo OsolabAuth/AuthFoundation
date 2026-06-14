@@ -236,6 +236,30 @@ public sealed class MfaEndpointShapeTests
         Assert.AreEqual("invalid_token", error.Error);
     }
 
+    /// <summary>
+    /// Purpose: prevent repeated MFA email sends within the cooldown window.
+    /// Input: the same login email is submitted to the MFA email start endpoint twice.
+    /// Expected: the second request returns 429 slow_down.
+    /// </summary>
+    [TestMethod]
+    public void StartEmail_ReturnsTooManyRequestsWhenRepeated()
+    {
+        var users = CreateUsers(MfaEmail);
+        var stepUp = new StepUpService(
+            users,
+            new DevelopmentEmailSender(),
+            new AttemptLimiter(),
+            new EmailSendCooldown(TimeSpan.FromMinutes(1)),
+            null);
+        var controller = EndpointTestHelper.WithHttpContext(new MfaController(stepUp));
+
+        _ = EndpointTestHelper.AssertOk(controller.StartEmail(new EmailRequest(MfaEmail)));
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.StartEmail(new EmailRequest(MfaEmail)), 429);
+
+        Assert.AreEqual("00010", error.ResponseCode);
+        Assert.AreEqual("slow_down", error.Error);
+    }
+
     private static MfaController CreateController(InMemoryUserStore? users = null)
     {
         return EndpointTestHelper.WithHttpContext(new MfaController(new StepUpService(users ?? new InMemoryUserStore())));

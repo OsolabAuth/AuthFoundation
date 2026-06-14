@@ -18,6 +18,7 @@ public static class AppConfig
     public static string AgentAccessTokenAudience { get; private set; } = "task-management-api";
     public static int AttemptLimitMaxAttempts { get; private set; } = 5;
     public static int AttemptLimitWindowMinutes { get; private set; } = 5;
+    public static int EmailSendCooldownSeconds { get; private set; } = 30;
     public static string MailFromName { get; private set; } = "AuthFoundation";
     public static string MailFromEmail { get; private set; } = string.Empty;
     public static string GmailSmtpHost { get; private set; } = "smtp.gmail.com";
@@ -42,6 +43,7 @@ public static class AppConfig
         AgentAccessTokenAudience = config["AgentAccessToken:Audience"] ?? AgentAccessTokenAudience;
         AttemptLimitMaxAttempts = config.GetValue("AttemptLimit:MaxAttempts", AttemptLimitMaxAttempts);
         AttemptLimitWindowMinutes = config.GetValue("AttemptLimit:WindowMinutes", AttemptLimitWindowMinutes);
+        EmailSendCooldownSeconds = config.GetValue("EmailSendCooldown:Seconds", EmailSendCooldownSeconds);
         MailFromName = config["Mail:FromName"] ?? MailFromName;
         MailFromEmail = config["Mail:FromEmail"] ?? MailFromEmail;
         GmailSmtpHost = config["GmailSmtp:Host"] ?? GmailSmtpHost;

@@ -161,6 +161,17 @@ public sealed class AttemptLimiterTests
             _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
         }
 
+        public bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn)
+        {
+            if (GetString(key) is not null)
+            {
+                return false;
+            }
+
+            SetString(key, value, expiresIn);
+            return true;
+        }
+
         public string? GetString(string key)
         {
             if (!_values.TryGetValue(key, out StoredValue? stored) || stored.ExpiresAt <= DateTimeOffset.UtcNow)

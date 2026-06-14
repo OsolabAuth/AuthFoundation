@@ -194,6 +194,8 @@ internal interface IRedisStringStore
 {
     void SetString(string key, string value, TimeSpan expiresIn);
 
+    bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn);
+
     string? GetString(string key);
 
     string? TakeString(string key);
@@ -222,6 +224,11 @@ return value
     public void SetString(string key, string value, TimeSpan expiresIn)
     {
         _database.StringSet(key, value, expiresIn);
+    }
+
+    public bool SetStringIfNotExists(string key, string value, TimeSpan expiresIn)
+    {
+        return _database.StringSet(key, value, expiresIn, When.NotExists);
     }
 
     public string? GetString(string key)
