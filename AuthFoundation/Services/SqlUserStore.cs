@@ -201,7 +201,7 @@ public sealed class SqlUserStore : IUserStore
                    u.[password],
                    u.[create_datetime],
                    MAX(CASE WHEN ui.[data_key] = 'name' THEN ui.[data_value] END) AS [name],
-                   MAX(CASE WHEN ui.[data_key] = 'birth_date' THEN ui.[data_value] END) AS [birth_date],
+                   MAX(CASE WHEN ui.[data_key] IN ('birth_date', 'birthdate') THEN ui.[data_value] END) AS [birth_date],
                    MAX(CASE WHEN utc.[consent_result] = 1 THEN utc.[term_id] END) AS [accepted_terms_id]
               FROM [auth].[osolab_user] u
               LEFT JOIN [auth].[user_info] ui
