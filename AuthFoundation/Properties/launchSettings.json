@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "AuthFoundation Local": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": ".well-known/openid-configuration",
+      "applicationUrl": "http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Issuer": "http://localhost:5000/",
+        "AuthUiBaseUrl": "http://localhost:5700",
+        "DisableHttpsRedirection": "true",
+        "Cors__AllowedOrigins": "http://localhost:5700",
+        "DevelopmentClient__ClientId": "00000000000000000000000000000000",
+        "DevelopmentClient__RedirectUri": "http://localhost:5700/callback",
+        "UserInfo__SharedClientId": "00000000000000000000000000000000",
+        "ConnectionStrings__AuthDb": "Server=localhost,14333;Database=AuthFoundation;User Id=sa;Password=OsolabAuth_Passw0rd!;TrustServerCertificate=True;Encrypt=True",
+        "ConnectionStrings__Redis": "localhost:63790,abortConnect=false",
+        "SigningKey__KeyId": "local-dev-signing-key",
+        "SigningKey__PrivateKeyPem": "-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDewialmcgRFtD9\\nAbtQQlw3cmz5qeXORf3xEfhHR+BCUWMW/7r5yNFSo5BSmGUDsPCCy+b+lVIzHZCI\\n/9yeVmJRh7hH/lLxPKNVfxHwCOnK2gMnBUg1zwJWMvh98EkPL2JteqlS1m/rF0aA\\nSYt4lW/vqunTOo/iq5/FcnyMdDONWP4MznqXZrs26tJdSXqrNtlG5TdPBgsx+Kpx\\nEf+rvHgmkh00cnQ631iopuRtXxoftEVdn1ME49y0lJtCtQoMI51N92ZE5GarqTZo\\n5DVtsDsKNgEpygK5ro4aTzPjorkqH83B/gIDKYHeTEXVlwCrNTMXaA6w5pcw/cZY\\n+7253hOnAgMBAAECggEAEddZAxBzDrNWH72AxCfcfPBkPAbYihHfCezXhtYB5y3f\\nktr+nbzwzv6cs5DTHl2QldlA8gkBoWhvyBk+EUx36XHGV7XN7NZfepyH0kLUftPB\\nRuHMa8rdtAu3DVcuctHnvz8Aysq0Ag9GLUY2rnzBj1+QBMP+/Dekv0qxIQq5ikt9\\nDYPP/HIvoxwIcvpK4q+ABQ7ImRRICLdMo3DYJ/UrOC4mibNy4NBXXfCgKcfN3U/h\\n6gLCqye9T3ejIGOD9Pvk5wB+RgM6uIjpZGmSRBOBsyMWJWKq3Nwax/xi90UzZ8lg\\np47uwJ3cRwITlazGtDr+mA88ZrDUKeBUfBMlofKzWQKBgQD/2RvG+gNgBAsGrAfb\\n387ZXHWJTixG/cnmI0rAzLF66tfOxEOrND6RSLdEM4ugCRrkNIYEExA7+OSmSD9q\\nDRRbXCzG8cumpif0SCERq3fWA0Azjc9Fg4btGwEugRiPqwxtus/cah+J37tpm8N7\\nSs6QxY/aPiEMqjQjhP5SE8JWbQKBgQDe5AMyzCa6xp5Eym9TWLnzHEo9fq+r3fzb\\nSahxHYDDUystO3Y08ZjR/j9pGDltD4om4lkE6gDdZPmGEkb7nPBwkyf0/ax9tEUg\\ngkH14dXKSycY1xlncjGYgbX0beUvWXvSTVVYAByBx4jhs0w2EwQG+xbBf4naLyum\\nBvlKCnaV4wKBgQD2RJorNj6HbnzaiD7sUwr9SLVOXDPcha+Q2Ym7+Ywgv+rI+TwV\\nkK1lFTRq7p7IhdsfrLsPMvZec95LfKGlyD8/DYOAYABiQe+VgNRr+LvaAbkLpsXL\\nqKX4lxTVGah1qfTFrpskE/aVtQjlx+wrQj+BNNmZ/lG7qh2TzxEqGiDnJQKBgHHQ\\napWwy4IKU9z6pdggcWtjocE/BIM1ap2rQhjooMyclmqVd2nXiFqKgmSu2vwGuFvc\\nruokd2aV3hiJErf+zoQdkIS4WDEkMTxFZ1sgA6Q1tfQoOi+pjwu6CGiVCTehcOnV\\nVWQHQoc+lXXysVLXaPILmvYZoxHHjnlMDFWzfBRTAoGAMFb83hfM8ih6ZXDDlbwm\\nBGElBRy+ObIkCyXz/BPYStTRdFGARmCe7pP19BMQVrQNa+chKqwPUQMs0NsHOq8H\\noXCavfMO0/NRdxLAgpCW0Ex6e5xT16VC1GD9wpr/EZVJonESbRpylDNMaX4XfRjp\\n7J2FO+Ol06U+QKrG3krsaUg=\\n-----END PRIVATE KEY-----"
+      }
+    }
+  }
+}
