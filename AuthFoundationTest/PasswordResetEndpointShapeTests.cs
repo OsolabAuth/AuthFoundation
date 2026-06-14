@@ -101,10 +101,11 @@ public sealed class PasswordResetEndpointShapeTests
     {
         var users = new InMemoryUserStore();
         users.CreateUser("reset-endpoint@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
-        var stepUp = new StepUpService(users);
+        var emailSender = new RecordingEmailSender();
+        var stepUp = new StepUpService(users, emailSender, new AttemptLimiter());
         var controller = CreateController(users, stepUp);
-        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-endpoint@example.com");
-        var request = new ResetPasswordRequest("reset-endpoint@example.com", "2000-01-02", challenge.Code, "Newpass1!");
+        _ = EndpointTestHelper.AssertOk(controller.StartReset(new ResetPasswordStartRequest("reset-endpoint@example.com", "2000-01-02")));
+        var request = new ResetPasswordRequest("reset-endpoint@example.com", "2000-01-02", emailSender.SentCodes[0].Code, "Newpass1!");
 
         var ok = EndpointTestHelper.AssertOk(controller.Reset(request));
 
@@ -133,6 +134,28 @@ public sealed class PasswordResetEndpointShapeTests
 
         Assert.AreEqual("password_reset", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
         Assert.AreEqual("Reset User", users.Authenticate("reset-redis@example.com", "Newpass1!").Name);
+    }
+
+    /// <summary>
+    /// 目的: MFA用メールコードをパスワードリセット用コードとして流用できないことを検証する。
+    /// 入力値: MFA開始で発行されたメールコード、登録済みメールアドレス、生年月日、新しいパスワード。
+    /// 期待値: 401 Unauthorized を返し、既存パスワードが維持されること。
+    /// </summary>
+    [TestMethod]
+    public void Reset_RejectsMfaEmailCode()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-mfa-code@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
+        var stepUp = new StepUpService(users);
+        var controller = CreateController(users, stepUp);
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-mfa-code@example.com");
+        var request = new ResetPasswordRequest("reset-mfa-code@example.com", "2000-01-02", challenge.Code, "Newpass1!");
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+        Assert.AreEqual("Reset User", users.Authenticate("reset-mfa-code@example.com", "Passw0rd!").Name);
     }
 
     /// <summary>
@@ -183,10 +206,11 @@ public sealed class PasswordResetEndpointShapeTests
     {
         var users = new InMemoryUserStore();
         users.CreateUser("reset-mismatch@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
-        var stepUp = new StepUpService(users);
+        var emailSender = new RecordingEmailSender();
+        var stepUp = new StepUpService(users, emailSender, new AttemptLimiter());
         var controller = CreateController(users, stepUp);
-        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-mismatch@example.com");
-        var request = new ResetPasswordRequest("reset-mismatch@example.com", "2001-01-02", challenge.Code, "Newpass1!");
+        _ = EndpointTestHelper.AssertOk(controller.StartReset(new ResetPasswordStartRequest("reset-mismatch@example.com", "2000-01-02")));
+        var request = new ResetPasswordRequest("reset-mismatch@example.com", "2001-01-02", emailSender.SentCodes[0].Code, "Newpass1!");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 401);
 
@@ -205,10 +229,11 @@ public sealed class PasswordResetEndpointShapeTests
     {
         var users = new InMemoryUserStore();
         users.CreateUser("reset-wrong-code@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 2));
-        var stepUp = new StepUpService(users);
+        var emailSender = new RecordingEmailSender();
+        var stepUp = new StepUpService(users, emailSender, new AttemptLimiter());
         var controller = CreateController(users, stepUp);
-        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("reset-wrong-code@example.com");
-        var request = new ResetPasswordRequest("reset-wrong-code@example.com", "2000-01-02", DifferentCode(challenge.Code), "Newpass1!");
+        _ = EndpointTestHelper.AssertOk(controller.StartReset(new ResetPasswordStartRequest("reset-wrong-code@example.com", "2000-01-02")));
+        var request = new ResetPasswordRequest("reset-wrong-code@example.com", "2000-01-02", DifferentCode(emailSender.SentCodes[0].Code), "Newpass1!");
 
         ErrorOutput error = EndpointTestHelper.AssertError(controller.Reset(request), 401);
 

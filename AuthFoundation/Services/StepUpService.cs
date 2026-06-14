@@ -38,7 +38,7 @@ public sealed class StepUpService
     public MfaEmailChallenge StartEmailChallenge(string email)
     {
         UserRecord user = _users.FindByEmail(email);
-        return CreateEmailChallenge(user);
+        return CreateEmailChallenge(user, EmailChallengeKey(user.Email));
     }
 
     /// <summary>
@@ -54,7 +54,7 @@ public sealed class StepUpService
                 return false;
             }
 
-            _ = CreateEmailChallenge(user);
+            _ = CreateEmailChallenge(user, PasswordResetEmailChallengeKey(user.Email));
             return true;
         }
         catch (ApiException)
@@ -79,6 +79,23 @@ public sealed class StepUpService
 
         _attempts.Reset(attemptKey);
         return CreateGrant(user.Subject, "email_code");
+    }
+
+    public void VerifyPasswordResetChallenge(string email, string code)
+    {
+        UserRecord user = _users.FindByEmail(email);
+        string attemptKey = $"password_reset_email:{user.Email}";
+        _attempts.EnsureAllowed(attemptKey);
+        MfaEmailChallenge? challenge = TakePasswordResetEmailChallenge(user.Email);
+        if (challenge is null
+            || challenge.ExpiresAt <= DateTimeOffset.UtcNow
+            || !string.Equals(challenge.Code, code, StringComparison.Ordinal))
+        {
+            _attempts.RecordFailure(attemptKey);
+            throw Code.UNAUTHORIZED;
+        }
+
+        _attempts.Reset(attemptKey);
     }
 
     public AuthenticatorSetup SetupAuthenticator(string email, string stepUpToken)
@@ -146,17 +163,17 @@ public sealed class StepUpService
         return grant;
     }
 
-    private MfaEmailChallenge CreateEmailChallenge(UserRecord user)
+    private MfaEmailChallenge CreateEmailChallenge(UserRecord user, string storageKey)
     {
         string code = Helper.GenerateNumericCode(6);
         var challenge = new MfaEmailChallenge(user.Email, code, DateTimeOffset.UtcNow.Add(ChallengeLifetime));
         if (_redisStore is null)
         {
-            _emailChallenges[user.Email] = challenge;
+            _emailChallenges[storageKey] = challenge;
         }
         else
         {
-            _redisStore.SetString(EmailChallengeKey(user.Email), JsonSerializer.Serialize(challenge, JsonOptions), ChallengeLifetime);
+            _redisStore.SetString(storageKey, JsonSerializer.Serialize(challenge, JsonOptions), ChallengeLifetime);
         }
 
         _emailSender.SendMfaCode(challenge.Email, challenge.Code, challenge.ExpiresAt);
@@ -165,12 +182,22 @@ public sealed class StepUpService
 
     private MfaEmailChallenge? TakeEmailChallenge(string email)
     {
+        return TakeEmailChallengeByKey(EmailChallengeKey(email));
+    }
+
+    private MfaEmailChallenge? TakePasswordResetEmailChallenge(string email)
+    {
+        return TakeEmailChallengeByKey(PasswordResetEmailChallengeKey(email));
+    }
+
+    private MfaEmailChallenge? TakeEmailChallengeByKey(string storageKey)
+    {
         if (_redisStore is null)
         {
-            return _emailChallenges.TryRemove(email, out MfaEmailChallenge? challenge) ? challenge : null;
+            return _emailChallenges.TryRemove(storageKey, out MfaEmailChallenge? challenge) ? challenge : null;
         }
 
-        string? value = _redisStore.TakeString(EmailChallengeKey(email));
+        string? value = _redisStore.TakeString(storageKey);
         return string.IsNullOrWhiteSpace(value) ? null : JsonSerializer.Deserialize<MfaEmailChallenge>(value, JsonOptions);
     }
 
@@ -209,6 +236,11 @@ public sealed class StepUpService
     private static string EmailChallengeKey(string email)
     {
         return $"auth:step_up:email_challenge:{email.ToLowerInvariant()}";
+    }
+
+    private static string PasswordResetEmailChallengeKey(string email)
+    {
+        return $"auth:step_up:password_reset_challenge:{email.ToLowerInvariant()}";
     }
 
     private static string StepUpGrantKey(string token)
