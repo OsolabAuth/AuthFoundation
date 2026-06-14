@@ -9,6 +9,7 @@ builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
 
 AppConfig.Initialize(builder.Configuration);
+ValidateStateStoreConfiguration(builder.Environment);
 
 builder.Services.AddControllers();
 builder.Services.AddCors(options =>
@@ -37,12 +38,15 @@ builder.Services.AddSingleton<IUserStore>(_ =>
         : new InMemoryUserStore());
 builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 builder.Services.AddSingleton<TermsService>();
-builder.Services.AddSingleton<AttemptLimiter>();
+builder.Services.AddSingleton(services => new AttemptLimiter(services.GetService<IRedisStringStore>()));
 builder.Services.AddSingleton<IEmailSender>(_ =>
     AppConfig.IsGmailSmtpConfigured()
         ? new GmailSmtpEmailSender()
         : new DevelopmentEmailSender());
-builder.Services.AddSingleton<SignupSessionService>();
+builder.Services.AddSingleton(services => new SignupSessionService(
+    services.GetRequiredService<IEmailSender>(),
+    services.GetRequiredService<AttemptLimiter>(),
+    services.GetService<IRedisStringStore>()));
 builder.Services.AddSingleton(_ => SigningKeyProvider.FromConfig());
 builder.Services.AddSingleton(services =>
 {
@@ -72,4 +76,23 @@ app.Run();
 [ExcludeFromCodeCoverage]
 public partial class Program
 {
+    private static void ValidateStateStoreConfiguration(IHostEnvironment environment)
+    {
+        bool cloudRun = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("K_SERVICE"));
+        bool externalStateRequired = environment.IsProduction() || cloudRun;
+        if (!externalStateRequired)
+        {
+            return;
+        }
+
+        if (!AppConfig.IsAuthDbConfigured())
+        {
+            throw new InvalidOperationException("AuthDb connection is required when running in production.");
+        }
+
+        if (!AppConfig.IsRedisConfigured())
+        {
+            throw new InvalidOperationException("Redis connection is required when running in production.");
+        }
+    }
 }

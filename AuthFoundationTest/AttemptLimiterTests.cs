@@ -80,6 +80,22 @@ public sealed class AttemptLimiterTests
     }
 
     /// <summary>
+    /// あるアプリケーションインスタンスで記録した失敗回数を、別インスタンスの試行制限でもRedis共有状態として検出できることを確認する。
+    /// </summary>
+    [TestMethod]
+    public void EnsureAllowed_UsesSharedRedisCounterAcrossInstances()
+    {
+        var redis = new FakeRedisStringStore();
+        var writer = new AttemptLimiter(1, TimeSpan.FromMinutes(1), TimeProvider.System, redis);
+        var reader = new AttemptLimiter(1, TimeSpan.FromMinutes(1), TimeProvider.System, redis);
+
+        writer.RecordFailure("redis-blocked");
+        ApiException error = Assert.ThrowsExactly<ApiException>(() => reader.EnsureAllowed("redis-blocked"));
+
+        Assert.AreEqual(Code.UNAUTHORIZED.InternalCode, error.InternalCode);
+    }
+
+    /// <summary>
     /// 目的: Ensure Allowed / Removes Expired Counter の仕様を検証する。
     /// 入力値: 期限切れに変更したテストデータ。
     /// 期待値: Ensure Allowed / Removes Expired Counter の期待結果になること。
@@ -135,4 +151,38 @@ public sealed class AttemptLimiterTests
             _utcNow = _utcNow.Add(delta);
         }
     }
+
+    private sealed class FakeRedisStringStore : IRedisStringStore
+    {
+        private readonly Dictionary<string, StoredValue> _values = new();
+
+        public void SetString(string key, string value, TimeSpan expiresIn)
+        {
+            _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public string? GetString(string key)
+        {
+            if (!_values.TryGetValue(key, out StoredValue? stored) || stored.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                return null;
+            }
+
+            return stored.Value;
+        }
+
+        public string? TakeString(string key)
+        {
+            string? value = GetString(key);
+            _ = _values.Remove(key);
+            return value;
+        }
+
+        public bool DeleteString(string key)
+        {
+            return _values.Remove(key);
+        }
+    }
+
+    private sealed record StoredValue(string Value, DateTimeOffset ExpiresAt);
 }

@@ -150,6 +150,51 @@ public sealed class SignupEndpointShapeTests
     }
 
     /// <summary>
+    /// サインアップのメール送信、コード検証、アカウント作成が別アプリケーションインスタンスで処理されても、Redis共有状態により完了できることを確認する。
+    /// </summary>
+    [TestMethod]
+    public async Task PortalSignupFlow_UsesSharedRedisSessionAcrossInstances()
+    {
+        var users = new InMemoryUserStore();
+        var redis = new FakeRedisStringStore();
+        var emailSender = new CapturingEmailSender();
+        var terms = new TermsService();
+        var emailSessions = new SignupSessionService(emailSender, new AttemptLimiter(redis), redis);
+        var verifySessions = new SignupSessionService(emailSender, new AttemptLimiter(redis), redis);
+        var accountSessions = new SignupSessionService(emailSender, new AttemptLimiter(redis), redis);
+        var emailController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, emailSessions));
+        EndpointTestHelper.SetForm(emailController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["email"] = "portal-redis-signup@example.com"
+        });
+        _ = EndpointTestHelper.AssertOk(await emailController.Email());
+        string signupCookie = ReadCookie(emailController.Response.Headers.SetCookie.ToString());
+
+        var verifyController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, verifySessions));
+        verifyController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(verifyController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["code"] = emailSender.LastCode
+        });
+        _ = EndpointTestHelper.AssertOk(await verifyController.Verify());
+
+        var accountController = EndpointTestHelper.WithHttpContext(new SignupController(users, terms, accountSessions));
+        accountController.Request.Headers.Cookie = signupCookie;
+        EndpointTestHelper.SetForm(accountController.HttpContext, new Dictionary<string, StringValues>
+        {
+            ["password"] = "Passw0rd!",
+            ["name"] = "Portal Redis Signup",
+            ["birthdate"] = "2000-01-02",
+            ["terms_accepted"] = "true"
+        });
+
+        var accountOk = EndpointTestHelper.AssertOk(await accountController.Account());
+
+        Assert.AreEqual("redirect", EndpointTestHelper.ReadProperty<string>(accountOk.Value, "result"));
+        Assert.AreEqual("Portal Redis Signup", users.Authenticate("portal-redis-signup@example.com", "Passw0rd!").Name);
+    }
+
+    /// <summary>
     /// メール認証が未完了の登録セッションではアカウント作成を拒否することを検証する。
     /// </summary>
     [TestMethod]
@@ -278,4 +323,38 @@ public sealed class SignupEndpointShapeTests
             LastCode = code;
         }
     }
+
+    private sealed class FakeRedisStringStore : IRedisStringStore
+    {
+        private readonly Dictionary<string, StoredValue> _values = new();
+
+        public void SetString(string key, string value, TimeSpan expiresIn)
+        {
+            _values[key] = new StoredValue(value, DateTimeOffset.UtcNow.Add(expiresIn));
+        }
+
+        public string? GetString(string key)
+        {
+            if (!_values.TryGetValue(key, out StoredValue? stored) || stored.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                return null;
+            }
+
+            return stored.Value;
+        }
+
+        public string? TakeString(string key)
+        {
+            string? value = GetString(key);
+            _ = _values.Remove(key);
+            return value;
+        }
+
+        public bool DeleteString(string key)
+        {
+            return _values.Remove(key);
+        }
+    }
+
+    private sealed record StoredValue(string Value, DateTimeOffset ExpiresAt);
 }

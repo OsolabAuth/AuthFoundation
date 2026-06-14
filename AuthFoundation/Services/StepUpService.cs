@@ -91,7 +91,7 @@ public sealed class StepUpService
         }
 
         string secret = TotpUtil.GenerateSecret();
-        _totpSecrets[user.Email] = secret;
+        SetTotpSecret(user.Email, secret);
         string issuer = Uri.EscapeDataString("OsolabAuth");
         string account = Uri.EscapeDataString(user.Email);
         string uri = $"otpauth://totp/{issuer}:{account}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30";
@@ -103,7 +103,8 @@ public sealed class StepUpService
         UserRecord user = _users.FindByEmail(email);
         string attemptKey = $"mfa_totp:{user.Email}";
         _attempts.EnsureAllowed(attemptKey);
-        if (!_totpSecrets.TryGetValue(user.Email, out string? secret)
+        string? secret = GetTotpSecret(user.Email);
+        if (string.IsNullOrWhiteSpace(secret)
             || !TotpUtil.VerifyCode(secret, code, DateTimeOffset.UtcNow))
         {
             _attempts.RecordFailure(attemptKey);
@@ -184,6 +185,27 @@ public sealed class StepUpService
         return string.IsNullOrWhiteSpace(value) ? null : JsonSerializer.Deserialize<StepUpGrant>(value, JsonOptions);
     }
 
+    private void SetTotpSecret(string email, string secret)
+    {
+        if (_redisStore is null)
+        {
+            _totpSecrets[email] = secret;
+            return;
+        }
+
+        _redisStore.SetString(TotpSecretKey(email), secret, TimeSpan.FromDays(365));
+    }
+
+    private string? GetTotpSecret(string email)
+    {
+        if (_redisStore is null)
+        {
+            return _totpSecrets.TryGetValue(email, out string? secret) ? secret : null;
+        }
+
+        return _redisStore.GetString(TotpSecretKey(email));
+    }
+
     private static string EmailChallengeKey(string email)
     {
         return $"auth:step_up:email_challenge:{email.ToLowerInvariant()}";
@@ -192,6 +214,11 @@ public sealed class StepUpService
     private static string StepUpGrantKey(string token)
     {
         return $"auth:step_up:grant:{token}";
+    }
+
+    private static string TotpSecretKey(string email)
+    {
+        return $"auth:step_up:totp_secret:{email.ToLowerInvariant()}";
     }
 }
 
