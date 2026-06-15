@@ -1,0 +1,76 @@
+name: osolab-authfoundation-local
+
+services:
+  auth-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: osolab-authfoundation-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${AUTHFOUNDATION_SQL_PASSWORD:?Set AUTHFOUNDATION_SQL_PASSWORD in .env}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "14333:1433"
+    volumes:
+      - auth-db-data:/var/opt/mssql
+
+  auth-db-init:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: osolab-authfoundation-db-init
+    depends_on:
+      auth-db:
+        condition: service_started
+    volumes:
+      - ./local/mssql/init-authfoundation.sql:/init-authfoundation.sql:ro
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      "for i in {1..60}; do
+        /opt/mssql-tools/bin/sqlcmd -S auth-db -U sa -P '${AUTHFOUNDATION_SQL_PASSWORD}' -Q 'SELECT 1' && break;
+        sleep 2;
+      done;
+      /opt/mssql-tools/bin/sqlcmd -S auth-db -U sa -P '${AUTHFOUNDATION_SQL_PASSWORD}' -i /init-authfoundation.sql"
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    container_name: osolab-authfoundation-redis
+    ports:
+      - "63790:6379"
+    volumes:
+      - auth-redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-api:
+    build:
+      context: .
+      dockerfile: AuthFoundation/Dockerfile
+    container_name: osolab-authfoundation-api
+    profiles:
+      - api
+    depends_on:
+      auth-db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      Issuer: "http://localhost:5000/"
+      AuthUiBaseUrl: "http://localhost:5700"
+      DisableHttpsRedirection: "true"
+      Cors__AllowedOrigins: "http://localhost:5700"
+      DevelopmentClient__ClientId: "00000000000000000000000000000000"
+      DevelopmentClient__RedirectUri: "http://localhost:5700/callback"
+      UserInfo__SharedClientId: "00000000000000000000000000000000"
+      ConnectionStrings__AuthDb: "Server=auth-db,1433;Database=AuthFoundation;User Id=sa;Password=${AUTHFOUNDATION_SQL_PASSWORD};TrustServerCertificate=True;Encrypt=True"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+    ports:
+      - "5000:8080"
+
+volumes:
+  auth-db-data:
+  auth-redis-data:

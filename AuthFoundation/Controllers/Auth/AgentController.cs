@@ -1,0 +1,199 @@
+using AuthFoundation.Common;
+using AuthFoundation.Contracts;
+using AuthFoundation.Services;
+using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
+using System.Text;
+
+namespace AuthFoundation.Controllers.Auth;
+
+[ApiController]
+[Route("agent")]
+public sealed class AgentController : ControllerBase
+{
+    private readonly IUserStore _users;
+    private readonly IAgentStore _agents;
+    private readonly StepUpService _stepUp;
+    private readonly OidcTokenService _tokens;
+
+    public AgentController(
+        IUserStore users,
+        IAgentStore agents,
+        StepUpService stepUp,
+        OidcTokenService tokens)
+    {
+        _users = users;
+        _agents = agents;
+        _stepUp = stepUp;
+        _tokens = tokens;
+    }
+
+    [HttpPost]
+    public IActionResult Create([FromBody] CreateAgentRequest request)
+    {
+        try
+        {
+            ValidateUtil.FormatParam(request.OwnerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+            ValidateUtil.FormatParam(request.AgentName, Code.HttpBodies.NAME.Key, Code.HttpBodies.NAME.Regex);
+            ValidateUtil.FormatParam(request.ClientId, Code.HttpBodies.CLIENT_ID.Key, Code.HttpBodies.CLIENT_ID.Regex);
+            ValidateUtil.FormatParam(request.Scope, Code.HttpQueries.SCOPE.Key, Code.HttpQueries.SCOPE.Regex);
+            ValidateUtil.IndispensableParam(request.StepUpToken, "step_up_token");
+            if (!string.Equals(request.ClientId, AppConfig.DevelopmentClientId, StringComparison.Ordinal))
+            {
+                throw Code.ILLEGAL_CLIENT;
+            }
+
+            UserRecord owner = ValidateStepUpOwner(request.OwnerEmail, request.StepUpToken);
+            int expiresDays = Math.Clamp(request.ExpiresDays, 1, 90);
+            AgentCreateResult result = _agents.CreateAgent(
+                owner,
+                request.AgentName,
+                request.ClientId,
+                request.Scope,
+                DateTimeOffset.UtcNow.AddDays(expiresDays));
+
+            return Ok(new AgentCreateOutput(
+                result.Agent.AgentId,
+                result.AgentSecret,
+                result.Delegation.DelegationId,
+                result.Delegation.Scope,
+                result.Delegation.ExpiresAt));
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    [HttpPost("{agent_id}/secret")]
+    public IActionResult RotateSecret([FromRoute(Name = "agent_id")] string agentId, [FromBody] AgentOwnerStepUpRequest request)
+    {
+        try
+        {
+            ValidateUtil.IndispensableParam(agentId, "agent_id");
+            UserRecord owner = ValidateStepUpOwner(request.OwnerEmail, request.StepUpToken);
+            AgentSecretRotationResult result = _agents.RotateSecret(owner, agentId);
+
+            return Ok(new AgentSecretOutput(result.Agent.AgentId, result.AgentSecret, result.Agent.UpdatedAt));
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    [HttpPost("{agent_id}/revoke")]
+    public IActionResult Revoke([FromRoute(Name = "agent_id")] string agentId, [FromBody] AgentOwnerStepUpRequest request)
+    {
+        try
+        {
+            ValidateUtil.IndispensableParam(agentId, "agent_id");
+            UserRecord owner = ValidateStepUpOwner(request.OwnerEmail, request.StepUpToken);
+            AgentRecord agent = _agents.RevokeAgent(owner, agentId);
+
+            return Ok(new AgentRevokeOutput(agent.AgentId, agent.Status, agent.RevokedAt));
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    [HttpPost("token")]
+    public IActionResult Token([FromBody] AgentTokenRequest request)
+    {
+        try
+        {
+            ValidateUtil.IndispensableParam(request.AgentId, "agent_id");
+            ValidateUtil.IndispensableParam(request.AgentSecret, "agent_secret");
+            ValidateUtil.FormatParam(request.ClientId, Code.HttpBodies.CLIENT_ID.Key, Code.HttpBodies.CLIENT_ID.Regex);
+            ValidateUtil.FormatParam(request.Scope, Code.HttpQueries.SCOPE.Key, Code.HttpQueries.SCOPE.Regex);
+            AgentTokenGrant grant = _agents.VerifyTokenRequest(
+                request.AgentId,
+                request.AgentSecret,
+                request.ClientId,
+                request.Scope);
+            SetTokenResponseCacheHeaders();
+            return Ok(_tokens.CreateAgentTokenResponse(grant.Agent, grant.Delegation, grant.Scope));
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    [HttpGet("me")]
+    public IActionResult Me([FromQuery(Name = "client_id")] string clientId, [FromQuery(Name = "scope")] string scope)
+    {
+        try
+        {
+            (string agentId, string agentSecret) = ReadBasicAgentCredential();
+            var input = new AgentMeRequest(clientId, scope);
+            ValidateUtil.FormatParam(input.ClientId, Code.HttpBodies.CLIENT_ID.Key, Code.HttpBodies.CLIENT_ID.Regex);
+            ValidateUtil.FormatParam(input.Scope, Code.HttpQueries.SCOPE.Key, Code.HttpQueries.SCOPE.Regex);
+
+            AgentTokenGrant grant = _agents.VerifyTokenRequest(agentId, agentSecret, input.ClientId, input.Scope);
+            return Ok(new AgentMeOutput(
+                "ai_agent",
+                grant.Agent.AgentId,
+                grant.Agent.AgentName,
+                grant.Agent.OwnerSubject,
+                grant.Delegation.DelegationId,
+                grant.Delegation.ClientId,
+                grant.Scope,
+                grant.Delegation.ExpiresAt,
+                grant.Agent.Status));
+        }
+        catch (ApiException ex)
+        {
+            return new ObjectResult(new ErrorOutput(ex)) { StatusCode = (int)ex.StatusCode };
+        }
+    }
+
+    private UserRecord ValidateStepUpOwner(string ownerEmail, string stepUpToken)
+    {
+        ValidateUtil.FormatParam(ownerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+        ValidateUtil.IndispensableParam(stepUpToken, "step_up_token");
+        UserRecord owner = _users.FindByEmail(ownerEmail);
+        StepUpGrant grant = _stepUp.ValidateStepUpToken(stepUpToken);
+        if (!string.Equals(grant.Subject, owner.Subject, StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return owner;
+    }
+
+    private (string AgentId, string AgentSecret) ReadBasicAgentCredential()
+    {
+        if (!Request.Headers.TryGetValue("Authorization", out var rawHeader)
+            || !AuthenticationHeaderValue.TryParse(rawHeader.ToString(), out AuthenticationHeaderValue? header)
+            || !string.Equals(header.Scheme, "Basic", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(header.Parameter))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        try
+        {
+            string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header.Parameter));
+            int separator = decoded.IndexOf(':', StringComparison.Ordinal);
+            if (separator <= 0 || separator == decoded.Length - 1)
+            {
+                throw Code.UNAUTHORIZED;
+            }
+
+            return (decoded[..separator], decoded[(separator + 1)..]);
+        }
+        catch (FormatException)
+        {
+            throw Code.UNAUTHORIZED;
+        }
+    }
+
+    private void SetTokenResponseCacheHeaders()
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
+    }
+}

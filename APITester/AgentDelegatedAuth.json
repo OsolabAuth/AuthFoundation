@@ -1,0 +1,117 @@
+{
+  "version": 6,
+  "entities": [
+    {
+      "entity": {
+        "type": "Project",
+        "id": "f4976d5a-6474-4815-98c7-c3cff6e7b1d8",
+        "name": "AuthFoundation - AgentDelegatedAuth"
+      },
+      "children": [
+        {
+          "entity": {
+            "type": "Scenario",
+            "id": "f0a9566a-bb7f-4581-ae03-85a900e567ab",
+            "name": "AgentDelegatedAuth"
+          },
+          "children": [
+            {
+              "entity": {
+                "type": "Request",
+                "id": "fa9d0777-2583-4d67-a4c6-88e1877a723e",
+                "name": "01. Create delegated agent",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/agent"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"owner_email\": \"${\"Email\"}\", \"agent_name\": \"${\"AgentName\"}\", \"client_id\": \"${\"ClientId\"}\", \"scope\": \"${\"AgentScope\"}\", \"expires_days\": 30, \"step_up_token\": \"${\"StepUpToken\"}\" }"
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "a308e801-af70-4a44-9c40-eaf66167175e",
+                "name": "02. Issue delegated agent token",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/agent/token"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"agent_id\": \"${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_id\"}\", \"agent_secret\": \"${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_secret\"}\", \"client_id\": \"${\"ClientId\"}\", \"scope\": \"${\"AgentScope\"}\" }"
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "8e4ba17e-9796-4f87-b3e4-937178874eb8",
+                "name": "03. Rotate delegated agent secret",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/agent/${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_id\"}/secret"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"owner_email\": \"${\"Email\"}\", \"step_up_token\": \"${\"StepUpToken\"}\" }"
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "bd216982-b5e8-49e8-8986-7c1ae7fd0bfa",
+                "name": "04. Revoke delegated agent",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/agent/${\"AuthFoundation - AgentDelegatedAuth\".\"01. Create delegated agent\".\"response\".\"body\".\"agent_id\"}/revoke"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"owner_email\": \"${\"Email\"}\", \"step_up_token\": \"${\"StepUpToken\"}\" }"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "9c11bb1e-2ce1-42cc-8d48-268634ca102e",
+      "name": "production",
+      "variables": {
+        "auth-host": { "name": "AuthHost", "value": "auth.osolab-auth.jp", "enabled": true, "private": false },
+        "client-id": { "name": "ClientId", "value": "30000000000000000000000000000018", "enabled": true, "private": false },
+        "agent-scope": { "name": "AgentScope", "value": "task_read task_create task_comment", "enabled": true, "private": false },
+        "agent-name": { "name": "AgentName", "value": "Issue Triage Agent", "enabled": true, "private": false },
+        "email": { "name": "Email", "value": null, "enabled": true, "private": true },
+        "step-up-token": { "name": "StepUpToken", "value": null, "enabled": true, "private": true }
+      }
+    }
+  ]
+}
