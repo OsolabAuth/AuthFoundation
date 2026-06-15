@@ -60,7 +60,7 @@ public sealed class StepUpService
         UserRecord user = _users.FindByEmail(email);
         string attemptKey = $"mfa_email:{user.Email}";
         _attempts.EnsureAllowed(attemptKey);
-        MfaEmailChallenge? challenge = TakeEmailChallenge(user.Email);
+        MfaEmailChallenge? challenge = GetEmailChallenge(user.Email);
         if (challenge is null
             || challenge.ExpiresAt <= DateTimeOffset.UtcNow
             || !string.Equals(challenge.Code, code, StringComparison.Ordinal))
@@ -70,6 +70,7 @@ public sealed class StepUpService
         }
 
         _attempts.Reset(attemptKey);
+        DeleteEmailChallenge(user.Email);
         return CreateGrant(user.Subject, "email_code");
     }
 
@@ -78,7 +79,7 @@ public sealed class StepUpService
         UserRecord user = _users.FindByEmail(email);
         string attemptKey = $"password_reset_email:{user.Email}";
         _attempts.EnsureAllowed(attemptKey);
-        MfaEmailChallenge? challenge = TakePasswordResetEmailChallenge(user.Email);
+        MfaEmailChallenge? challenge = GetPasswordResetEmailChallenge(user.Email);
         if (challenge is null
             || challenge.ExpiresAt <= DateTimeOffset.UtcNow
             || !string.Equals(challenge.Code, code, StringComparison.Ordinal))
@@ -88,6 +89,7 @@ public sealed class StepUpService
         }
 
         _attempts.Reset(attemptKey);
+        DeletePasswordResetEmailChallenge(user.Email);
     }
 
     public AuthenticatorSetup SetupAuthenticator(string email, string stepUpToken)
@@ -196,18 +198,28 @@ public sealed class StepUpService
         return challenge;
     }
 
-    private MfaEmailChallenge? TakeEmailChallenge(string email)
+    private MfaEmailChallenge? GetEmailChallenge(string email)
     {
-        string? value = _redisStore.TakeString(MfaEmailChallengeSession.GetRedisKey(email));
+        string? value = _redisStore.GetString(MfaEmailChallengeSession.GetRedisKey(email));
         MfaEmailChallengeSession? session = RedisSessionJson.Deserialize<MfaEmailChallengeSession>(value);
         return session is null ? null : new MfaEmailChallenge(session.Email, session.Code, session.ExpiresAt);
     }
 
-    private MfaEmailChallenge? TakePasswordResetEmailChallenge(string email)
+    private void DeleteEmailChallenge(string email)
     {
-        string? value = _redisStore.TakeString(PasswordResetEmailChallengeSession.GetRedisKey(email));
+        _redisStore.DeleteString(MfaEmailChallengeSession.GetRedisKey(email));
+    }
+
+    private MfaEmailChallenge? GetPasswordResetEmailChallenge(string email)
+    {
+        string? value = _redisStore.GetString(PasswordResetEmailChallengeSession.GetRedisKey(email));
         PasswordResetEmailChallengeSession? session = RedisSessionJson.Deserialize<PasswordResetEmailChallengeSession>(value);
         return session is null ? null : new MfaEmailChallenge(session.Email, session.Code, session.ExpiresAt);
+    }
+
+    private void DeletePasswordResetEmailChallenge(string email)
+    {
+        _redisStore.DeleteString(PasswordResetEmailChallengeSession.GetRedisKey(email));
     }
 
     private StepUpGrant? GetStepUpGrant(string token)

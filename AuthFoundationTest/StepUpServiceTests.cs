@@ -82,6 +82,37 @@ public sealed class StepUpServiceTests
             () => stepUp.VerifyEmailChallenge("mfa-wrong@example.com", "000000"));
     }
 
+    [TestMethod]
+    public void VerifyEmailChallenge_AllowsCorrectCodeAfterWrongAttempt()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("mfa-retry@example.com", "Passw0rd!", "Mfa User", new DateOnly(2000, 1, 1));
+        var stepUp = TestServices.CreateStepUpService(users);
+        MfaEmailChallenge challenge = stepUp.StartEmailChallenge("mfa-retry@example.com");
+
+        Assert.ThrowsExactly<ApiException>(
+            () => stepUp.VerifyEmailChallenge("mfa-retry@example.com", DifferentCode(challenge.Code)));
+        StepUpGrant grant = stepUp.VerifyEmailChallenge("mfa-retry@example.com", challenge.Code);
+
+        Assert.AreEqual("email_code", grant.Method);
+    }
+
+    [TestMethod]
+    public void VerifyPasswordResetChallenge_AllowsCorrectCodeAfterWrongAttempt()
+    {
+        var users = new InMemoryUserStore();
+        users.CreateUser("reset-retry@example.com", "Passw0rd!", "Reset User", new DateOnly(2000, 1, 1));
+        var sender = new RecordingEmailSender();
+        var stepUp = TestServices.CreateStepUpService(users, sender);
+
+        Assert.IsTrue(stepUp.TryStartPasswordResetChallenge("reset-retry@example.com", new DateOnly(2000, 1, 1)));
+        string code = sender.SentMessages[0].Code;
+
+        Assert.ThrowsExactly<ApiException>(
+            () => stepUp.VerifyPasswordResetChallenge("reset-retry@example.com", DifferentCode(code)));
+        stepUp.VerifyPasswordResetChallenge("reset-retry@example.com", code);
+    }
+
     /// <summary>
     /// 逶ｮ逧・ Verify Email Challenge / Blocks After Repeated Wrong Codes 縺ｮ莉墓ｧ倥ｒ讀懆ｨｼ縺吶ｋ縲・
     /// 蜈･蜉帛､: 豁｣縺励＞荳ｻ菴薙↓邏舌▼縺九↑縺・・ｽ・ｽ縺｣縺溯ｪ崎ｨｼ諠・・ｽ・ｽ縲・
@@ -344,6 +375,11 @@ public sealed class StepUpServiceTests
     {
         MfaEmailChallenge challenge = stepUp.StartEmailChallenge(email);
         return stepUp.VerifyEmailChallenge(email, challenge.Code);
+    }
+
+    private static string DifferentCode(string code)
+    {
+        return string.Equals(code, "000000", StringComparison.Ordinal) ? "111111" : "000000";
     }
 
     private sealed class RecordingEmailSender : IEmailSender
