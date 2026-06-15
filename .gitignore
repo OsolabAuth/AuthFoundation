@@ -3,6 +3,9 @@ obj/
 .vs/
 TestResults/
 artifacts/
+.env
+.env.*
+!.env.example
 *.user
 *.lscache
 /SampleClients/

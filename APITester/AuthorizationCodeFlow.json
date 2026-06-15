@@ -1,0 +1,167 @@
+{
+  "version": 6,
+  "entities": [
+    {
+      "entity": {
+        "type": "Project",
+        "id": "2d07df3d-5c60-4f86-8228-912d4dc2cb01",
+        "name": "AuthFoundation - AuthorizationCodeFlow"
+      },
+      "children": [
+        {
+          "entity": {
+            "type": "Scenario",
+            "id": "c74b6863-b9ef-4f2c-a018-9e074a7ce572",
+            "name": "AuthorizationCodeFlow"
+          },
+          "children": [
+            {
+              "entity": {
+                "type": "Request",
+                "id": "4f03a5b7-cc28-4c54-8345-9e79d0b3d037",
+                "name": "01. Start authorize request",
+                "method": {
+                  "name": "GET",
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.1"
+                },
+                "uri": {
+                  "scheme": {
+                    "secure": true,
+                    "name": "https",
+                    "version": "V11"
+                  },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/authorize",
+                  "query": {
+                    "delimiter": "&",
+                    "items": [
+                      { "enabled": true, "name": "response_type", "value": "code" },
+                      { "enabled": true, "name": "client_id", "value": "${\"ClientId\"}" },
+                      { "enabled": true, "name": "redirect_uri", "value": "${\"RedirectUri\"}" },
+                      { "enabled": true, "name": "scope", "value": "${\"Scope\"}" },
+                      { "enabled": true, "name": "state", "value": "${\"State\"}" },
+                      { "enabled": true, "name": "nonce", "value": "${\"Nonce\"}" },
+                      { "enabled": true, "name": "code_challenge", "value": "${\"CodeChallenge\"}" },
+                      { "enabled": true, "name": "code_challenge_method", "value": "S256" }
+                    ]
+                  }
+                },
+                "headers": [
+                  { "enabled": true, "name": "x-auth-ui-response-mode", "value": "json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": []
+                  }
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "fd0144e4-ae8c-49b9-9759-c7bf41b3f8d3",
+                "name": "02. Login for authorize session",
+                "method": {
+                  "name": "POST",
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3"
+                },
+                "uri": {
+                  "scheme": {
+                    "secure": true,
+                    "name": "https",
+                    "version": "V11"
+                  },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/login",
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  }
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/x-www-form-urlencoded" },
+                  { "enabled": true, "name": "Cookie", "value": "${\"AuthFoundation - AuthorizationCodeFlow\".\"01. Start authorize request\".\"response\".\"headers\".\"set-cookie\"}" }
+                ],
+                "body": {
+                  "bodyType": "Form",
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": [
+                      { "enabled": true, "type": "Text", "name": "email", "value": "${\"Email\"}" },
+                      { "enabled": true, "type": "Text", "name": "password", "value": "${\"Password\"}" }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "00ca2f2a-bc46-4dde-bad8-ebaa6c6c5f47",
+                "name": "03. Exchange authorization code",
+                "method": {
+                  "name": "POST",
+                  "requestBody": true,
+                  "link": "http://tools.ietf.org/html/rfc7231#section-4.3.3"
+                },
+                "uri": {
+                  "scheme": {
+                    "secure": true,
+                    "name": "https",
+                    "version": "V11"
+                  },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/token",
+                  "query": {
+                    "delimiter": "&",
+                    "items": []
+                  }
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/x-www-form-urlencoded" }
+                ],
+                "body": {
+                  "bodyType": "Form",
+                  "formBody": {
+                    "overrideContentType": true,
+                    "encoding": "application/x-www-form-urlencoded",
+                    "items": [
+                      { "enabled": true, "type": "Text", "name": "grant_type", "value": "authorization_code" },
+                      { "enabled": true, "type": "Text", "name": "client_id", "value": "${\"ClientId\"}" },
+                      { "enabled": true, "type": "Text", "name": "redirect_uri", "value": "${\"RedirectUri\"}" },
+                      { "enabled": true, "type": "Text", "name": "code", "value": "${\"AuthFoundation - AuthorizationCodeFlow\".\"02. Login for authorize session\".\"response\".\"body\".\"authorization_code\"}" },
+                      { "enabled": true, "type": "Text", "name": "code_verifier", "value": "${\"CodeVerifier\"}" }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "88b1b1f4-e2a9-4591-a12e-b7809dfb204d",
+      "name": "production",
+      "variables": {
+        "auth-host": { "name": "AuthHost", "value": "auth.osolab-auth.jp", "enabled": true, "private": false },
+        "client-id": { "name": "ClientId", "value": "30000000000000000000000000000018", "enabled": true, "private": false },
+        "redirect-uri": { "name": "RedirectUri", "value": "https://taiga.osolab.jp/oidc/callback", "enabled": true, "private": false },
+        "scope": { "name": "Scope", "value": "openid profile email", "enabled": true, "private": false },
+        "state": { "name": "State", "value": "state-production-scenario", "enabled": true, "private": false },
+        "nonce": { "name": "Nonce", "value": "nonce-production-scenario", "enabled": true, "private": false },
+        "code-verifier": { "name": "CodeVerifier", "value": "replace-with-code-verifier", "enabled": true, "private": true },
+        "code-challenge": { "name": "CodeChallenge", "value": "replace-with-code-challenge", "enabled": true, "private": true },
+        "email": { "name": "Email", "value": null, "enabled": true, "private": true },
+        "password": { "name": "Password", "value": null, "enabled": true, "private": true }
+      }
+    }
+  ]
+}

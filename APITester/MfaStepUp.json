@@ -1,0 +1,115 @@
+{
+  "version": 6,
+  "entities": [
+    {
+      "entity": {
+        "type": "Project",
+        "id": "4d7a1f2d-b717-48a2-83df-d9a6358a3165",
+        "name": "AuthFoundation - MfaStepUp"
+      },
+      "children": [
+        {
+          "entity": {
+            "type": "Scenario",
+            "id": "a4678809-84b8-4e7a-ac64-3d7c8d9c7722",
+            "name": "MfaStepUp"
+          },
+          "children": [
+            {
+              "entity": {
+                "type": "Request",
+                "id": "3cc4b028-d062-4454-9c1e-8e49dd7c3de3",
+                "name": "01. Start email MFA challenge",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/mfa/email/start"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"email\": \"${\"Email\"}\" }"
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "08f3bb7e-2fe5-4d4c-a978-dc64df85d3ca",
+                "name": "02. Verify email MFA challenge",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/mfa/email/verify"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"email\": \"${\"Email\"}\", \"code\": \"${\"EmailCode\"}\" }"
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "5a241827-c358-4ca5-b8f7-c3d2bf7dbbb2",
+                "name": "03. Setup authenticator MFA",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/mfa/authenticator/setup"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"email\": \"${\"Email\"}\", \"step_up_token\": \"${\"AuthFoundation - MfaStepUp\".\"02. Verify email MFA challenge\".\"response\".\"body\".\"step_up_token\"}\" }"
+                }
+              }
+            },
+            {
+              "entity": {
+                "type": "Request",
+                "id": "d6ab5ba1-7f45-4ccb-ae5a-961d11066faa",
+                "name": "04. Verify authenticator MFA",
+                "method": { "name": "POST", "requestBody": true },
+                "uri": {
+                  "scheme": { "secure": true, "name": "https", "version": "V11" },
+                  "host": "${\"AuthHost\"}",
+                  "path": "/mfa/authenticator/verify"
+                },
+                "headers": [
+                  { "enabled": true, "name": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "bodyType": "Text",
+                  "textBody": "{ \"email\": \"${\"Email\"}\", \"code\": \"${\"AuthenticatorCode\"}\" }"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "id": "e68a9946-bfd1-4811-a078-df0eef08c1cf",
+      "name": "production",
+      "variables": {
+        "auth-host": { "name": "AuthHost", "value": "auth.osolab-auth.jp", "enabled": true, "private": false },
+        "email": { "name": "Email", "value": null, "enabled": true, "private": true },
+        "email-code": { "name": "EmailCode", "value": null, "enabled": true, "private": true },
+        "authenticator-code": { "name": "AuthenticatorCode", "value": null, "enabled": true, "private": true }
+      }
+    }
+  ]
+}

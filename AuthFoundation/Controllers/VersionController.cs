@@ -1,3 +1,4 @@
+using AuthFoundation.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthFoundation.Controllers;
@@ -9,11 +10,6 @@ public sealed class VersionController : ControllerBase
     [HttpGet]
     public IActionResult Get()
     {
-        return Ok(new
-        {
-            service = "AuthFoundation",
-            version = "rebuild-common",
-            status = "ok"
-        });
+        return Ok(new VersionOutput("AuthFoundation", "rebuild-common", "ok"));
     }
 }

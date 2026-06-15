@@ -18,6 +18,22 @@ public static class Helper
         return Convert.ToHexString(bytes).ToLowerInvariant()[..length];
     }
 
+    public static string GenerateNumericCode(int digits)
+    {
+        if (digits <= 0 || digits > 9)
+        {
+            throw Code.REQUEST_PARAMETER_ERROR;
+        }
+
+        int maxExclusive = 1;
+        for (int index = 0; index < digits; index++)
+        {
+            maxExclusive *= 10;
+        }
+
+        return RandomNumberGenerator.GetInt32(0, maxExclusive).ToString($"D{digits}");
+    }
+
     public static string[] ParseScopes(string scope)
     {
         return scope

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "AuthFoundation Local": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": ".well-known/openid-configuration",
+      "applicationUrl": "http://localhost:5000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Issuer": "http://localhost:5000/",
+        "AuthUiBaseUrl": "http://localhost:5700",
+        "DisableHttpsRedirection": "true",
+        "Cors__AllowedOrigins": "http://localhost:5700",
+        "DevelopmentClient__ClientId": "00000000000000000000000000000000",
+        "DevelopmentClient__RedirectUri": "http://localhost:5700/callback",
+        "UserInfo__SharedClientId": "00000000000000000000000000000000",
+        "ConnectionStrings__Redis": "localhost:63790,abortConnect=false"
+      }
+    }
+  }
+}

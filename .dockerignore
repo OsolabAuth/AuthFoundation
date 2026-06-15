@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.git/
+.env
+.env.*
+!.env.example
+**/*.user
+**/*.lscache
+TestResults/
+artifacts/
