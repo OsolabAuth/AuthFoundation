@@ -33,7 +33,12 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         var ok = AssertOk(action);
         Assert.AreEqual(200, ok.StatusCode ?? 200);
         Assert.AreEqual($"{AppConfig.AuthUiBaseUrl}/login", ReadProperty<string>(ok.Value, "redirect_url"));
-        Assert.IsTrue(controller.Response.Headers.SetCookie.ToString().Contains("AuthRequestId=", StringComparison.Ordinal));
+        string setCookie = controller.Response.Headers.SetCookie.ToString();
+        Assert.IsTrue(setCookie.Contains("AuthRequestId=", StringComparison.Ordinal));
+        Assert.IsTrue(setCookie.Contains("httponly", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(setCookie.Contains("samesite=lax", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(setCookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
+        Assert.IsTrue(setCookie.Contains("path=/", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

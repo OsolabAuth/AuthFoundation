@@ -2,6 +2,7 @@ using AuthFoundation.Common;
 using AuthFoundation.Contracts;
 using AuthFoundation.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace AuthFoundation.Controllers.Auth;
 
@@ -49,7 +50,9 @@ public sealed class AuthorizeController : ControllerBase
             {
                 HttpOnly = true,
                 SameSite = SameSiteMode.Lax,
-                Secure = Request.IsHttps
+                Secure = ShouldUseSecureCookie(),
+                Path = "/",
+                Expires = request.ExpiresAt
             });
 
             string redirectUrl = $"{AppConfig.AuthUiBaseUrl}/login";
@@ -81,5 +84,22 @@ public sealed class AuthorizeController : ControllerBase
         {
             throw Code.ILLEGAL_CLIENT;
         }
+    }
+
+    private bool ShouldUseSecureCookie()
+    {
+        if (Request.IsHttps)
+        {
+            return true;
+        }
+
+        IServiceProvider? services = HttpContext.RequestServices;
+        if (services is null)
+        {
+            return true;
+        }
+
+        IHostEnvironment? environment = services.GetService<IHostEnvironment>();
+        return environment is null || !environment.IsDevelopment();
     }
 }
