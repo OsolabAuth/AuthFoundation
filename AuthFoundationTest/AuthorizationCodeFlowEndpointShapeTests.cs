@@ -5,6 +5,7 @@ using AuthFoundation.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Primitives;
 
 namespace AuthFoundationTest;
@@ -14,6 +15,8 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
 {
     private const string LoginEmail = "login-flow@example.com";
     private const string LoginPassword = "Passw0rd!";
+    private const string TaigaClientId = "30000000000000000000000000000002";
+    private const string TaigaRedirectUri = "https://taiga.osolab.jp/oidc/callback/";
 
     /// <summary>
     /// 目的: Authorize / Returns Json Login Redirect And Request Cookie の仕様を検証する。
@@ -37,6 +40,33 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
     }
 
     /// <summary>
+    /// Taiga用に追加登録した client_id と callback URL の組み合わせで authorize を開始できることを検証する。
+    /// </summary>
+    [TestMethod]
+    public void Authorize_ReturnsJsonLoginRedirectForAdditionalTaigaClient()
+    {
+        try
+        {
+            InitializeAppConfigWithTaigaClient();
+            var store = new InMemoryOidcStore();
+            var controller = CreateAuthorizeController(store);
+            AddAuthorizeQuery(controller.HttpContext, TaigaClientId, TaigaRedirectUri);
+            controller.Request.Headers["x-auth-ui-response-mode"] = "json";
+
+            IActionResult action = controller.Get();
+
+            var ok = AssertOk(action);
+            Assert.AreEqual(200, ok.StatusCode ?? 200);
+            Assert.AreEqual($"{AppConfig.AuthUiBaseUrl}/login", ReadProperty<string>(ok.Value, "redirect_url"));
+            Assert.IsTrue(controller.Response.Headers.SetCookie.ToString().Contains("AuthRequestId=", StringComparison.Ordinal));
+        }
+        finally
+        {
+            InitializeDefaultAppConfig();
+        }
+    }
+
+    /// <summary>
     /// 目的: Authorize / Returns Invalid Client For Unknown Client の仕様を検証する。
     /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
     /// 期待値: invalid_client のエラーを返すこと。
@@ -55,6 +85,30 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.AreEqual("illegal client", error.Message);
         Assert.AreEqual("invalid_client", error.Error);
         Assert.AreEqual("illegal client", error.ErrorDescription);
+    }
+
+    /// <summary>
+    /// 登録済み client_id であっても、別クライアントの redirect_uri を組み合わせた authorize は拒否されることを検証する。
+    /// </summary>
+    [TestMethod]
+    public void Authorize_ReturnsInvalidClientForKnownClientWithWrongRedirectUri()
+    {
+        try
+        {
+            InitializeAppConfigWithTaigaClient();
+            var controller = CreateAuthorizeController(new InMemoryOidcStore());
+            AddAuthorizeQuery(controller.HttpContext, AppConfig.DevelopmentClientId, TaigaRedirectUri);
+
+            IActionResult action = controller.Get();
+
+            var error = AssertError(action, 400);
+            Assert.AreEqual("00002", error.ResponseCode);
+            Assert.AreEqual("invalid_client", error.Error);
+        }
+        finally
+        {
+            InitializeDefaultAppConfig();
+        }
     }
 
     /// <summary>
@@ -521,6 +575,32 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         context.Request.ContentType = "application/x-www-form-urlencoded";
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(string.Empty));
         context.Features.Set<IFormFeature>(new FormFeature(new FormCollection(values)));
+    }
+
+    private static void InitializeAppConfigWithTaigaClient()
+    {
+        AppConfig.Initialize(Configuration(new Dictionary<string, string?>
+        {
+            ["DevelopmentClient:ClientId"] = "00000000000000000000000000000000",
+            ["DevelopmentClient:RedirectUri"] = "http://localhost:5700/callback",
+            ["OidcClients:Additional"] = $"{TaigaClientId}|{TaigaRedirectUri}|Taiga"
+        }));
+    }
+
+    private static void InitializeDefaultAppConfig()
+    {
+        AppConfig.Initialize(Configuration(new Dictionary<string, string?>
+        {
+            ["DevelopmentClient:ClientId"] = "00000000000000000000000000000000",
+            ["DevelopmentClient:RedirectUri"] = "http://localhost:5700/callback"
+        }));
+    }
+
+    private static IConfiguration Configuration(IEnumerable<KeyValuePair<string, string?>> values)
+    {
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
+            .Build();
     }
 
     private static OkObjectResult AssertOk(IActionResult action)

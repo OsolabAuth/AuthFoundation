@@ -34,6 +34,10 @@ public sealed class AppConfigTests
         Assert.IsFalse(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("00000000000000000000000000000000", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:5700/callback", AppConfig.DevelopmentRedirectUri);
+        Assert.AreEqual(1, AppConfig.OidcClients.Count);
+        Assert.IsTrue(AppConfig.IsOidcClientRedirectUriAllowed(
+            "00000000000000000000000000000000",
+            "http://localhost:5700/callback"));
         Assert.AreEqual("00000000000000000000000000000000", AppConfig.SharedUserInfoClientId);
         Assert.AreEqual(string.Empty, AppConfig.AuthDbConnectionString);
         Assert.IsFalse(AppConfig.IsAuthDbConfigured());
@@ -70,6 +74,7 @@ public sealed class AppConfigTests
             ["DisableHttpsRedirection"] = "true",
             ["DevelopmentClient:ClientId"] = "30000000000000000000000000000001",
             ["DevelopmentClient:RedirectUri"] = "http://localhost:3000/callback",
+            ["OidcClients:Additional"] = "30000000000000000000000000000002|https://taiga.osolab.jp/oidc/callback/|Taiga",
             ["UserInfo:SharedClientId"] = "00000000000000000000000000000002",
             ["ConnectionStrings:AuthDb"] = "Server=localhost;Database=Auth;",
             ["ConnectionStrings:Redis"] = "localhost:6379,password=redis-password,abortConnect=false",
@@ -95,6 +100,16 @@ public sealed class AppConfigTests
         Assert.IsTrue(AppConfig.DisableHttpsRedirection);
         Assert.AreEqual("30000000000000000000000000000001", AppConfig.DevelopmentClientId);
         Assert.AreEqual("http://localhost:3000/callback", AppConfig.DevelopmentRedirectUri);
+        Assert.AreEqual(2, AppConfig.OidcClients.Count);
+        Assert.IsTrue(AppConfig.IsOidcClientRedirectUriAllowed(
+            "30000000000000000000000000000001",
+            "http://localhost:3000/callback"));
+        Assert.IsTrue(AppConfig.IsOidcClientRedirectUriAllowed(
+            "30000000000000000000000000000002",
+            "https://taiga.osolab.jp/oidc/callback/"));
+        Assert.IsFalse(AppConfig.IsOidcClientRedirectUriAllowed(
+            "30000000000000000000000000000001",
+            "https://taiga.osolab.jp/oidc/callback/"));
         Assert.AreEqual("00000000000000000000000000000002", AppConfig.SharedUserInfoClientId);
         Assert.AreEqual("Server=localhost;Database=Auth;", AppConfig.AuthDbConnectionString);
         Assert.IsTrue(AppConfig.IsAuthDbConfigured());

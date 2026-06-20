@@ -29,7 +29,7 @@ public sealed class AuthorizeController : ControllerBase
             RequiredQuery(Code.HttpQueries.CODE_CHALLENGE_METHOD);
             string codeChallenge = RequiredQuery(Code.HttpQueries.CODE_CHALLENGE);
 
-            RequireDevelopmentClient(clientId, redirectUri);
+            RequireRegisteredClient(clientId, redirectUri);
             string[] scopes = Helper.ParseScopes(scope);
             if (!scopes.Contains(Code.Scope.OPENID, StringComparer.Ordinal))
             {
@@ -66,10 +66,9 @@ public sealed class AuthorizeController : ControllerBase
         return value;
     }
 
-    private static void RequireDevelopmentClient(string clientId, string redirectUri)
+    private static void RequireRegisteredClient(string clientId, string redirectUri)
     {
-        if (!string.Equals(clientId, AppConfig.DevelopmentClientId, StringComparison.Ordinal)
-            || !string.Equals(redirectUri, AppConfig.DevelopmentRedirectUri, StringComparison.Ordinal))
+        if (!AppConfig.IsOidcClientRedirectUriAllowed(clientId, redirectUri))
         {
             throw Code.ILLEGAL_CLIENT;
         }

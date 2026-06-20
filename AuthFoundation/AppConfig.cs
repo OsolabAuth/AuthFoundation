@@ -10,6 +10,7 @@ public static class AppConfig
     public static bool DisableHttpsRedirection { get; private set; }
     public static string DevelopmentClientId { get; private set; } = "00000000000000000000000000000000";
     public static string DevelopmentRedirectUri { get; private set; } = "http://localhost:5700/callback";
+    public static IReadOnlyList<OidcClientRegistration> OidcClients { get; private set; } = [];
     public static string SharedUserInfoClientId { get; private set; } = "00000000000000000000000000000000";
     public static string AuthDbConnectionString { get; private set; } = string.Empty;
     public static string RedisConnectionString { get; private set; } = string.Empty;
@@ -35,6 +36,7 @@ public static class AppConfig
         DisableHttpsRedirection = config.GetValue("DisableHttpsRedirection", false);
         DevelopmentClientId = config["DevelopmentClient:ClientId"] ?? DevelopmentClientId;
         DevelopmentRedirectUri = config["DevelopmentClient:RedirectUri"] ?? DevelopmentRedirectUri;
+        OidcClients = ParseOidcClients(config, DevelopmentClientId, DevelopmentRedirectUri);
         SharedUserInfoClientId = config["UserInfo:SharedClientId"] ?? SharedUserInfoClientId;
         AuthDbConnectionString = config.GetConnectionString("AuthDb") ?? config["AuthDb:ConnectionString"] ?? AuthDbConnectionString;
         RedisConnectionString = config.GetConnectionString("Redis") ?? config["Redis:ConnectionString"] ?? RedisConnectionString;
@@ -71,6 +73,16 @@ public static class AppConfig
         return !string.IsNullOrWhiteSpace(RedisConnectionString);
     }
 
+    /// <summary>
+    /// 設定済みのOIDCクライアントとして、client_id と redirect_uri の組み合わせが許可されているかを判定する。
+    /// </summary>
+    public static bool IsOidcClientRedirectUriAllowed(string clientId, string redirectUri)
+    {
+        return OidcClients.Any(client =>
+            string.Equals(client.ClientId, clientId, StringComparison.Ordinal)
+            && string.Equals(client.RedirectUri, redirectUri, StringComparison.Ordinal));
+    }
+
     private static string NormalizeIssuer(string value)
     {
         string normalized = NormalizeBaseUrl(value);
@@ -92,6 +104,77 @@ public static class AppConfig
         return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
     }
 
+    private static IReadOnlyList<OidcClientRegistration> ParseOidcClients(
+        IConfiguration config,
+        string fallbackClientId,
+        string fallbackRedirectUri)
+    {
+        var clients = new List<OidcClientRegistration>
+        {
+            new(fallbackClientId, fallbackRedirectUri, "AuthPortal")
+        };
+
+        foreach (IConfigurationSection section in config.GetSection("OidcClients").GetChildren())
+        {
+            if (string.Equals(section.Key, "Additional", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            AddOidcClient(
+                clients,
+                section["ClientId"],
+                section["RedirectUri"],
+                section["Name"]);
+        }
+
+        string? additionalClients = config["OidcClients:Additional"];
+        if (!string.IsNullOrWhiteSpace(additionalClients))
+        {
+            foreach (string item in additionalClients.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string[] parts = item.Split('|', StringSplitOptions.TrimEntries);
+                AddOidcClient(
+                    clients,
+                    parts.ElementAtOrDefault(0),
+                    parts.ElementAtOrDefault(1),
+                    parts.ElementAtOrDefault(2));
+            }
+        }
+
+        var unique = new List<OidcClientRegistration>();
+        foreach (OidcClientRegistration client in clients)
+        {
+            if (!unique.Any(existing =>
+                    string.Equals(existing.ClientId, client.ClientId, StringComparison.Ordinal)
+                    && string.Equals(existing.RedirectUri, client.RedirectUri, StringComparison.Ordinal)))
+            {
+                unique.Add(client);
+            }
+        }
+
+        return unique.ToArray();
+    }
+
+    private static void AddOidcClient(
+        ICollection<OidcClientRegistration> clients,
+        string? clientId,
+        string? redirectUri,
+        string? name)
+    {
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(redirectUri))
+        {
+            return;
+        }
+
+        ValidateUtil.FormatParam(clientId, Code.HttpQueries.CLIENT_ID.Key, Code.HttpQueries.CLIENT_ID.Regex);
+        ValidateUtil.FormatParam(redirectUri, Code.HttpQueries.REDIRECT_URI.Key, Code.HttpQueries.REDIRECT_URI.Regex);
+        clients.Add(new OidcClientRegistration(
+            clientId.Trim(),
+            redirectUri.Trim(),
+            string.IsNullOrWhiteSpace(name) ? clientId.Trim() : name.Trim()));
+    }
+
     /// <summary>
     /// CORSで許可する画面側Originを設定文字列から構築する。
     /// </summary>
@@ -105,3 +188,11 @@ public static class AppConfig
             .ToArray();
     }
 }
+
+/// <summary>
+/// AuthFoundation が受け付けるOIDCクライアントの設定値を表す。
+/// </summary>
+public sealed record OidcClientRegistration(
+    string ClientId,
+    string RedirectUri,
+    string Name);
