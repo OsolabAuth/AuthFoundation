@@ -37,19 +37,19 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
     }
 
     /// <summary>
-    /// Purpose: Verify that the Taiga OIDC client can start Authorization Code + PKCE login.
-    /// Input: Taiga client_id and its registered callback redirect URI.
+    /// Purpose: Verify that the Osolab Workbench OIDC client can start Authorization Code + PKCE login.
+    /// Input: Osolab Workbench client_id and its registered callback redirect URI.
     /// Expected: The API accepts the client and returns the AuthPortal login redirect.
     /// </summary>
     [TestMethod]
-    public void Authorize_ReturnsJsonLoginRedirectForTaigaClient()
+    public void Authorize_ReturnsJsonLoginRedirectForOsolabWorkbenchClient()
     {
         var store = new InMemoryOidcStore();
         var controller = CreateAuthorizeController(store);
         AddAuthorizeQuery(
             controller.HttpContext,
-            "30000000000000000000000000000028",
-            "https://taiga.osolab.jp/oidc/callback");
+            "30000000000000000000000000000002",
+            "https://taiga.osolab.jp/auth/osolab/callback");
         controller.Request.Headers["x-auth-ui-response-mode"] = "json";
 
         IActionResult action = controller.Get();
