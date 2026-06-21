@@ -16,6 +16,12 @@ public interface IOidcStore
 
     AuthorizationCodeRecord TakeCode(string code);
 
+    AuthSessionRecord CreateAuthSession(string subject, string email, string name);
+
+    AuthSessionRecord? FindAuthSession(string sessionId);
+
+    bool RevokeAuthSession(string sessionId);
+
     AccessTokenRecord CreateAccessToken(AuthorizationCodeRecord code);
 
     AccessTokenRecord CreateAgentAccessToken(AgentRecord agent, AgentDelegationRecord delegation, string scope);

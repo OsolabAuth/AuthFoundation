@@ -68,6 +68,27 @@ public sealed class RedisOidcStoreTests
     }
 
     /// <summary>
+    /// Redis-backed auth sessions can be read and revoked across application instances for browser SSO.
+    /// </summary>
+    [TestMethod]
+    public void FindAndRevokeAuthSession_UsesSharedRedisState()
+    {
+        var redis = new FakeRedisStringStore();
+        var writer = new RedisOidcStore(redis);
+        var reader = new RedisOidcStore(redis);
+        AuthSessionRecord session = writer.CreateAuthSession("subject_1", "subject@example.com", "Subject One");
+
+        AuthSessionRecord? actual = reader.FindAuthSession(session.SessionId);
+        bool revoked = reader.RevokeAuthSession(session.SessionId);
+
+        Assert.IsNotNull(actual);
+        Assert.AreEqual(session.SessionId, actual.SessionId);
+        Assert.AreEqual("subject_1", actual.Subject);
+        Assert.IsTrue(revoked);
+        Assert.IsNull(writer.FindAuthSession(session.SessionId));
+    }
+
+    /// <summary>
     /// Redis-backed agent access tokens preserve delegated principal claims.
     /// </summary>
     [TestMethod]

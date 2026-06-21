@@ -8,6 +8,7 @@ public sealed class RedisOidcStore : IOidcStore
 {
     private static readonly TimeSpan RequestLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan AuthSessionLifetime = TimeSpan.FromHours(8);
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
     private static readonly JsonSerializerOptions JsonOptions = new();
     private readonly IRedisStringStore _store;
@@ -71,6 +72,46 @@ public sealed class RedisOidcStore : IOidcStore
             DateTimeOffset.UtcNow.Add(CodeLifetime));
         Set(CodeKey(code), record, CodeLifetime);
         return record;
+    }
+
+    public AuthSessionRecord CreateAuthSession(string subject, string email, string name)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string sessionId = Helper.GenerateHex(32);
+        var record = new AuthSessionRecord(
+            sessionId,
+            subject,
+            email,
+            name,
+            now,
+            now,
+            now.Add(AuthSessionLifetime));
+        Set(AuthSessionKey(sessionId), record, AuthSessionLifetime);
+        return record;
+    }
+
+    public AuthSessionRecord? FindAuthSession(string sessionId)
+    {
+        AuthSessionRecord? record = GetOptional<AuthSessionRecord>(AuthSessionKey(sessionId));
+        if (record is null)
+        {
+            return null;
+        }
+
+        if (record.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            _store.DeleteString(AuthSessionKey(sessionId));
+            return null;
+        }
+
+        AuthSessionRecord refreshed = record with { LatestAuthAt = DateTimeOffset.UtcNow };
+        Set(AuthSessionKey(sessionId), refreshed, refreshed.ExpiresAt - DateTimeOffset.UtcNow);
+        return refreshed;
+    }
+
+    public bool RevokeAuthSession(string sessionId)
+    {
+        return _store.DeleteString(AuthSessionKey(sessionId));
     }
 
     public AuthorizationCodeRecord TakeCode(string code)
@@ -147,6 +188,11 @@ public sealed class RedisOidcStore : IOidcStore
         return $"auth:oidc:code:{code}";
     }
 
+    private static string AuthSessionKey(string sessionId)
+    {
+        return $"auth:oidc:auth_session:{sessionId}";
+    }
+
     private static string AccessTokenKey(string accessToken)
     {
         return $"auth:oidc:access_token:{accessToken}";
@@ -161,6 +207,17 @@ public sealed class RedisOidcStore : IOidcStore
     {
         string? value = _store.GetString(key);
         return Deserialize<T>(value, error);
+    }
+
+    private T? GetOptional<T>(string key)
+    {
+        string? value = _store.GetString(key);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return default;
+        }
+
+        return JsonSerializer.Deserialize<T>(value, JsonOptions);
     }
 
     private T Take<T>(string key, ApiException error)

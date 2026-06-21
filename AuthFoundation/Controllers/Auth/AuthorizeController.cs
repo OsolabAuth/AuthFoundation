@@ -8,6 +8,8 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("authorize")]
 public sealed class AuthorizeController : ControllerBase
 {
+    private const string AuthRequestCookieName = "AuthRequestId";
+    private const string AuthSessionCookieName = "AuthSessionId";
     private readonly IOidcStore _store;
 
     public AuthorizeController(IOidcStore store)
@@ -36,8 +38,36 @@ public sealed class AuthorizeController : ControllerBase
                 throw Code.INVALID_SCOPE;
             }
 
+            AuthSessionRecord? authSession = FindAuthSession();
+            if (authSession is not null)
+            {
+                var ssoRequest = new AuthorizationRequestRecord(
+                    string.Empty,
+                    clientId,
+                    redirectUri,
+                    scope,
+                    state,
+                    nonce,
+                    codeChallenge,
+                    DateTimeOffset.UtcNow.AddMinutes(5));
+                AuthorizationCodeRecord code = _store.CreateCode(
+                    ssoRequest,
+                    authSession.Subject,
+                    authSession.Email,
+                    authSession.Name);
+                string ssoRedirectUrl = BuildRedirectUrl(ssoRequest.RedirectUri, code.Code, ssoRequest.State);
+
+                if (Request.Headers.TryGetValue("x-auth-ui-response-mode", out var responseMode)
+                    && string.Equals(responseMode.ToString(), "json", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Ok(new { result = "redirect", redirect_url = ssoRedirectUrl, authorization_code = code.Code });
+                }
+
+                return Redirect(ssoRedirectUrl);
+            }
+
             AuthorizationRequestRecord request = _store.CreateRequest(clientId, redirectUri, scope, state, nonce, codeChallenge);
-            Response.Cookies.Append("AuthRequestId", request.RequestId, new CookieOptions
+            Response.Cookies.Append(AuthRequestCookieName, request.RequestId, new CookieOptions
             {
                 HttpOnly = true,
                 SameSite = SameSiteMode.Lax,
@@ -64,6 +94,29 @@ public sealed class AuthorizeController : ControllerBase
         string value = Request.Query[validation.Key].ToString();
         ValidateUtil.FormatParam(value, validation.Key, validation.Regex);
         return value;
+    }
+
+    private AuthSessionRecord? FindAuthSession()
+    {
+        string? sessionId = Request.Cookies[AuthSessionCookieName];
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return null;
+        }
+
+        AuthSessionRecord? session = _store.FindAuthSession(sessionId);
+        if (session is null)
+        {
+            Response.Cookies.Delete(AuthSessionCookieName);
+        }
+
+        return session;
+    }
+
+    private static string BuildRedirectUrl(string redirectUri, string code, string state)
+    {
+        string separator = redirectUri.Contains('?') ? "&" : "?";
+        return $"{redirectUri}{separator}code={Uri.EscapeDataString(code)}&state={Uri.EscapeDataString(state)}";
     }
 
     private static void RequireDevelopmentClient(string clientId, string redirectUri)

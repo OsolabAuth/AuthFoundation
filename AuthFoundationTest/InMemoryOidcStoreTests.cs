@@ -111,6 +111,55 @@ public sealed class InMemoryOidcStoreTests
     }
 
     /// <summary>
+    /// Verifies that an auth session can be created and read back for browser SSO.
+    /// </summary>
+    [TestMethod]
+    public void FindAuthSession_ReturnsKnownSession()
+    {
+        var store = new InMemoryOidcStore();
+        AuthSessionRecord session = store.CreateAuthSession("subject_1", "subject@example.com", "Subject One");
+
+        AuthSessionRecord? actual = store.FindAuthSession(session.SessionId);
+
+        Assert.IsNotNull(actual);
+        Assert.AreEqual(session.SessionId, actual.SessionId);
+        Assert.AreEqual("subject_1", actual.Subject);
+        Assert.AreEqual("subject@example.com", actual.Email);
+        Assert.AreEqual("Subject One", actual.Name);
+    }
+
+    /// <summary>
+    /// Verifies that revoking an auth session prevents later SSO reuse.
+    /// </summary>
+    [TestMethod]
+    public void RevokeAuthSession_RemovesKnownSession()
+    {
+        var store = new InMemoryOidcStore();
+        AuthSessionRecord session = store.CreateAuthSession("subject_1", "subject@example.com", "Subject One");
+
+        bool revoked = store.RevokeAuthSession(session.SessionId);
+
+        Assert.IsTrue(revoked);
+        Assert.IsNull(store.FindAuthSession(session.SessionId));
+    }
+
+    /// <summary>
+    /// Verifies that expired auth sessions are ignored and removed from memory.
+    /// </summary>
+    [TestMethod]
+    public void FindAuthSession_ReturnsNullForExpiredSession()
+    {
+        var store = new InMemoryOidcStore();
+        AuthSessionRecord session = store.CreateAuthSession("subject_1", "subject@example.com", "Subject One");
+        AuthSessions(store)[session.SessionId] = session with { ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(-1) };
+
+        AuthSessionRecord? actual = store.FindAuthSession(session.SessionId);
+
+        Assert.IsNull(actual);
+        Assert.IsFalse(AuthSessions(store).ContainsKey(session.SessionId));
+    }
+
+    /// <summary>
     /// 目的: Find Access Token / Returns Known Access Token の仕様を検証する。
     /// 入力値: テスト内で登録した正常な対象データ。
     /// 期待値: トークンレスポンスと保存状態が仕様どおりになること。
@@ -191,6 +240,11 @@ public sealed class InMemoryOidcStoreTests
     private static ConcurrentDictionary<string, AuthorizationCodeRecord> Codes(InMemoryOidcStore store)
     {
         return PrivateField<ConcurrentDictionary<string, AuthorizationCodeRecord>>(store, "_codes");
+    }
+
+    private static ConcurrentDictionary<string, AuthSessionRecord> AuthSessions(InMemoryOidcStore store)
+    {
+        return PrivateField<ConcurrentDictionary<string, AuthSessionRecord>>(store, "_authSessions");
     }
 
     private static ConcurrentDictionary<string, AccessTokenRecord> AccessTokens(InMemoryOidcStore store)

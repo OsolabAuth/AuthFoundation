@@ -16,13 +16,34 @@ public sealed class LogoutRevokeEndpointShapeTests
     [TestMethod]
     public void Logout_ReturnsLoggedOutAndDeletesRequestCookie()
     {
-        var controller = EndpointTestHelper.WithHttpContext(new LogoutController());
+        var controller = EndpointTestHelper.WithHttpContext(new LogoutController(new InMemoryOidcStore()));
 
         var ok = EndpointTestHelper.AssertOk(controller.Post());
 
         Assert.AreEqual(200, ok.StatusCode ?? 200);
         Assert.AreEqual("logged_out", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
         Assert.IsTrue(controller.Response.Headers.SetCookie.ToString().Contains("AuthRequestId=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Verifies that logout revokes the AuthSessionId cookie from the OIDC store and deletes both auth cookies.
+    /// </summary>
+    [TestMethod]
+    public void Logout_RevokesAuthSessionAndDeletesSessionCookie()
+    {
+        var store = new InMemoryOidcStore();
+        AuthSessionRecord session = store.CreateAuthSession("subject_1", "subject@example.com", "Subject One");
+        var controller = EndpointTestHelper.WithHttpContext(new LogoutController(store));
+        controller.Request.Headers.Cookie = $"AuthSessionId={session.SessionId}";
+
+        var ok = EndpointTestHelper.AssertOk(controller.Post());
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual("logged_out", EndpointTestHelper.ReadProperty<string>(ok.Value, "result"));
+        Assert.IsNull(store.FindAuthSession(session.SessionId));
+        string setCookie = controller.Response.Headers.SetCookie.ToString();
+        Assert.IsTrue(setCookie.Contains("AuthRequestId=", StringComparison.Ordinal));
+        Assert.IsTrue(setCookie.Contains("AuthSessionId=", StringComparison.Ordinal));
     }
 
     /// <summary>

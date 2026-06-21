@@ -37,6 +37,32 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
     }
 
     /// <summary>
+    /// Verifies that a valid AuthSessionId cookie lets authorize issue an authorization code without showing the login page.
+    /// </summary>
+    [TestMethod]
+    public void Authorize_ReturnsCodeRedirectWhenAuthSessionCookieIsValid()
+    {
+        var store = new InMemoryOidcStore();
+        AuthSessionRecord session = store.CreateAuthSession("subject_1", LoginEmail, "Login User");
+        var controller = CreateAuthorizeController(store);
+        AddAuthorizeQuery(controller.HttpContext, AppConfig.DevelopmentClientId, AppConfig.DevelopmentRedirectUri);
+        controller.Request.Headers["x-auth-ui-response-mode"] = "json";
+        controller.Request.Headers.Cookie = $"AuthSessionId={session.SessionId}";
+
+        IActionResult action = controller.Get();
+
+        var ok = AssertOk(action);
+        Assert.AreEqual("redirect", ReadProperty<string>(ok.Value, "result"));
+        string redirectUrl = ReadProperty<string>(ok.Value, "redirect_url");
+        string authorizationCode = ReadProperty<string>(ok.Value, "authorization_code");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(authorizationCode));
+        Assert.IsTrue(redirectUrl.StartsWith($"{AppConfig.DevelopmentRedirectUri}?code=", StringComparison.Ordinal));
+        Assert.IsTrue(redirectUrl.Contains($"code={authorizationCode}", StringComparison.Ordinal));
+        Assert.IsTrue(redirectUrl.Contains("&state=state_1", StringComparison.Ordinal));
+        Assert.IsFalse(controller.Response.Headers.SetCookie.ToString().Contains("AuthRequestId=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// 目的: Authorize / Returns Invalid Client For Unknown Client の仕様を検証する。
     /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
     /// 期待値: invalid_client のエラーを返すこと。
@@ -137,6 +163,7 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
         Assert.IsTrue(redirectUrl.Contains($"code={authorizationCode}", StringComparison.Ordinal));
         Assert.IsTrue(redirectUrl.Contains("&state=state_1", StringComparison.Ordinal));
         Assert.AreEqual(redirectUrl, controller.Response.Headers.Location.ToString());
+        Assert.IsTrue(controller.Response.Headers.SetCookie.ToString().Contains("AuthSessionId=", StringComparison.Ordinal));
     }
 
     /// <summary>

@@ -8,6 +8,8 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("login")]
 public sealed class LoginController : ControllerBase
 {
+    private const string AuthRequestCookieName = "AuthRequestId";
+    private const string AuthSessionCookieName = "AuthSessionId";
     private readonly IOidcStore _store;
     private readonly IUserStore _users;
 
@@ -33,11 +35,22 @@ public sealed class LoginController : ControllerBase
             string requestId = form["request_id"].ToString();
             if (string.IsNullOrWhiteSpace(requestId))
             {
-                requestId = Request.Cookies["AuthRequestId"] ?? string.Empty;
+                requestId = Request.Cookies[AuthRequestCookieName] ?? string.Empty;
             }
 
             ValidateUtil.IndispensableParam(requestId, "request_id");
             AuthorizationRequestRecord request = _store.TakeRequest(requestId);
+            AuthSessionRecord session = _store.CreateAuthSession(user.Subject, user.Email, user.Name);
+            Response.Cookies.Append(AuthSessionCookieName, session.SessionId, new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps,
+                Expires = session.ExpiresAt,
+                MaxAge = session.ExpiresAt - DateTimeOffset.UtcNow
+            });
+            Response.Cookies.Delete(AuthRequestCookieName);
+
             AuthorizationCodeRecord code = _store.CreateCode(
                 request,
                 user.Subject,

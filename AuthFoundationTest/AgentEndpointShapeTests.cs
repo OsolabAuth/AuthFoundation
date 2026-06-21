@@ -40,6 +40,69 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
+    /// Purpose: Verify that a logged-in Osolab user can create an AI agent without manually entering owner email.
+    /// Input: AuthSessionId cookie for the owner and a step-up token issued to the same user.
+    /// Expected: The API creates the agent and returns one-time agent credentials.
+    /// </summary>
+    [TestMethod]
+    public void Create_UsesAuthSessionOwnerWhenOwnerEmailIsMissing()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-session@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1), "agent_session_owner");
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-session@example.com");
+        var oidcStore = new InMemoryOidcStore();
+        AuthSessionRecord session = oidcStore.CreateAuthSession(owner.Subject, owner.Email, owner.Name);
+        var controller = CreateController(users, new InMemoryAgentStore(), stepUp, oidcStore);
+        SetAuthSessionCookie(controller, session.SessionId);
+        var request = new CreateAgentRequest(
+            string.Empty,
+            "Issue Triage Agent",
+            AppConfig.DevelopmentClientId,
+            "task_read task_comment",
+            7,
+            grant.StepUpToken);
+
+        var ok = EndpointTestHelper.AssertOk(controller.Create(request));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_id").StartsWith("agent_", StringComparison.Ordinal));
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_secret").StartsWith("ags_", StringComparison.Ordinal));
+        Assert.AreEqual("task_read task_comment", EndpointTestHelper.ReadProperty<string>(ok.Value, "scope"));
+    }
+
+    /// <summary>
+    /// Purpose: Verify that a logged-in user cannot create an AI agent with another user's step-up token.
+    /// Input: AuthSessionId cookie for one user and a step-up token issued to another user.
+    /// Expected: The API rejects the request as an invalid token.
+    /// </summary>
+    [TestMethod]
+    public void Create_ReturnsUnauthorizedWhenAuthSessionAndStepUpSubjectsDiffer()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-session-owner@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1), "agent_session_owner");
+        users.CreateUser("agent-session-other@example.com", "Passw0rd!", "Other Owner", new DateOnly(2000, 1, 1), "agent_session_other");
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-session-other@example.com");
+        var oidcStore = new InMemoryOidcStore();
+        AuthSessionRecord session = oidcStore.CreateAuthSession(owner.Subject, owner.Email, owner.Name);
+        var controller = CreateController(users, new InMemoryAgentStore(), stepUp, oidcStore);
+        SetAuthSessionCookie(controller, session.SessionId);
+        var request = new CreateAgentRequest(
+            string.Empty,
+            "Issue Triage Agent",
+            AppConfig.DevelopmentClientId,
+            "task_read",
+            7,
+            grant.StepUpToken);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Create(request), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
     /// 目的: Create / Returns Invalid Client For Unknown Client の仕様を検証する。
     /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
     /// 期待値: invalid_client のエラーを返すこと。
@@ -469,14 +532,20 @@ public sealed class AgentEndpointShapeTests
         StepUpService stepUp,
         InMemoryOidcStore? oidcStore = null)
     {
+        InMemoryOidcStore store = oidcStore ?? new InMemoryOidcStore();
         return EndpointTestHelper.WithHttpContext(
-            new AgentController(users, agents, stepUp, TestSigningKeys.CreateTokenService(oidcStore ?? new InMemoryOidcStore())));
+            new AgentController(users, agents, stepUp, TestSigningKeys.CreateTokenService(store), store));
     }
 
     private static void SetBasicAgentCredential(AgentController controller, string agentId, string agentSecret)
     {
         string credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{agentId}:{agentSecret}"));
         controller.Request.Headers.Authorization = $"Basic {credentials}";
+    }
+
+    private static void SetAuthSessionCookie(AgentController controller, string sessionId)
+    {
+        controller.Request.Headers.Cookie = $"AuthSessionId={sessionId}";
     }
 
     private static StepUpGrant IssueEmailStepUp(StepUpService stepUp, string email)

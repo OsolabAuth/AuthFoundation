@@ -7,9 +7,11 @@ public sealed class InMemoryOidcStore : IOidcStore
 {
     private static readonly TimeSpan RequestLifetime = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan AuthSessionLifetime = TimeSpan.FromHours(8);
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
     private readonly ConcurrentDictionary<string, AuthorizationRequestRecord> _requests = new();
     private readonly ConcurrentDictionary<string, AuthorizationCodeRecord> _codes = new();
+    private readonly ConcurrentDictionary<string, AuthSessionRecord> _authSessions = new();
     private readonly ConcurrentDictionary<string, AccessTokenRecord> _accessTokens = new();
 
     public AuthorizationRequestRecord CreateRequest(
@@ -61,6 +63,45 @@ public sealed class InMemoryOidcStore : IOidcStore
             DateTimeOffset.UtcNow.Add(CodeLifetime));
         _codes[code] = record;
         return record;
+    }
+
+    public AuthSessionRecord CreateAuthSession(string subject, string email, string name)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string sessionId = Helper.GenerateHex(32);
+        var record = new AuthSessionRecord(
+            sessionId,
+            subject,
+            email,
+            name,
+            now,
+            now,
+            now.Add(AuthSessionLifetime));
+        _authSessions[sessionId] = record;
+        return record;
+    }
+
+    public AuthSessionRecord? FindAuthSession(string sessionId)
+    {
+        if (!_authSessions.TryGetValue(sessionId, out AuthSessionRecord? record))
+        {
+            return null;
+        }
+
+        if (record.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            _authSessions.TryRemove(sessionId, out _);
+            return null;
+        }
+
+        AuthSessionRecord refreshed = record with { LatestAuthAt = DateTimeOffset.UtcNow };
+        _authSessions[sessionId] = refreshed;
+        return refreshed;
+    }
+
+    public bool RevokeAuthSession(string sessionId)
+    {
+        return _authSessions.TryRemove(sessionId, out _);
     }
 
     public AuthorizationCodeRecord TakeCode(string code)
@@ -139,6 +180,15 @@ public sealed record AuthorizationRequestRecord(
     string State,
     string Nonce,
     string CodeChallenge,
+    DateTimeOffset ExpiresAt);
+
+public sealed record AuthSessionRecord(
+    string SessionId,
+    string Subject,
+    string Email,
+    string Name,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset LatestAuthAt,
     DateTimeOffset ExpiresAt);
 
 public sealed record AuthorizationCodeRecord(

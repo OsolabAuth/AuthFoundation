@@ -11,21 +11,26 @@ namespace AuthFoundation.Controllers.Auth;
 [Route("agent")]
 public sealed class AgentController : ControllerBase
 {
+    private const string AuthSessionCookieName = "AuthSessionId";
+
     private readonly IUserStore _users;
     private readonly IAgentStore _agents;
     private readonly StepUpService _stepUp;
     private readonly OidcTokenService _tokens;
+    private readonly IOidcStore _oidcStore;
 
     public AgentController(
         IUserStore users,
         IAgentStore agents,
         StepUpService stepUp,
-        OidcTokenService tokens)
+        OidcTokenService tokens,
+        IOidcStore oidcStore)
     {
         _users = users;
         _agents = agents;
         _stepUp = stepUp;
         _tokens = tokens;
+        _oidcStore = oidcStore;
     }
 
     [HttpPost]
@@ -33,7 +38,6 @@ public sealed class AgentController : ControllerBase
     {
         try
         {
-            ValidateUtil.FormatParam(request.OwnerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
             ValidateUtil.FormatParam(request.AgentName, Code.HttpBodies.NAME.Key, Code.HttpBodies.NAME.Regex);
             ValidateUtil.FormatParam(request.ClientId, Code.HttpBodies.CLIENT_ID.Key, Code.HttpBodies.CLIENT_ID.Regex);
             ValidateUtil.FormatParam(request.Scope, Code.HttpQueries.SCOPE.Key, Code.HttpQueries.SCOPE.Regex);
@@ -165,9 +169,8 @@ public sealed class AgentController : ControllerBase
 
     private UserRecord ValidateStepUpOwner(string ownerEmail, string stepUpToken)
     {
-        ValidateUtil.FormatParam(ownerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
         ValidateUtil.IndispensableParam(stepUpToken, "step_up_token");
-        UserRecord owner = _users.FindByEmail(ownerEmail);
+        UserRecord owner = ResolveOwner(ownerEmail);
         StepUpGrant grant = _stepUp.ValidateStepUpToken(stepUpToken);
         if (!string.Equals(grant.Subject, owner.Subject, StringComparison.Ordinal))
         {
@@ -175,6 +178,35 @@ public sealed class AgentController : ControllerBase
         }
 
         return owner;
+    }
+
+    private UserRecord ResolveOwner(string ownerEmail)
+    {
+        AuthSessionRecord? session = FindAuthSession();
+        if (session is not null)
+        {
+            UserRecord sessionOwner = _users.FindByEmail(session.Email);
+            if (!string.Equals(sessionOwner.Subject, session.Subject, StringComparison.Ordinal))
+            {
+                throw Code.UNAUTHORIZED;
+            }
+
+            return sessionOwner;
+        }
+
+        ValidateUtil.FormatParam(ownerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
+        return _users.FindByEmail(ownerEmail);
+    }
+
+    private AuthSessionRecord? FindAuthSession()
+    {
+        string? sessionId = Request.Cookies[AuthSessionCookieName];
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return null;
+        }
+
+        return _oidcStore.FindAuthSession(sessionId);
     }
 
     private (string AgentId, string AgentSecret) ReadBasicAgentCredential()
