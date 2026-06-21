@@ -37,6 +37,30 @@ public sealed class AuthorizationCodeFlowEndpointShapeTests
     }
 
     /// <summary>
+    /// Purpose: Verify that the Taiga OIDC client can start Authorization Code + PKCE login.
+    /// Input: Taiga client_id and its registered callback redirect URI.
+    /// Expected: The API accepts the client and returns the AuthPortal login redirect.
+    /// </summary>
+    [TestMethod]
+    public void Authorize_ReturnsJsonLoginRedirectForTaigaClient()
+    {
+        var store = new InMemoryOidcStore();
+        var controller = CreateAuthorizeController(store);
+        AddAuthorizeQuery(
+            controller.HttpContext,
+            "30000000000000000000000000000028",
+            "https://taiga.osolab.jp/oidc/callback");
+        controller.Request.Headers["x-auth-ui-response-mode"] = "json";
+
+        IActionResult action = controller.Get();
+
+        var ok = AssertOk(action);
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.AreEqual($"{AppConfig.AuthUiBaseUrl}/login", ReadProperty<string>(ok.Value, "redirect_url"));
+        Assert.IsTrue(controller.Response.Headers.SetCookie.ToString().Contains("AuthRequestId=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// Verifies that a valid AuthSessionId cookie lets authorize issue an authorization code without showing the login page.
     /// </summary>
     [TestMethod]

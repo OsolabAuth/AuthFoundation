@@ -10,6 +10,8 @@ public sealed class AuthorizeController : ControllerBase
 {
     private const string AuthRequestCookieName = "AuthRequestId";
     private const string AuthSessionCookieName = "AuthSessionId";
+    private const string TaigaClientId = "30000000000000000000000000000028";
+    private const string TaigaRedirectUri = "https://taiga.osolab.jp/oidc/callback";
     private readonly IOidcStore _store;
 
     public AuthorizeController(IOidcStore store)
@@ -31,7 +33,7 @@ public sealed class AuthorizeController : ControllerBase
             RequiredQuery(Code.HttpQueries.CODE_CHALLENGE_METHOD);
             string codeChallenge = RequiredQuery(Code.HttpQueries.CODE_CHALLENGE);
 
-            RequireDevelopmentClient(clientId, redirectUri);
+            RequireRegisteredClient(clientId, redirectUri);
             string[] scopes = Helper.ParseScopes(scope);
             if (!scopes.Contains(Code.Scope.OPENID, StringComparer.Ordinal))
             {
@@ -119,12 +121,20 @@ public sealed class AuthorizeController : ControllerBase
         return $"{redirectUri}{separator}code={Uri.EscapeDataString(code)}&state={Uri.EscapeDataString(state)}";
     }
 
-    private static void RequireDevelopmentClient(string clientId, string redirectUri)
+    private static void RequireRegisteredClient(string clientId, string redirectUri)
     {
-        if (!string.Equals(clientId, AppConfig.DevelopmentClientId, StringComparison.Ordinal)
-            || !string.Equals(redirectUri, AppConfig.DevelopmentRedirectUri, StringComparison.Ordinal))
+        if (string.Equals(clientId, AppConfig.DevelopmentClientId, StringComparison.Ordinal)
+            && string.Equals(redirectUri, AppConfig.DevelopmentRedirectUri, StringComparison.Ordinal))
         {
-            throw Code.ILLEGAL_CLIENT;
+            return;
         }
+
+        if (string.Equals(clientId, TaigaClientId, StringComparison.Ordinal)
+            && string.Equals(redirectUri, TaigaRedirectUri, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        throw Code.ILLEGAL_CLIENT;
     }
 }
