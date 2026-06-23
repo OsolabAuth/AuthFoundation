@@ -182,6 +182,12 @@ public sealed class AgentController : ControllerBase
 
     private UserRecord ResolveOwner(string ownerEmail)
     {
+        UserRecord? bearerOwner = FindBearerOwner();
+        if (bearerOwner is not null)
+        {
+            return bearerOwner;
+        }
+
         AuthSessionRecord? session = FindAuthSession();
         if (session is not null)
         {
@@ -196,6 +202,35 @@ public sealed class AgentController : ControllerBase
 
         ValidateUtil.FormatParam(ownerEmail, Code.HttpBodies.EMAIL.Key, Code.HttpBodies.EMAIL.Regex);
         return _users.FindByEmail(ownerEmail);
+    }
+
+    private UserRecord? FindBearerOwner()
+    {
+        string header = Request.Headers.Authorization.ToString();
+        const string prefix = "Bearer ";
+        if (!header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string accessToken = header[prefix.Length..].Trim();
+        ValidateUtil.IndispensableParam(accessToken, "access_token");
+
+        AccessTokenRecord token = _oidcStore.FindAccessToken(accessToken);
+        if (!string.Equals(token.PrincipalType, "user", StringComparison.Ordinal)
+            || !HasScope(token.Scope, Code.Scope.OPENID)
+            || !HasScope(token.Scope, Code.Scope.PROFILE))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        UserRecord owner = _users.FindByEmail(token.Email);
+        if (!string.Equals(owner.Subject, token.Subject, StringComparison.Ordinal))
+        {
+            throw Code.UNAUTHORIZED;
+        }
+
+        return owner;
     }
 
     private AuthSessionRecord? FindAuthSession()
@@ -240,6 +275,13 @@ public sealed class AgentController : ControllerBase
     {
         Response.Headers.CacheControl = "no-store";
         Response.Headers.Pragma = "no-cache";
+    }
+
+    private static bool HasScope(string scope, string requiredScope)
+    {
+        return scope
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(value => string.Equals(value, requiredScope, StringComparison.Ordinal));
     }
 }
 

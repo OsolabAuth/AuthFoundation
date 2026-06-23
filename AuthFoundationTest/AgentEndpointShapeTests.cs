@@ -103,6 +103,69 @@ public sealed class AgentEndpointShapeTests
     }
 
     /// <summary>
+    /// Purpose: verify that a Portal session access token can identify the AI agent owner without owner email input.
+    /// Input: a user bearer access token and a step-up token issued to the same subject.
+    /// Expected: /agent creates a delegated agent for the logged-in user.
+    /// </summary>
+    [TestMethod]
+    public void Create_UsesBearerAccessTokenOwnerWhenOwnerEmailIsMissing()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-bearer@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1), "agent_bearer_owner");
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-bearer@example.com");
+        var oidcStore = new InMemoryOidcStore();
+        AccessTokenRecord token = IssueUserAccessToken(oidcStore, owner.Subject, owner.Email, owner.Name);
+        var controller = CreateController(users, new InMemoryAgentStore(), stepUp, oidcStore);
+        controller.Request.Headers.Authorization = $"Bearer {token.AccessToken}";
+        var request = new CreateAgentRequest(
+            string.Empty,
+            "Issue Triage Agent",
+            AppConfig.DevelopmentClientId,
+            "task_read task_comment",
+            7,
+            grant.StepUpToken);
+
+        var ok = EndpointTestHelper.AssertOk(controller.Create(request));
+
+        Assert.AreEqual(200, ok.StatusCode ?? 200);
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_id").StartsWith("agent_", StringComparison.Ordinal));
+        Assert.IsTrue(EndpointTestHelper.ReadProperty<string>(ok.Value, "agent_secret").StartsWith("ags_", StringComparison.Ordinal));
+        Assert.AreEqual("task_read task_comment", EndpointTestHelper.ReadProperty<string>(ok.Value, "scope"));
+    }
+
+    /// <summary>
+    /// Purpose: verify that bearer-owner agent creation still requires the step-up token to belong to that user.
+    /// Input: a bearer access token for one user and a step-up token issued to another subject.
+    /// Expected: /agent returns 401 invalid_token.
+    /// </summary>
+    [TestMethod]
+    public void Create_ReturnsUnauthorizedWhenBearerOwnerAndStepUpSubjectsDiffer()
+    {
+        var users = new InMemoryUserStore();
+        UserRecord owner = users.CreateUser("agent-bearer-owner@example.com", "Passw0rd!", "Agent Owner", new DateOnly(2000, 1, 1), "agent_bearer_owner");
+        users.CreateUser("agent-bearer-other@example.com", "Passw0rd!", "Other Owner", new DateOnly(2000, 1, 1), "agent_bearer_other");
+        var stepUp = new StepUpService(users);
+        StepUpGrant grant = IssueEmailStepUp(stepUp, "agent-bearer-other@example.com");
+        var oidcStore = new InMemoryOidcStore();
+        AccessTokenRecord token = IssueUserAccessToken(oidcStore, owner.Subject, owner.Email, owner.Name);
+        var controller = CreateController(users, new InMemoryAgentStore(), stepUp, oidcStore);
+        controller.Request.Headers.Authorization = $"Bearer {token.AccessToken}";
+        var request = new CreateAgentRequest(
+            string.Empty,
+            "Issue Triage Agent",
+            AppConfig.DevelopmentClientId,
+            "task_read",
+            7,
+            grant.StepUpToken);
+
+        ErrorOutput error = EndpointTestHelper.AssertError(controller.Create(request), 401);
+
+        Assert.AreEqual("00008", error.ResponseCode);
+        Assert.AreEqual("invalid_token", error.Error);
+    }
+
+    /// <summary>
     /// 目的: Create / Returns Invalid Client For Unknown Client の仕様を検証する。
     /// 入力値: 存在しないIDやメールアドレスなど、未知の対象を表す値。
     /// 期待値: invalid_client のエラーを返すこと。
@@ -546,6 +609,21 @@ public sealed class AgentEndpointShapeTests
     private static void SetAuthSessionCookie(AgentController controller, string sessionId)
     {
         controller.Request.Headers.Cookie = $"AuthSessionId={sessionId}";
+    }
+
+    private static AccessTokenRecord IssueUserAccessToken(InMemoryOidcStore oidcStore, string subject, string email, string name)
+    {
+        return oidcStore.CreateAccessToken(new AuthorizationCodeRecord(
+            "code",
+            AppConfig.DevelopmentClientId,
+            AppConfig.DevelopmentRedirectUri,
+            "openid profile email",
+            "nonce",
+            "challenge",
+            subject,
+            email,
+            name,
+            DateTimeOffset.UtcNow.AddMinutes(5)));
     }
 
     private static StepUpGrant IssueEmailStepUp(StepUpService stepUp, string email)
